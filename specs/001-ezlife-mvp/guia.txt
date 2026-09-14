@@ -1,0 +1,34 @@
+Vamos a crear la constitución de un proyecto nuevo: una app para registrar las finanzas personales y de pareja/familia.
+
+Proponme un docs/constitutions.md con los principios innegociables, cortos y verificable, que cubran: simplicidad de stack, relación entre spec y código, separación entre lógica e interfaz, política de tests, persistencia de datos e idioma del código y los mensajes. Máximo 15 líneas. Espera mi aprobación.
+
+-----------------------------------------------------------------------------------------------------------------------------------------
+
+NO escribas código en ningún momento. Vamos a redactar la especificación de la primera funcionalidad de ez-life. Lee docs/constitution.md.
+
+Idea inicial: una app mobile first (deploy en web) con las siguientes funcionalidades: regístrate con Google o GitHub, completar el tutorial para configurar la app, ingresar tu o tus ingresos mensuales, seleccionar el porcentaje de cada gasto (necesidades, deseos, ahorros), crear tus categorías de gastos, crear tus subcategorías para clasificar tus gastos, agregar ingresos y egresos con descripción.
+
+Tu trabajo:
+1. Hazme preguntas de UNA en UNA para eliminar ambigüedades (casos límite, comportamiento con errores, qué queda fuera del MVP).
+2. Con mis respuestas, genera specs/001-ezlife-mvp/spec.md con esta estructura: contexto y objetivo, usuarios, historias de usuario, requisitos funcionales numerados (RF-x) con criterios de aceptación en notación EARS en español, requisitos no funcionales, casos límite, fuera de alcance, criterios de finalización y dudas abiertas marcadas como [NECESITA ACLARACIÓN].
+3. El QUÉ y el POR QUÉ. Nada de stack, arquitectura ni nombres de archivos: eso irá en el plan.
+
+-----------------------------------------------------------------------------------------------------------------------------------------
+
+Revisa specs/001-ezlife-mvp/spec.md  como si fueras un QA muy profesional. Lista: (1) ambigüedades restantes, (2) contradicciones entre requisitos, (3) casos límite no cubiertos, (4) conflictos con docs/constitution.md. No propongas soluciones todavía: solo detecta. Formato: lista numerada.
+
+-----------------------------------------------------------------------------------------------------------------------------------------
+
+Lee docs/constitution.md y specs/001-ezlife-mvp/spec.md. NO escribas código. Genera specs/001-ezlife-mvp/plan.md con: estructura de módulos y carpetas, modelo de datos relacional para Supabase, algoritmo en pseudocódigo, diseño de arquitectura de la capa sync, resolución técnica de casos limite, decisiones técnicas justificadas (y su alternativa descartada), y estrategia de tests. Todo debe respetar la constitución y cubrir todos los RF. Marca qué RF cubre cada parte.
+
+-----------------------------------------------------------------------------------------------------------------------------------------
+
+A partir de spec.md y plan.md, genera specs/001-ezlife-mvp/tasks.md: tareas pequeñas (máx. 20-30 min cada una), en orden de dependencia, cada una con los RF que cubre y una línea "Hecho cuando:" verificable. Usa checkboxes.
+
+-----------------------------------------------------------------------------------------------------------------------------------------
+
+Implementa SOLA la Fase 01 de specs/001-ezlife-mvp/tasks.md, siguiendo plan.md y constitution.md. Escribe primero los tests, luego el código. Ejecuta pnpm test y muéstrame el resultado. Al terminar: marca cada tarea en tasks.md.
+
+-----------------------------------------------------------------------------------------------------------------------------------------
+
+Recorre specs/001-ezlife-mvp/spec.md requisito por requisito. Para cada uno indica: qué test lo cubre, y el resultado de ejecutarlo. Si algún RF no está cubierto o falla, dilo claramente. Después comprueba los criterios de finalización y dame un veredicto: ¿la spec está cumplida?

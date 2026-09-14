@@ -1,27 +1,100 @@
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+}
+
+@layer base {
+  .theme {
+    --font-heading: var(--font-sans);
+    --font-sans: var(--font-sans);
+  }
+  :root {
+    /* Warm cream base — not pure white */
+    --background: 38 30% 96%;
+    --foreground: 25 25% 15%;
+
+    /* Cards slightly whiter than background */
+    --card: 0 0% 100%;
+    --card-foreground: 25 25% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 25 25% 15%;
+
+    /* Sage green — more saturated and expressive */
+    --primary: 155 38% 40%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Warm peach/beige secondary */
+    --secondary: 35 45% 91%;
+    --secondary-foreground: 25 25% 20%;
+
+    /* Warm muted tones */
+    --muted: 38 20% 91%;
+    --muted-foreground: 30 15% 45%;
+
+    /* Accent: warm amber touch */
+    --accent: 35 45% 91%;
+    --accent-foreground: 25 25% 20%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 35 18% 84%;
+    --input: 35 18% 84%;
+    --ring: 155 38% 40%;
+
+    /* More rounded = warmer feel */
+    --radius: 1rem;
+  }
+
+  .dark {
+    /* Slate-blue dark — warmer than pure green-dark */
+    --background: 222 20% 11%;
+    --foreground: 38 20% 92%;
+
+    --card: 222 20% 14%;
+    --card-foreground: 38 20% 92%;
+
+    --popover: 222 20% 14%;
+    --popover-foreground: 38 20% 92%;
+
+    /* Sage green — brighter in dark for contrast */
+    --primary: 155 38% 52%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 222 15% 22%;
+    --secondary-foreground: 38 20% 88%;
+
+    --muted: 222 15% 22%;
+    --muted-foreground: 222 10% 60%;
+
+    --accent: 222 15% 22%;
+    --accent-foreground: 38 20% 88%;
+
+    --destructive: 0 55% 42%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 222 12% 24%;
+    --input: 222 12% 24%;
+    --ring: 155 38% 52%;
+  }
+
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  html {
+    @apply font-sans;
   }
 }
