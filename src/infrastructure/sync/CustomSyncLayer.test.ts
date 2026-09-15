@@ -1,17 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CustomSyncLayer } from './CustomSyncLayer';
 import { db } from '../db/db';
-import { supabase } from '../supabase/client';
+
+const { mockFrom } = vi.hoisted(() => {
+  const mockFrom = vi.fn().mockReturnValue({
+    select: vi.fn().mockReturnValue({
+      gt: vi.fn().mockResolvedValue({ data: [], error: null })
+    }),
+    upsert: vi.fn().mockResolvedValue({ error: null })
+  });
+  return { mockFrom };
+});
 
 vi.mock('../supabase/client', () => ({
-  supabase: {
-    from: vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        gt: vi.fn().mockResolvedValue({ data: [], error: null })
-      }),
-      upsert: vi.fn().mockResolvedValue({ error: null })
-    })
-  }
+  getSupabaseBrowserClient: vi.fn(() => ({ from: mockFrom }))
 }));
 
 describe('CustomSyncLayer', () => {
@@ -35,7 +37,7 @@ describe('CustomSyncLayer', () => {
     await layer.sync();
 
     // Verify it was pushed
-    expect(supabase.from).toHaveBeenCalledWith('movements');
+    expect(mockFrom).toHaveBeenCalledWith('movements');
 
     // Verify it was deleted from queue
     const queue = await db.sync_queue.toArray();

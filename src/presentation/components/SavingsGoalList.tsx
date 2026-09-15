@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { LocalSavingsGoalRepository } from '../../infrastructure/repositories/local/LocalSavingsGoalRepository';
 import { LocalMovementRepository } from '../../infrastructure/repositories/local/LocalMovementRepository';
-import { SavingsGoal, Movement } from '../../core/domain/models/types';
+import { SavingsGoal } from '../../core/domain/models/types';
 
 interface Props {
   userId: string;
@@ -17,11 +17,7 @@ export default function SavingsGoalList({ userId }: Props) {
   const [goals, setGoals] = useState<GoalWithProgress[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadGoals();
-  }, [userId]);
-
-  const loadGoals = async () => {
+  const loadGoals = useCallback(async () => {
     try {
       const goalRepo = new LocalSavingsGoalRepository();
       const moveRepo = new LocalMovementRepository();
@@ -45,7 +41,11 @@ export default function SavingsGoalList({ userId }: Props) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
+
+  useEffect(() => {
+    loadGoals();
+  }, [loadGoals]);
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('¿Seguro que deseas eliminar esta meta?')) return;

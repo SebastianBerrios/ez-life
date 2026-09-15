@@ -11,7 +11,7 @@ describe('SavingsGoalForm', () => {
     const user = userEvent.setup();
     const mockSave = vi.fn();
     const mockOnComplete = vi.fn();
-    (LocalSavingsGoalRepository as any).mockImplementation(function() { return { save: mockSave }; });
+    vi.mocked(LocalSavingsGoalRepository).mockImplementation(function() { return { save: mockSave } as unknown as InstanceType<typeof LocalSavingsGoalRepository>; });
 
     render(<SavingsGoalForm userId="fake-user-id" onComplete={mockOnComplete} onCancel={vi.fn()} />);
 

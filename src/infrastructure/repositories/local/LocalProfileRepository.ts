@@ -1,7 +1,6 @@
 import { db } from '../../db/db';
 import { IProfileRepository } from '../../../core/domain/repositories/IRepositories';
 import { Profile, UUID } from '../../../core/domain/models/types';
-import { uuidv7 } from 'uuidv7';
 
 export class LocalProfileRepository implements IProfileRepository {
   async get(id: UUID): Promise<Profile | undefined> {

@@ -18,9 +18,9 @@ describe('OnboardingStep1', () => {
     const mockSaveIncome = vi.fn();
     const mockOnComplete = vi.fn();
 
-    (LocalProfileRepository as any).mockImplementation(function() { return { save: mockSaveProfile }; });
-    (LocalIncomeSourceRepository as any).mockImplementation(function() { return { save: mockSaveIncome }; });
-    (uuidv7 as any).mockReturnValue('fake-uuid');
+    vi.mocked(LocalProfileRepository).mockImplementation(function() { return { save: mockSaveProfile } as unknown as InstanceType<typeof LocalProfileRepository>; });
+    vi.mocked(LocalIncomeSourceRepository).mockImplementation(function() { return { save: mockSaveIncome } as unknown as InstanceType<typeof LocalIncomeSourceRepository>; });
+    vi.mocked(uuidv7).mockReturnValue('fake-uuid');
 
     render(<OnboardingStep1 onComplete={mockOnComplete} />);
 

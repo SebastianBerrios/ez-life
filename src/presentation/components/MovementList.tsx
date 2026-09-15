@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { LocalMovementRepository } from '../../infrastructure/repositories/local/LocalMovementRepository';
 import { Movement } from '../../core/domain/models/types';
 import { calculateMonthlyCycle } from '../../core/use-cases/calculateMonthlyCycle';
@@ -13,11 +13,7 @@ export default function MovementList({ userId }: Props) {
   const [movements, setMovements] = useState<Movement[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadMovements();
-  }, [userId]);
-
-  const loadMovements = async () => {
+  const loadMovements = useCallback(async () => {
     try {
       const repo = new LocalMovementRepository();
       const [start, end] = calculateMonthlyCycle(new Date());
@@ -30,7 +26,11 @@ export default function MovementList({ userId }: Props) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
+
+  useEffect(() => {
+    loadMovements();
+  }, [loadMovements]);
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('¿Seguro que deseas eliminar este movimiento?')) return;

@@ -1,14 +1,30 @@
 import Dexie, { type Table } from 'dexie';
+import type {
+  Profile,
+  IncomeSource,
+  DistributionCategory,
+  ExpenseCategory,
+  ExpenseSubcategory,
+  SavingsGoal,
+  Movement,
+} from '../../core/domain/models/types';
+
+interface SyncQueueItem {
+  id: string;
+  table_name: string;
+  data: Record<string, unknown>;
+  created_at: Date;
+}
 
 export class EzLifeDB extends Dexie {
-  profiles!: Table<any, string>;
-  income_sources!: Table<any, string>;
-  distribution_categories!: Table<any, string>;
-  expense_categories!: Table<any, string>;
-  expense_subcategories!: Table<any, string>;
-  savings_goals!: Table<any, string>;
-  movements!: Table<any, string>;
-  sync_queue!: Table<any, string>;
+  profiles!: Table<Profile, string>;
+  income_sources!: Table<IncomeSource, string>;
+  distribution_categories!: Table<DistributionCategory, string>;
+  expense_categories!: Table<ExpenseCategory, string>;
+  expense_subcategories!: Table<ExpenseSubcategory, string>;
+  savings_goals!: Table<SavingsGoal, string>;
+  movements!: Table<Movement, string>;
+  sync_queue!: Table<SyncQueueItem, string>;
 
   constructor() {
     super('ezlife-db');
@@ -21,7 +37,7 @@ export class EzLifeDB extends Dexie {
       savings_goals: 'id, user_id',
       movements: 'id, user_id, date',
       sync_queue: 'id, created_at'
-    }).upgrade(trans => {
+    }).upgrade(() => {
       // Automatic upgrade handled by Dexie
     });
 

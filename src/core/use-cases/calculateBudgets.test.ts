@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { calculateBudgets } from './calculateBudgets';
+import type { DistributionCategory } from '../domain/models/types';
 
 describe('calculateBudgets', () => {
   it('should distribute total income exactly and allocate the remainder to the highest percentage', () => {
@@ -9,7 +10,7 @@ describe('calculateBudgets', () => {
       { id: '1', percentage: 50 },
       { id: '2', percentage: 30 },
       { id: '3', percentage: 20 },
-    ] as any[];
+    ] as Pick<DistributionCategory, 'id' | 'percentage'>[];
 
     const result = calculateBudgets(totalIncomeCents, categories);
 

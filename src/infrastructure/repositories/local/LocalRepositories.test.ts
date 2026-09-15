@@ -3,6 +3,7 @@ import { db } from '../../db/db';
 import { LocalProfileRepository } from './LocalProfileRepository';
 import { LocalIncomeSourceRepository } from './LocalIncomeSourceRepository';
 import { uuidv7 } from 'uuidv7';
+import type { IncomeSource } from '../../../core/domain/models/types';
 
 describe('Local Repositories', () => {
   beforeEach(async () => {
@@ -34,8 +35,8 @@ describe('Local Repositories', () => {
       const repo = new LocalIncomeSourceRepository();
       const userId = uuidv7();
       
-      const source1 = await repo.save({ user_id: userId, name: 'Salary', amount: 500000 } as any);
-      const source2 = await repo.save({ user_id: userId, name: 'Freelance', amount: 100000 } as any);
+      const source1 = await repo.save({ user_id: userId, name: 'Salary', amount: 500000 } as Omit<IncomeSource, 'id' | 'created_at' | 'updated_at'>);
+      const source2 = await repo.save({ user_id: userId, name: 'Freelance', amount: 100000 } as Omit<IncomeSource, 'id' | 'created_at' | 'updated_at'>);
       
       expect(source1.id).toBeDefined();
       expect(source1.created_at).toBeDefined();
