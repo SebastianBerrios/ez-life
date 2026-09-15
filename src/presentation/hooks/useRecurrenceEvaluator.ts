@@ -29,7 +29,7 @@ export function useRecurrenceEvaluator(userId: string | null) {
         if (result.shouldUpdate) {
           // Clone movements
           for (const clone of result.clonedMovements) {
-            await moveRepo.save(clone);
+            await moveRepo.save({ ...clone, id: '' });
           }
           
           // Update profile

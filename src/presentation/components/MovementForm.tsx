@@ -123,7 +123,7 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
             <div className="space-y-2">
               <Label htmlFor="distCat">Categoría (50/30/20)</Label>
               {dataLoaded ? (
-                <Select value={distCategoryId} onValueChange={setDistCategoryId} required>
+                <Select value={distCategoryId} onValueChange={(val) => setDistCategoryId(val || '')} required>
                   <SelectTrigger id="distCat">
                     <SelectValue placeholder="Seleccionar categoría" />
                   </SelectTrigger>
@@ -143,7 +143,7 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
           {showSavingsGoal && dataLoaded && (
             <div className="space-y-2">
               <Label htmlFor="savingsGoal">Meta de Ahorro (Opcional)</Label>
-              <Select value={savingsGoalId} onValueChange={setSavingsGoalId}>
+              <Select value={savingsGoalId} onValueChange={(val) => setSavingsGoalId(val || '')}>
                 <SelectTrigger id="savingsGoal">
                   <SelectValue placeholder="— Sin asignar —" />
                 </SelectTrigger>
