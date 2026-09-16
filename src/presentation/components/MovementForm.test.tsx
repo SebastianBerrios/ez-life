@@ -20,7 +20,9 @@ describe('MovementForm', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (LocalCategoryRepository as any).mockImplementation(function() {
       return {
-        getDistributionCategories: vi.fn().mockResolvedValue([{ id: 'cat-id', name: 'Ahorro e Inversión', percentage: 20, is_default: true }])
+        getDistributionCategories: vi.fn().mockResolvedValue([{ id: 'cat-id', name: 'Ahorro e Inversión', percentage: 20, is_default: true }]),
+        getExpenseCategories: vi.fn().mockResolvedValue([{ id: 'exp-cat-id', name: 'Alimentación' }]),
+        getSubcategories: vi.fn().mockResolvedValue([{ id: 'sub-id', name: 'Desayuno' }])
       };
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -36,7 +38,7 @@ describe('MovementForm', () => {
     // No need to change type since default is already EXPENSE
 
     // Wait for the category select to be available (rendered after dataLoaded=true)
-    const catSelect = await screen.findByLabelText(/Categoría/i);
+    const catSelect = await screen.findByLabelText(/Categoría \(50\/30\/20\)/i);
     expect(catSelect).toBeInTheDocument();
     await user.click(catSelect);
     const catOption = await screen.findByRole('option', { name: /Ahorro e Inversión/i });

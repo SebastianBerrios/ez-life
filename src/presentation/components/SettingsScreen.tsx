@@ -121,15 +121,16 @@ export default function SettingsScreen({ userId, onEditCategories, onLogout }: P
       {/* Categories */}
       <Section title="Categorías y Distribución">
         <p className="text-sm text-muted-foreground">
-          Definí cuánto porcentaje de tus ingresos va a Necesidades, Deseos y Ahorros.
-          Podés editarlo cuando quieras — los cambios se aplican al siguiente mes.
+          Gestioná tus categorías y subcategorías de gasto. Los cambios en distribución
+          (50/30/20) también están disponibles desde acá.
         </p>
+
         <button
           onClick={onEditCategories}
           className="w-full flex items-center justify-center gap-2 py-2.5 px-4 border border-border rounded-xl text-sm font-medium text-foreground bg-background hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Edit2 className="w-4 h-4" />
-          Editar Categorías (50/30/20)
+          Gestionar categorías de gasto
         </button>
       </Section>
 

@@ -2,8 +2,7 @@
 
 import React, { useState } from 'react';
 import LoginScreen from './LoginScreen';
-import OnboardingStep1 from './OnboardingStep1';
-import OnboardingStep2 from './OnboardingStep2';
+import OnboardingWizard from './OnboardingWizard';
 import Layout from './Layout';
 import Dashboard from './Dashboard';
 import MovementList from './MovementList';
@@ -15,7 +14,8 @@ import { useSyncManager } from '../hooks/useSyncManager';
 import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
 
 export default function MainFlow() {
-  const [step, setStep] = useState<'loading' | 'login' | 'onboarding-1' | 'onboarding-2' | 'app'>('loading');
+  const [step, setStep] = useState<'loading' | 'login' | 'onboarding-wizard' | 'app'>('loading');
+  const [wizardStartStep, setWizardStartStep] = useState<1 | 2 | 3>(1);
   const [currentRoute, setCurrentRoute] = useState('dashboard');
   const [profileId, setProfileId] = useState<string | null>(null);
   const [showMovementForm, setShowMovementForm] = useState(false);
@@ -41,8 +41,14 @@ export default function MainFlow() {
           try {
             const catRepo = new LocalCategoryRepository();
             const cats = await catRepo.getDistributionCategories(userId);
+            const expCats = await catRepo.getExpenseCategories(userId);
+
             if (cats.length === 0) {
-              setStep('onboarding-2');
+              setWizardStartStep(1);
+              setStep('onboarding-wizard');
+            } else if (expCats.length === 0) {
+              setWizardStartStep(3);
+              setStep('onboarding-wizard');
             } else {
               setStep('app');
             }
@@ -87,22 +93,23 @@ export default function MainFlow() {
   }
 
   if (step === 'login') {
-    return <LoginScreen onSkip={() => setStep('onboarding-1')} />;
-  }
-
-  if (step === 'onboarding-1') {
     return (
-      <div className="min-h-screen bg-background flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-        <OnboardingStep1 onComplete={(id) => { setProfileId(id); setStep('onboarding-2'); }} />
-      </div>
+      <LoginScreen
+        onSkip={() => {
+          setWizardStartStep(1);
+          setStep('onboarding-wizard');
+        }}
+      />
     );
   }
 
-  if (step === 'onboarding-2' && profileId) {
+  if (step === 'onboarding-wizard') {
     return (
-      <div className="min-h-screen bg-background flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-        <OnboardingStep2 profileId={profileId} onComplete={() => setStep('app')} />
-      </div>
+      <OnboardingWizard
+        profileId={profileId ?? ''}
+        startStep={wizardStartStep}
+        onComplete={() => setStep('app')}
+      />
     );
   }
 
@@ -163,7 +170,7 @@ export default function MainFlow() {
         {currentRoute === 'settings' && profileId && (
           <SettingsScreen
             userId={profileId}
-            onEditCategories={() => setStep('onboarding-2')}
+            onEditCategories={() => { setWizardStartStep(3); setStep('onboarding-wizard'); }}
             onLogout={() => setStep('login')}
           />
         )}

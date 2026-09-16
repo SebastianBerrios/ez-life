@@ -16,13 +16,13 @@ export default function OnboardingStep1({ onComplete }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
     try {
       const profileRepo = new LocalProfileRepository();
       const incomeRepo = new LocalIncomeSourceRepository();
-      
-      const userId = uuidv7(); 
-      
+
+      const userId = uuidv7();
+
       // We save the profile
       await profileRepo.save({
         id: userId
@@ -30,7 +30,7 @@ export default function OnboardingStep1({ onComplete }: Props) {
 
       // We save the base income in cents
       const incomeInCents = Math.round(parseFloat(income) * 100);
-      
+
       await incomeRepo.save({
         id: uuidv7(),
         user_id: userId,
@@ -47,15 +47,17 @@ export default function OnboardingStep1({ onComplete }: Props) {
   };
 
   return (
-    <div className="max-w-md mx-auto bg-white p-6 rounded-xl shadow-md">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Paso 1: Configuración Básica</h2>
+    <div className="max-w-md mx-auto bg-card border border-border p-6 rounded-2xl shadow-sm">
+      <h2 className="text-2xl font-bold text-foreground mb-6">Paso 1: Configuración Básica</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
-        
+
         <div>
-          <label htmlFor="income" className="block text-sm font-medium text-gray-700">Sueldo o Ingreso Base (Mensual)</label>
+          <label htmlFor="income" className="block text-sm font-medium text-foreground">
+            Sueldo o Ingreso Base (Mensual)
+          </label>
           <div className="mt-1 relative rounded-md shadow-sm">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <span className="text-gray-500 sm:text-sm">S/</span>
+              <span className="text-muted-foreground sm:text-sm">S/</span>
             </div>
             <input
               type="number"
@@ -64,7 +66,7 @@ export default function OnboardingStep1({ onComplete }: Props) {
               required
               step="0.01"
               min="0"
-              className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 border"
+              className="focus:ring-ring focus:border-ring block w-full pl-10 sm:text-sm border-input rounded-xl py-2.5 border bg-background text-foreground focus:outline-none focus:ring-2 transition-colors"
               placeholder="0.00"
               value={income}
               onChange={(e) => setIncome(e.target.value)}
@@ -75,9 +77,9 @@ export default function OnboardingStep1({ onComplete }: Props) {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring transition-colors disabled:opacity-50"
         >
-          Continuar
+          {isSubmitting ? 'Guardando...' : 'Continuar'}
         </button>
       </form>
     </div>
