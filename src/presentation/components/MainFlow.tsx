@@ -15,6 +15,13 @@ import SharedSpaceScreen from './SharedSpaceScreen';
 import SharedSpaceCreate from './SharedSpaceCreate';
 import SharedSpaceJoin from './SharedSpaceJoin';
 import SharedMovementForm from './SharedMovementForm';
+import HabitList from './HabitList';
+import HabitForm from './HabitForm';
+import HabitsDashboard from './HabitsDashboard';
+import GoalList from './GoalList';
+import GoalForm from './GoalForm';
+import TaskList from './TaskList';
+import TaskForm from './TaskForm';
 import AnalysisScreen from './AnalysisScreen';
 import { Membership } from '../../core/domain/models/types';
 import SettingsScreen from './SettingsScreen';
@@ -49,6 +56,11 @@ export default function MainFlow() {
   const [showSharedSpaceJoin, setShowSharedSpaceJoin] = useState(false);
   const [sharedSpacesRefreshKey, setSharedSpacesRefreshKey] = useState(0);
   const [addMovementTarget, setAddMovementTarget] = useState<{ spaceId: string; members: Membership[] } | null>(null);
+  const [showHabitForm, setShowHabitForm] = useState(false);
+  const [habitsRefreshKey, setHabitsRefreshKey] = useState(0);
+  const [showObjectiveGoalForm, setShowObjectiveGoalForm] = useState(false);
+  const [showTaskForm, setShowTaskForm] = useState(false);
+  const [objectivesRefreshKey, setObjectivesRefreshKey] = useState(0);
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -271,6 +283,46 @@ export default function MainFlow() {
           </div>
         )}
 
+        {currentRoute === 'habits' && profileId && (
+          <div className="space-y-6">
+            <HabitsDashboard key={`dash-${habitsRefreshKey}`} userId={profileId} />
+
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-bold text-foreground">Hábitos</h2>
+                <Button size="sm" onClick={() => setShowHabitForm(true)}>
+                  + Nuevo hábito
+                </Button>
+              </div>
+              <HabitList key={habitsRefreshKey} userId={profileId} />
+            </div>
+          </div>
+        )}
+
+        {currentRoute === 'objectives' && profileId && (
+          <div className="space-y-6">
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-bold text-foreground">Metas</h2>
+                <Button size="sm" onClick={() => setShowObjectiveGoalForm(true)}>
+                  + Nueva meta
+                </Button>
+              </div>
+              <GoalList key={`goals-${objectivesRefreshKey}`} userId={profileId} />
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-bold text-foreground">Tareas</h2>
+                <Button size="sm" onClick={() => setShowTaskForm(true)}>
+                  + Nueva tarea
+                </Button>
+              </div>
+              <TaskList key={`tasks-${objectivesRefreshKey}`} userId={profileId} />
+            </div>
+          </div>
+        )}
+
         {currentRoute === 'settings' && profileId && (
           <SettingsScreen
             userId={profileId}
@@ -376,6 +428,51 @@ export default function MainFlow() {
                 setSharedSpacesRefreshKey(k => k + 1);
               }}
               onCancel={() => setAddMovementTarget(null)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {profileId && (
+        <Dialog open={showHabitForm} onOpenChange={(open) => !open && setShowHabitForm(false)}>
+          <DialogContent className={SHEET_DIALOG_CONTENT_CLASS}>
+            <HabitForm
+              userId={profileId}
+              onComplete={() => {
+                setShowHabitForm(false);
+                setHabitsRefreshKey(k => k + 1);
+              }}
+              onCancel={() => setShowHabitForm(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {profileId && (
+        <Dialog open={showObjectiveGoalForm} onOpenChange={(open) => !open && setShowObjectiveGoalForm(false)}>
+          <DialogContent className={SHEET_DIALOG_CONTENT_CLASS}>
+            <GoalForm
+              userId={profileId}
+              onComplete={() => {
+                setShowObjectiveGoalForm(false);
+                setObjectivesRefreshKey(k => k + 1);
+              }}
+              onCancel={() => setShowObjectiveGoalForm(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {profileId && (
+        <Dialog open={showTaskForm} onOpenChange={(open) => !open && setShowTaskForm(false)}>
+          <DialogContent className={SHEET_DIALOG_CONTENT_CLASS}>
+            <TaskForm
+              userId={profileId}
+              onComplete={() => {
+                setShowTaskForm(false);
+                setObjectivesRefreshKey(k => k + 1);
+              }}
+              onCancel={() => setShowTaskForm(false)}
             />
           </DialogContent>
         </Dialog>

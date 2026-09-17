@@ -68,7 +68,7 @@ export interface Movement extends BaseEntity {
   is_linked?: boolean; // true blocks direct edit/delete outside that SharedMovement (FR-011)
 }
 
-export type NotificationType = 'budget_over_80' | 'goal_completed' | 'daily_reminder' | 'loan_due_soon' | 'shared_movement_added';
+export type NotificationType = 'budget_over_80' | 'goal_completed' | 'daily_reminder' | 'loan_due_soon' | 'shared_movement_added' | 'habit_reminder' | 'streak_at_risk' | 'task_due';
 
 export interface Notification extends BaseEntity {
   id: UUID;
@@ -133,6 +133,57 @@ export interface SharedInvite extends BaseEntity {
   expires_at: Date;
   redeemed_by?: UUID;
   redeemed_at?: Date;
+}
+
+export type HabitScheduleMode = 'fixed_days' | 'frequency';
+export type DayOfWeek = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+
+export interface Habit extends BaseEntity {
+  id: UUID;
+  user_id: UUID;
+  name: string;
+  schedule_mode: HabitScheduleMode;
+  fixed_days?: DayOfWeek[]; // required if schedule_mode = 'fixed_days', at least one
+  frequency_target?: number; // required if schedule_mode = 'frequency', >= 1
+}
+
+export interface HabitCompletion extends BaseEntity {
+  id: UUID;
+  habit_id: UUID;
+  date: Date;
+  token_used: boolean; // true if a streak-protection token covered this day instead of a real completion
+}
+
+export type GoalKind = 'numeric' | 'checklist';
+export type GoalStatus = 'active' | 'completed';
+
+export interface GoalMilestone {
+  id: UUID;
+  label: string;
+  done: boolean;
+}
+
+export interface Goal extends BaseEntity {
+  id: UUID;
+  user_id: UUID;
+  name: string;
+  kind: GoalKind;
+  target_value?: number; // required if kind = 'numeric'
+  current_value?: number; // only meaningful if kind = 'numeric'
+  milestones?: GoalMilestone[]; // required if kind = 'checklist'
+  status: GoalStatus;
+  completed_at?: Date;
+}
+
+export type TaskStatus = 'pending' | 'done';
+
+export interface Task extends BaseEntity {
+  id: UUID;
+  user_id: UUID;
+  title: string;
+  due_date: Date;
+  status: TaskStatus;
+  done_at?: Date;
 }
 
 export type DebtDirection = 'lent' | 'borrowed';

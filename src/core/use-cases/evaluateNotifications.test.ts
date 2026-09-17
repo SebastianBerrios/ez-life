@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { evaluateNotifications } from './evaluateNotifications';
 import type { BudgetedCategory } from './calculateBudgets';
-import type { Debt, Notification, SavingsGoal, SharedMovement } from '../domain/models/types';
+import type { Debt, Goal, Notification, SavingsGoal, SharedMovement, Task } from '../domain/models/types';
+import type { HabitPendingToday } from './evaluateNotifications';
 
 describe('evaluateNotifications', () => {
   const userId = 'user-1';
@@ -44,6 +45,9 @@ describe('evaluateNotifications', () => {
       savingsGoals: [],
       debts: [] as Debt[],
       sharedMovements: [] as SharedMovement[],
+      habitsPendingToday: [] as HabitPendingToday[],
+      goals: [] as Goal[],
+      tasks: [] as Task[],
       notificationHour: undefined,
       existingNotifications: [] as Notification[],
       ...overrides,
@@ -355,6 +359,105 @@ describe('evaluateNotifications', () => {
       }));
 
       expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('habit_reminder / streak_at_risk', () => {
+    it('fires habit_reminder for a pending habit that still has a token available (FR-022)', () => {
+      const result = evaluateNotifications(baseParams({
+        notificationHour: 10,
+        habitsPendingToday: [{ habitId: 'h1', habitName: 'Correr', hasTokensAvailable: true }],
+      }));
+
+      expect(result.some(n => n.type === 'habit_reminder' && n.related_id === 'h1')).toBe(true);
+      expect(result.some(n => n.type === 'streak_at_risk')).toBe(false);
+    });
+
+    it('fires streak_at_risk instead when the habit has no token left to fall back on', () => {
+      const result = evaluateNotifications(baseParams({
+        notificationHour: 10,
+        habitsPendingToday: [{ habitId: 'h1', habitName: 'Correr', hasTokensAvailable: false }],
+      }));
+
+      expect(result.some(n => n.type === 'streak_at_risk' && n.related_id === 'h1')).toBe(true);
+      expect(result.some(n => n.type === 'habit_reminder')).toBe(false);
+    });
+
+    it('does not fire before the configured notification hour', () => {
+      const result = evaluateNotifications(baseParams({
+        notificationHour: 21,
+        habitsPendingToday: [{ habitId: 'h1', habitName: 'Correr', hasTokensAvailable: false }],
+      }));
+
+      expect(result).toHaveLength(0);
+    });
+
+    it('does not duplicate a habit notification already sent today', () => {
+      const existing: Notification = {
+        id: 'n1', user_id: userId, type: 'streak_at_risk', title: 't', body: 'b',
+        related_id: 'h1', cycle_key: '2024-06-15', created_at: now, updated_at: now,
+      };
+
+      const result = evaluateNotifications(baseParams({
+        notificationHour: 10,
+        habitsPendingToday: [{ habitId: 'h1', habitName: 'Correr', hasTokensAvailable: false }],
+        existingNotifications: [existing],
+      }));
+
+      expect(result.some(n => n.related_id === 'h1')).toBe(false);
+    });
+  });
+
+  describe('goal_completed (generic Goal, FR-020)', () => {
+    it('fires when a numeric goal reaches its target', () => {
+      const goal: Goal = {
+        id: 'goal-x', user_id: userId, name: 'Correr 100km', kind: 'numeric',
+        target_value: 100, current_value: 100, status: 'active',
+        created_at: new Date(), updated_at: new Date(),
+      };
+
+      const result = evaluateNotifications(baseParams({ goals: [goal] }));
+
+      expect(result.some(n => n.type === 'goal_completed' && n.related_id === 'goal-x')).toBe(true);
+    });
+
+    it('does not fire for an incomplete checklist goal', () => {
+      const goal: Goal = {
+        id: 'goal-y', user_id: userId, name: 'Aprender React', kind: 'checklist',
+        milestones: [{ id: 'm1', label: 'Fundamentos', done: false }], status: 'active',
+        created_at: new Date(), updated_at: new Date(),
+      };
+
+      const result = evaluateNotifications(baseParams({ goals: [goal] }));
+
+      expect(result.some(n => n.related_id === 'goal-y')).toBe(false);
+    });
+  });
+
+  describe('task_due', () => {
+    const baseTask: Task = {
+      id: 'task-1', user_id: userId, title: 'Pagar alquiler', status: 'pending',
+      due_date: new Date(2024, 5, 16), created_at: new Date(), updated_at: new Date(),
+    };
+
+    it('fires when a pending task is due within the reminder window', () => {
+      const result = evaluateNotifications(baseParams({ tasks: [baseTask] }));
+
+      expect(result.some(n => n.type === 'task_due' && n.related_id === 'task-1')).toBe(true);
+    });
+
+    it('does not fire for a task already marked done', () => {
+      const doneTask: Task = { ...baseTask, status: 'done' };
+      const result = evaluateNotifications(baseParams({ tasks: [doneTask] }));
+
+      expect(result.some(n => n.type === 'task_due')).toBe(false);
+    });
+
+    it('does not fire once the due date has passed', () => {
+      const overdueTask: Task = { ...baseTask, due_date: new Date(2024, 5, 1) };
+      const result = evaluateNotifications(baseParams({ tasks: [overdueTask] }));
+
+      expect(result.some(n => n.type === 'task_due')).toBe(false);
     });
   });
 

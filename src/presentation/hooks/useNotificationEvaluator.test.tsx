@@ -14,6 +14,14 @@ describe('useNotificationEvaluator', () => {
     await db.savings_goals.clear();
     await db.notifications.clear();
     await db.sync_queue.clear();
+    await db.debts.clear();
+    await db.habits.clear();
+    await db.habit_completions.clear();
+    await db.goals.clear();
+    await db.tasks.clear();
+    await db.shared_spaces.clear();
+    await db.memberships.clear();
+    await db.shared_movements.clear();
   });
 
   afterEach(() => {
@@ -89,6 +97,33 @@ describe('useNotificationEvaluator', () => {
     expect(notifications).toHaveLength(1);
 
     unmountSecond();
+  });
+
+  it('surfaces loan_due_soon, task_due, and habit-related notifications through the same pipeline (Principio XI)', async () => {
+    await db.profiles.put({ id: userId, push_enabled: false, created_at: now, updated_at: now });
+
+    const dueSoon = new Date();
+    dueSoon.setDate(dueSoon.getDate() + 1);
+
+    await db.debts.put({
+      id: 'debt-1', user_id: userId, counterparty_name: 'Juan', direction: 'lent', origin: 'manual',
+      amount: 5000, settled_amount: 0, due_date: dueSoon, created_at: now, updated_at: now,
+    });
+
+    await db.tasks.put({
+      id: 'task-1', user_id: userId, title: 'Pagar alquiler', status: 'pending',
+      due_date: dueSoon, created_at: now, updated_at: now,
+    });
+
+    const { unmount } = renderHook(() => useNotificationEvaluator(userId));
+
+    await waitFor(async () => {
+      const notifications = await db.notifications.where('user_id').equals(userId).toArray();
+      const types = notifications.map(n => n.type).sort();
+      expect(types).toEqual(['loan_due_soon', 'task_due']);
+    });
+
+    unmount();
   });
 
   it('does nothing when userId is null', async () => {

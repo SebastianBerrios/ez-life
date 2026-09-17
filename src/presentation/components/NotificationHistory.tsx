@@ -2,9 +2,22 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { LocalNotificationRepository } from '../../infrastructure/repositories/local/LocalNotificationRepository';
-import { Notification } from '../../core/domain/models/types';
+import { Notification, NotificationType } from '../../core/domain/models/types';
 import { Button } from '@/components/ui/button';
-import { X, BellOff } from 'lucide-react';
+import { X, BellOff, PiggyBank, Trophy, Bell, HandCoins, Users, Flame, AlertTriangle, CalendarClock, type LucideIcon } from 'lucide-react';
+
+// One icon per notification type (Principio XI: a single pipeline, so every
+// type this app will ever raise gets a home here, not a parallel display).
+const NOTIFICATION_ICONS: Record<NotificationType, LucideIcon> = {
+  budget_over_80: PiggyBank,
+  goal_completed: Trophy,
+  daily_reminder: Bell,
+  loan_due_soon: HandCoins,
+  shared_movement_added: Users,
+  habit_reminder: Flame,
+  streak_at_risk: AlertTriangle,
+  task_due: CalendarClock,
+};
 
 interface Props {
   userId: string;
@@ -65,6 +78,7 @@ export default function NotificationHistory({ userId, onClose }: Props) {
           <ul className="-mx-5 divide-y divide-border sm:-mx-6">
             {notifications.map(n => {
               const isUnread = !n.read_at;
+              const Icon = NOTIFICATION_ICONS[n.type] ?? Bell;
               return (
                 <li
                   key={n.id}
@@ -73,6 +87,7 @@ export default function NotificationHistory({ userId, onClose }: Props) {
                   <div className="space-y-1 min-w-0">
                     <div className="flex items-center gap-2">
                       {isUnread && <span className="h-2 w-2 rounded-full bg-primary shrink-0" aria-hidden="true" />}
+                      <Icon className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden="true" />
                       <p className="text-sm font-semibold text-foreground truncate">{n.title}</p>
                     </div>
                     <p className="text-sm text-muted-foreground">{n.body}</p>

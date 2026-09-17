@@ -8,6 +8,11 @@ import { LocalDebtRepository } from '../../infrastructure/repositories/local/Loc
 import { LocalSharedSpaceRepository } from '../../infrastructure/repositories/local/LocalSharedSpaceRepository';
 import { LocalSharedMovementRepository } from '../../infrastructure/repositories/local/LocalSharedMovementRepository';
 import { SharedMovement } from '../../core/domain/models/types';
+import { LocalHabitRepository } from '../../infrastructure/repositories/local/LocalHabitRepository';
+import { buildFixedDaysLog, evaluateFixedDaysStreak } from '../../core/use-cases/evaluateHabitStreak';
+import { HabitPendingToday } from '../../core/use-cases/evaluateNotifications';
+import { LocalGoalRepository } from '../../infrastructure/repositories/local/LocalGoalRepository';
+import { LocalTaskRepository } from '../../infrastructure/repositories/local/LocalTaskRepository';
 import { calculateMonthlyCycle } from '../../core/use-cases/calculateMonthlyCycle';
 import { calculateBudgets } from '../../core/use-cases/calculateBudgets';
 import { calculateSpentByBucket } from '../../core/use-cases/calculateCategoryBreakdown';
@@ -35,6 +40,9 @@ export function useNotificationEvaluator(userId: string | null) {
     const debtRepo = new LocalDebtRepository();
     const sharedSpaceRepo = new LocalSharedSpaceRepository();
     const sharedMovementRepo = new LocalSharedMovementRepository();
+    const habitRepo = new LocalHabitRepository();
+    const goalRepoGeneric = new LocalGoalRepository();
+    const taskRepo = new LocalTaskRepository();
 
     const run = async () => {
       try {
@@ -57,6 +65,28 @@ export function useNotificationEvaluator(userId: string | null) {
         );
         const sharedMovements: SharedMovement[] = sharedMovementLists.flat();
 
+        const habits = await habitRepo.getAll(userId);
+        const fixedDaysHabits = habits.filter(h => h.schedule_mode === 'fixed_days');
+        const today = new Date();
+        const todayCode = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][today.getUTCDay()];
+
+        const habitsPendingToday: HabitPendingToday[] = [];
+        for (const habit of fixedDaysHabits) {
+          if (!habit.fixed_days?.includes(todayCode as typeof habit.fixed_days[number])) continue;
+
+          const completions = await habitRepo.getCompletions(habit.id);
+          const todayLog = buildFixedDaysLog(habit.fixed_days, completions, today, today);
+          if (todayLog[0]?.completed) continue; // already done today
+
+          const historyLog = buildFixedDaysLog(habit.fixed_days, completions, habit.created_at, today);
+          const { tokensAvailable } = evaluateFixedDaysStreak(historyLog.slice(0, -1)); // exclude today (not completed)
+
+          habitsPendingToday.push({ habitId: habit.id, habitName: habit.name, hasTokensAvailable: tokensAvailable > 0 });
+        }
+
+        const goals = await goalRepoGeneric.getAll(userId);
+        const tasks = await taskRepo.getAll(userId);
+
         const totalIncome = cycleMovements
           .filter(m => m.type === 'INCOME')
           .reduce((acc, m) => acc + m.amount, 0);
@@ -77,6 +107,9 @@ export function useNotificationEvaluator(userId: string | null) {
           savingsGoals: savingsGoalsWithProgress,
           debts,
           sharedMovements,
+          habitsPendingToday,
+          goals,
+          tasks,
           notificationHour: profile?.notification_hour,
           existingNotifications,
         });

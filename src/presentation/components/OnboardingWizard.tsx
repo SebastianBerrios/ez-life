@@ -17,17 +17,21 @@ import { Button } from '@/components/ui/button';
 // Mapped to buckets structurally (highest-% non-savings bucket, then the
 // next one) rather than by name, since bucket names are user-editable.
 // ---------------------------------------------------------------------------
+// FR-023: the wizard's template must pre-load example categories in EVERY
+// bucket, including the savings one — not just the two spending buckets.
 const DEFAULT_CATEGORIES = [
   { bucket: 'primary' as const, name: 'Alimentación', subcategories: ['Desayuno', 'Almuerzo', 'Cena', 'Snack'] },
   { bucket: 'secondary' as const, name: 'Ocio', subcategories: ['Deporte', 'Cine', 'Fiesta', 'Restaurante'] },
   { bucket: 'primary' as const, name: 'Transporte', subcategories: ['Combustible', 'Taxi/Uber', 'Transporte público'] },
+  { bucket: 'savings' as const, name: 'Ahorro', subcategories: ['Fondo de emergencia', 'Inversiones'] },
 ];
 
-function pickSeedBuckets(buckets: DistributionCategory[]): { primary: UUID; secondary: UUID } {
+function pickSeedBuckets(buckets: DistributionCategory[]): { primary: UUID; secondary: UUID; savings: UUID } {
   const nonSavings = [...buckets].filter(b => !b.is_savings).sort((a, b) => b.percentage - a.percentage);
   const primary = nonSavings[0]?.id ?? buckets[0]?.id ?? '';
   const secondary = nonSavings[1]?.id ?? primary;
-  return { primary, secondary };
+  const savingsBucket = buckets.find(b => b.is_savings)?.id ?? primary;
+  return { primary, secondary, savings: savingsBucket };
 }
 
 // ---------------------------------------------------------------------------
@@ -150,13 +154,13 @@ function Step3Categories({
     const init = async () => {
       const { cats, loadedBuckets } = await loadAll();
       if (cats.length === 0 && loadedBuckets.length > 0) {
-        const { primary, secondary } = pickSeedBuckets(loadedBuckets);
+        const seedBuckets = pickSeedBuckets(loadedBuckets);
         for (const def of DEFAULT_CATEGORIES) {
           const catId = uuidv7();
           await catRepo.saveExpenseCategory({
             id: catId,
             user_id: profileId,
-            distribution_category_id: def.bucket === 'primary' ? primary : secondary,
+            distribution_category_id: seedBuckets[def.bucket],
             name: def.name,
           });
           for (const subName of def.subcategories) {

@@ -18,7 +18,8 @@ export class CustomSyncLayer {
       const tablesToSync = [
         'profiles', 'income_sources', 'distribution_categories',
         'expense_categories', 'expense_subcategories', 'savings_goals', 'movements',
-        'notifications', 'debts', 'shared_spaces', 'memberships', 'shared_invites'
+        'notifications', 'debts', 'shared_spaces', 'memberships', 'shared_invites',
+        'shared_movements', 'habits', 'habit_completions', 'goals', 'tasks'
       ];
 
       for (const tableName of tablesToSync) {
@@ -64,9 +65,17 @@ export class CustomSyncLayer {
       let pushHadErrors = false;
 
       for (const item of pendingQueue) {
-        const { error } = await supabase
-          .from(item.table_name)
-          .upsert(item.data);
+        // `profiles` can only ever be created remotely by the enroll_self()
+        // RPC (Principio IX) — a client `.upsert()` always attempts an
+        // INSERT ... ON CONFLICT under the hood, which needs INSERT
+        // privilege even when the row already exists and only the UPDATE
+        // branch will ever fire. There is deliberately no INSERT policy on
+        // `profiles`, so that upsert always gets a 403. A plain UPDATE is
+        // both correct (the row is guaranteed to already exist once synced
+        // this far) and doesn't need an INSERT grant at all.
+        const { error } = item.table_name === 'profiles'
+          ? await supabase.from('profiles').update(item.data).eq('id', item.data.id)
+          : await supabase.from(item.table_name).upsert(item.data);
 
         if (!error) {
           // Si fue exitoso, lo sacamos de la cola

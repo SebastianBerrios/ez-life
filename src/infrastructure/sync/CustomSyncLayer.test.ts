@@ -148,6 +148,40 @@ describe('CustomSyncLayer', () => {
     expect(local?.amount).toBe(777); // remote wins, as before
   });
 
+  it('pushes profile changes via update, never upsert (Principio IX — profiles can only ever be created by enroll_self(), never a client insert)', async () => {
+    await db.sync_queue.put({
+      id: 'q-profile',
+      table_name: 'profiles',
+      data: { id: 'user-1', notification_hour: 20 },
+      created_at: new Date(),
+    });
+
+    const mockEq = vi.fn().mockResolvedValue({ error: null });
+    const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+    const mockUpsert = vi.fn().mockResolvedValue({ error: null });
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'profiles') {
+        return {
+          select: vi.fn().mockReturnValue({ gt: vi.fn().mockResolvedValue({ data: [], error: null }) }),
+          update: mockUpdate,
+          upsert: mockUpsert,
+        };
+      }
+      return emptyPullUpsertOk();
+    });
+
+    const layer = new CustomSyncLayer();
+    await layer.sync();
+
+    expect(mockUpdate).toHaveBeenCalledWith({ id: 'user-1', notification_hour: 20 });
+    expect(mockEq).toHaveBeenCalledWith('id', 'user-1');
+    expect(mockUpsert).not.toHaveBeenCalled();
+
+    const queue = await db.sync_queue.toArray();
+    expect(queue.length).toBe(0);
+  });
+
   it('does not advance last_sync when a push fails', async () => {
     await db.sync_queue.put({
       id: 'q1',

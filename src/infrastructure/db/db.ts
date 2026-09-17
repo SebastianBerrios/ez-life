@@ -13,6 +13,10 @@ import type {
   Membership,
   SharedInvite,
   SharedMovement,
+  Habit,
+  HabitCompletion,
+  Goal,
+  Task,
 } from '../../core/domain/models/types';
 
 interface SyncQueueItem {
@@ -36,6 +40,10 @@ export class EzLifeDB extends Dexie {
   memberships!: Table<Membership, string>;
   shared_invites!: Table<SharedInvite, string>;
   shared_movements!: Table<SharedMovement, string>;
+  habits!: Table<Habit, string>;
+  habit_completions!: Table<HabitCompletion, string>;
+  goals!: Table<Goal, string>;
+  tasks!: Table<Task, string>;
   sync_queue!: Table<SyncQueueItem, string>;
 
   constructor() {
@@ -125,6 +133,50 @@ export class EzLifeDB extends Dexie {
       // Automatic upgrade handled by Dexie
     });
 
+    this.version(9).stores({
+      profiles: 'id',
+      income_sources: 'id, user_id',
+      distribution_categories: 'id, user_id',
+      expense_categories: 'id, user_id, distribution_category_id',
+      expense_subcategories: 'id, category_id',
+      savings_goals: 'id, user_id',
+      movements: 'id, user_id, date',
+      notifications: 'id, user_id, created_at',
+      debts: 'id, user_id, due_date',
+      shared_spaces: 'id, status',
+      memberships: 'id, shared_space_id, user_id',
+      shared_invites: 'id, shared_space_id, code',
+      shared_movements: 'id, shared_space_id, date',
+      habits: 'id, user_id',
+      habit_completions: 'id, habit_id, date',
+      sync_queue: 'id, created_at'
+    }).upgrade(() => {
+      // Automatic upgrade handled by Dexie
+    });
+
+    this.version(10).stores({
+      profiles: 'id',
+      income_sources: 'id, user_id',
+      distribution_categories: 'id, user_id',
+      expense_categories: 'id, user_id, distribution_category_id',
+      expense_subcategories: 'id, category_id',
+      savings_goals: 'id, user_id',
+      movements: 'id, user_id, date',
+      notifications: 'id, user_id, created_at',
+      debts: 'id, user_id, due_date',
+      shared_spaces: 'id, status',
+      memberships: 'id, shared_space_id, user_id',
+      shared_invites: 'id, shared_space_id, code',
+      shared_movements: 'id, shared_space_id, date',
+      habits: 'id, user_id',
+      habit_completions: 'id, habit_id, date',
+      goals: 'id, user_id, status',
+      tasks: 'id, user_id, status, due_date',
+      sync_queue: 'id, created_at'
+    }).upgrade(() => {
+      // Automatic upgrade handled by Dexie
+    });
+
     this.setupHooks();
   }
 
@@ -132,7 +184,7 @@ export class EzLifeDB extends Dexie {
     const tablesToSync = [
       'profiles', 'income_sources', 'distribution_categories',
       'expense_categories', 'expense_subcategories', 'savings_goals', 'movements',
-      'notifications', 'debts'
+      'notifications', 'debts', 'habits', 'habit_completions', 'goals', 'tasks'
     ];
 
     tablesToSync.forEach(tableName => {

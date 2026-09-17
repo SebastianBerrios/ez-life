@@ -1,4 +1,4 @@
-import { UUID, Profile, IncomeSource, DistributionCategory, ExpenseCategory, ExpenseSubcategory, SavingsGoal, Movement, Notification, Debt, SharedSpace, SharedSpacePermissionMode, SharedInvite, Membership, SharedMovement, SharedMovementSplit, SharedMovementType, SharedMovementSplitMode } from '../models/types';
+import { UUID, Profile, IncomeSource, DistributionCategory, ExpenseCategory, ExpenseSubcategory, SavingsGoal, Movement, Notification, Debt, SharedSpace, SharedSpacePermissionMode, SharedInvite, Membership, SharedMovement, SharedMovementSplit, SharedMovementType, SharedMovementSplitMode, Habit, HabitCompletion, Goal, Task } from '../models/types';
 
 export interface IProfileRepository {
   get(id: UUID): Promise<Profile | undefined>;
@@ -97,5 +97,30 @@ export interface CreateSharedMovementParams {
 export interface ISharedMovementRepository {
   getAllForSpace(spaceId: UUID): Promise<SharedMovement[]>;
   create(params: CreateSharedMovementParams): Promise<SharedMovement>;
+  delete(id: UUID): Promise<void>;
+}
+
+export interface IHabitRepository {
+  getAll(userId: UUID): Promise<Habit[]>;
+  save(habit: Omit<Habit, 'created_at' | 'updated_at'>): Promise<Habit>;
+  delete(id: UUID): Promise<void>;
+  getCompletions(habitId: UUID): Promise<HabitCompletion[]>;
+  /** Streak/token math is never computed here — see evaluateHabitStreak.ts (Principio III). */
+  recordCompletion(habitId: UUID, date: Date, tokenUsed: boolean): Promise<HabitCompletion>;
+}
+
+export interface IGoalRepository {
+  getAll(userId: UUID): Promise<Goal[]>;
+  save(goal: Omit<Goal, 'created_at' | 'updated_at'>): Promise<Goal>;
+  /** Completion is evaluated by evaluateGoalCompletion.ts, not here (Principio III). */
+  updateProgress(goalId: UUID, update: { currentValue: number } | { milestoneId: UUID; done: boolean }): Promise<Goal>;
+  delete(id: UUID): Promise<void>;
+}
+
+export interface ITaskRepository {
+  /** Only pending (non-done, non-deleted) tasks — a done task is archived (FR-021). */
+  getAll(userId: UUID): Promise<Task[]>;
+  save(task: Omit<Task, 'created_at' | 'updated_at'>): Promise<Task>;
+  markDone(id: UUID): Promise<Task>;
   delete(id: UUID): Promise<void>;
 }

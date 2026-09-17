@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { LocalMovementRepository } from '../../infrastructure/repositories/local/LocalMovementRepository';
 import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
-import { Movement, DistributionCategory } from '../../core/domain/models/types';
+import { LocalDebtRepository } from '../../infrastructure/repositories/local/LocalDebtRepository';
+import { Movement, DistributionCategory, Debt } from '../../core/domain/models/types';
 import { calculateMonthlyCycle } from '../../core/use-cases/calculateMonthlyCycle';
 import { calculateSpentByBucket } from '../../core/use-cases/calculateCategoryBreakdown';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,6 +20,7 @@ interface Props {
 export default function Dashboard({ userId }: Props) {
   const [movements, setMovements] = useState<Movement[]>([]);
   const [distCategories, setDistCategories] = useState<DistributionCategory[]>([]);
+  const [debts, setDebts] = useState<Debt[]>([]);
   const [loading, setLoading] = useState(true);
   const [refDate, setRefDate] = useState(() => new Date());
 
@@ -28,16 +30,19 @@ export default function Dashboard({ userId }: Props) {
       try {
         const moveRepo = new LocalMovementRepository();
         const catRepo = new LocalCategoryRepository();
+        const debtRepo = new LocalDebtRepository();
 
         const [start, end] = calculateMonthlyCycle(refDate);
 
-        const [movesData, catsData] = await Promise.all([
+        const [movesData, catsData, debtsData] = await Promise.all([
           moveRepo.getAllByCycle(userId, start, end),
-          catRepo.getDistributionCategories(userId)
+          catRepo.getDistributionCategories(userId),
+          debtRepo.getAll(userId),
         ]);
 
         setMovements(movesData);
         setDistCategories(catsData);
+        setDebts(debtsData.filter(d => d.settled_amount < d.amount));
       } catch (err) {
         console.error(err);
       } finally {
@@ -129,6 +134,28 @@ export default function Dashboard({ userId }: Props) {
                 );
               });
             })()
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-warm-sm">
+        <CardHeader>
+          <CardTitle className="text-lg">Deudas activas</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {debts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No tenés deudas activas.</p>
+          ) : (
+            debts.map(debt => {
+              const remaining = debt.amount - debt.settled_amount;
+              const directionLabel = debt.direction === 'lent' ? 'Le prestaste a' : 'Te prestó';
+              return (
+                <div key={debt.id} className="flex justify-between items-center text-sm">
+                  <span className="text-foreground">{directionLabel} {debt.counterparty_name}</span>
+                  <span className="font-medium text-primary">S/ {(remaining / 100).toFixed(2)}</span>
+                </div>
+              );
+            })
           )}
         </CardContent>
       </Card>

@@ -1,9 +1,16 @@
-import { Debt, Notification, SavingsGoal, SharedMovement, UUID } from '../domain/models/types';
+import { Debt, Goal, Notification, SavingsGoal, SharedMovement, Task, UUID } from '../domain/models/types';
+import { evaluateGoalCompletion } from './evaluateGoalCompletion';
 import { BudgetedCategory } from './calculateBudgets';
 
 interface SavingsGoalWithProgress {
   goal: SavingsGoal;
   currentAmountCents: number;
+}
+
+export interface HabitPendingToday {
+  habitId: UUID;
+  habitName: string;
+  hasTokensAvailable: boolean;
 }
 
 export interface EvaluateNotificationsParams {
@@ -14,6 +21,9 @@ export interface EvaluateNotificationsParams {
   savingsGoals: SavingsGoalWithProgress[];
   debts: Debt[];
   sharedMovements: SharedMovement[];
+  habitsPendingToday: HabitPendingToday[];
+  goals: Goal[];
+  tasks: Task[];
   notificationHour: number | undefined;
   existingNotifications: Notification[];
 }
@@ -63,6 +73,9 @@ export function evaluateNotifications(params: EvaluateNotificationsParams): NewN
     savingsGoals,
     debts,
     sharedMovements,
+    habitsPendingToday,
+    goals,
+    tasks,
     notificationHour,
     existingNotifications,
   } = params;
@@ -158,6 +171,69 @@ export function evaluateNotifications(params: EvaluateNotificationsParams): NewN
       body: 'Alguien registró un movimiento en tu espacio compartido.',
       related_id: movement.id,
       cycle_key: undefined,
+    });
+  }
+
+  // 6. habit_reminder / streak_at_risk — one per pending habit, once the
+  // configured hour has passed (same gate as daily_reminder). A habit with
+  // no streak-protection token left gets the sharper streak_at_risk instead
+  // of the plain reminder, since missing it today has no safety net.
+  if (notificationHour !== undefined && now.getHours() >= notificationHour) {
+    const dayKey = cycleDayKey(now);
+
+    for (const habit of habitsPendingToday) {
+      const type = habit.hasTokensAvailable ? 'habit_reminder' : 'streak_at_risk';
+      if (hasEquivalent(existingNotifications, type, habit.habitId, dayKey)) continue;
+
+      notifications.push({
+        user_id: userId,
+        type,
+        title: type === 'streak_at_risk' ? 'Tu racha está en riesgo' : 'Hábito pendiente hoy',
+        body: type === 'streak_at_risk'
+          ? `Todavía no marcaste "${habit.habitName}" hoy y no te quedan comodines.`
+          : `No olvides "${habit.habitName}" hoy.`,
+        related_id: habit.habitId,
+        cycle_key: dayKey,
+      });
+    }
+  }
+
+  // 7. goal_completed (generic Goal, FR-020) — reuses the same type as the
+  // SavingsGoal branch above (both are "you completed X" events); dedup by
+  // related_id already keeps them from colliding since ids are unique
+  // across entities.
+  for (const goal of goals) {
+    if (!evaluateGoalCompletion(goal)) continue;
+    if (hasEquivalent(existingNotifications, 'goal_completed', goal.id, undefined)) continue;
+
+    notifications.push({
+      user_id: userId,
+      type: 'goal_completed',
+      title: '¡Meta cumplida!',
+      body: `Alcanzaste tu meta "${goal.name}".`,
+      related_id: goal.id,
+      cycle_key: undefined,
+    });
+  }
+
+  // 8. task_due — re-fires once per day (like loan_due_soon) while a
+  // pending task's due date is within the reminder window.
+  for (const task of tasks) {
+    if (task.status !== 'pending') continue;
+
+    const daysUntilDue = Math.ceil((task.due_date.getTime() - now.getTime()) / MS_PER_DAY);
+    if (daysUntilDue < 0 || daysUntilDue > LOAN_DUE_SOON_DAYS_THRESHOLD) continue;
+
+    const dayKey = cycleDayKey(now);
+    if (hasEquivalent(existingNotifications, 'task_due', task.id, dayKey)) continue;
+
+    notifications.push({
+      user_id: userId,
+      type: 'task_due',
+      title: 'Tarea por vencer',
+      body: `"${task.title}" vence pronto.`,
+      related_id: task.id,
+      cycle_key: dayKey,
     });
   }
 
