@@ -9,6 +9,8 @@ import { DistributionCategory, ExpenseCategory, ExpenseSubcategory, UUID } from 
 import { uuidv7 } from 'uuidv7';
 import OnboardingStep1 from './OnboardingStep1';
 import OnboardingStep2 from './OnboardingStep2';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 // ---------------------------------------------------------------------------
 // Seed data for Step 3 (populated only when no expense categories exist).
@@ -241,9 +243,9 @@ function Step3Categories({
 
   return (
     <div className="max-w-md mx-auto px-4 space-y-4">
-      <div className="bg-card border border-border rounded-2xl shadow-sm p-6 space-y-5">
+      <div className="bg-card border border-border rounded-2xl shadow-warm-md p-6 space-y-5">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Categorías de gasto</h2>
+          <h2 className="text-2xl font-bold text-foreground font-heading">Categorías de gasto</h2>
           <p className="text-sm text-muted-foreground mt-1">
             Organizá tus gastos en categorías y subcategorías, agrupadas por cada categoría de distribución.
           </p>
@@ -264,13 +266,14 @@ function Step3Categories({
                     {/* Category header */}
                     <div className="flex items-center justify-between">
                       <span className="text-base font-semibold text-foreground">{category.name}</span>
-                      <button
+                      <Button
+                        variant="link"
                         onClick={() => handleDeleteCategory(category.id)}
-                        className="text-destructive hover:text-destructive/80 text-sm font-medium"
+                        className="h-auto p-0 text-destructive hover:text-destructive/80"
                         aria-label={`Eliminar categoría ${category.name}`}
                       >
                         Eliminar
-                      </button>
+                      </Button>
                     </div>
 
                     {errors[category.id] && (
@@ -283,13 +286,14 @@ function Step3Categories({
                         <li key={sub.id}>
                           <div className="flex items-center justify-between text-sm">
                             <span className="text-muted-foreground">• {sub.name}</span>
-                            <button
+                            <Button
+                              variant="link"
                               onClick={() => handleDeleteSubcategory(sub.id, category.id)}
-                              className="text-destructive/70 hover:text-destructive text-sm ml-2"
+                              className="h-auto p-0 ml-2 text-destructive/70 hover:text-destructive"
                               aria-label={`Eliminar subcategoría ${sub.name}`}
                             >
                               ×
-                            </button>
+                            </Button>
                           </div>
                           {errors[sub.id] && (
                             <p className="text-sm text-destructive">{errors[sub.id]}</p>
@@ -301,7 +305,7 @@ function Step3Categories({
                     {/* Add subcategory inline */}
                     {addingSubFor === category.id ? (
                       <div className="flex gap-2 mt-1">
-                        <input
+                        <Input
                           autoFocus
                           type="text"
                           placeholder="Nombre de subcategoría"
@@ -313,28 +317,23 @@ function Step3Categories({
                             if (e.key === 'Enter') { e.preventDefault(); handleAddSubcategory(category.id); }
                             if (e.key === 'Escape') setAddingSubFor(null);
                           }}
-                          className="flex-1 h-10 bg-background border border-input rounded-lg py-1.5 px-3 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
+                          className="flex-1"
                         />
-                        <button
-                          onClick={() => handleAddSubcategory(category.id)}
-                          className="h-10 px-3 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
-                        >
+                        <Button size="sm" onClick={() => handleAddSubcategory(category.id)}>
                           Agregar
-                        </button>
-                        <button
-                          onClick={() => setAddingSubFor(null)}
-                          className="h-10 px-3 bg-muted text-muted-foreground rounded-lg text-sm hover:bg-muted/80 transition-colors"
-                        >
+                        </Button>
+                        <Button size="sm" variant="secondary" onClick={() => setAddingSubFor(null)}>
                           ×
-                        </button>
+                        </Button>
                       </div>
                     ) : (
-                      <button
+                      <Button
+                        variant="link"
                         onClick={() => setAddingSubFor(category.id)}
-                        className="text-sm text-primary hover:text-primary/80 font-medium mt-1"
+                        className="h-auto p-0 mt-1"
                       >
                         + Agregar subcategoría
-                      </button>
+                      </Button>
                     )}
                   </div>
                 ))}
@@ -343,7 +342,7 @@ function Step3Categories({
               {/* Add category, scoped to this bucket */}
               {addingCatFor === bucket.id ? (
                 <div className="flex gap-2">
-                  <input
+                  <Input
                     autoFocus
                     type="text"
                     placeholder="Nombre de categoría"
@@ -353,41 +352,32 @@ function Step3Categories({
                       if (e.key === 'Enter') { e.preventDefault(); handleAddCategory(bucket.id); }
                       if (e.key === 'Escape') setAddingCatFor(null);
                     }}
-                    className="flex-1 h-11 bg-background border border-input rounded-xl py-2 px-3 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
+                    className="flex-1"
                   />
-                  <button
-                    onClick={() => handleAddCategory(bucket.id)}
-                    className="h-11 px-4 bg-primary text-primary-foreground rounded-xl text-base font-medium hover:bg-primary/90 transition-colors"
-                  >
+                  <Button onClick={() => handleAddCategory(bucket.id)}>
                     Agregar
-                  </button>
-                  <button
-                    onClick={() => setAddingCatFor(null)}
-                    className="h-11 px-3 bg-muted text-muted-foreground rounded-xl text-base hover:bg-muted/80 transition-colors"
-                  >
+                  </Button>
+                  <Button variant="secondary" onClick={() => setAddingCatFor(null)}>
                     ×
-                  </button>
+                  </Button>
                 </div>
               ) : (
-                <button
+                <Button
+                  variant="outline"
                   onClick={() => setAddingCatFor(bucket.id)}
-                  className="w-full h-11 px-4 border border-dashed border-border rounded-xl text-base font-medium text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+                  className="w-full border-dashed text-muted-foreground hover:text-foreground"
                 >
                   + Nueva categoría en {bucket.name}
-                </button>
+                </Button>
               )}
             </div>
           );
         })}
 
         {/* Finish button */}
-        <button
-          onClick={onComplete}
-          disabled={!canFinish}
-          className="w-full h-12 px-4 rounded-xl text-base font-semibold text-primary-foreground bg-primary hover:bg-primary/90 transition-colors disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
+        <Button onClick={onComplete} disabled={!canFinish} size="lg" className="w-full">
           Finalizar configuración
-        </button>
+        </Button>
 
         {!canFinish && (
           <p className="text-sm text-muted-foreground text-center">
@@ -430,22 +420,24 @@ export default function OnboardingWizard({ profileId, startStep = 1, onComplete 
       <div className="sm:mx-auto sm:w-full sm:max-w-md mb-2">
         <div className="flex items-center justify-center gap-2 mb-6">
           <span className="text-3xl">🌿</span>
-          <h1 className="text-2xl font-extrabold text-foreground tracking-tight">ez-life</h1>
+          <h1 className="text-2xl font-extrabold text-foreground tracking-tight font-heading">ez-life</h1>
         </div>
         <ProgressBar currentStep={currentStep} />
       </div>
 
-      {currentStep === 1 && (
-        <OnboardingStep1 onComplete={handleStep1Complete} />
-      )}
+      <div key={currentStep} className="animate-fade-slide-up">
+        {currentStep === 1 && (
+          <OnboardingStep1 onComplete={handleStep1Complete} />
+        )}
 
-      {currentStep === 2 && (
-        <OnboardingStep2 profileId={wizardProfileId} onComplete={handleStep2Complete} />
-      )}
+        {currentStep === 2 && (
+          <OnboardingStep2 profileId={wizardProfileId} onComplete={handleStep2Complete} />
+        )}
 
-      {currentStep === 3 && (
-        <Step3Categories profileId={wizardProfileId} onComplete={handleStep3Complete} />
-      )}
+        {currentStep === 3 && (
+          <Step3Categories profileId={wizardProfileId} onComplete={handleStep3Complete} />
+        )}
+      </div>
     </div>
   );
 }

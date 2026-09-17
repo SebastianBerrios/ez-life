@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
@@ -28,6 +29,28 @@ describe('OnboardingStep2', () => {
     expect(mockSave).toHaveBeenCalledTimes(3);
     expect(submitBtn).not.toBeDisabled();
     expect(screen.getByText(/total: 100%/i)).toBeInTheDocument();
+  });
+
+  it('does not double-seed buckets when mounted under React Strict Mode', async () => {
+    const mockSave = echoSave();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (LocalCategoryRepository as any).mockImplementation(function () {
+      return {
+        getDistributionCategories: vi.fn().mockResolvedValue([]),
+        saveDistributionCategory: mockSave,
+      };
+    });
+
+    render(
+      <StrictMode>
+        <OnboardingStep2 profileId="fake-id" onComplete={vi.fn()} />
+      </StrictMode>
+    );
+
+    await screen.findByRole('button', { name: /guardar distribución/i });
+    // Strict Mode replays the seed effect's setup once; without the
+    // seedStartedRef guard this would write 6 buckets instead of 3.
+    await waitFor(() => expect(mockSave).toHaveBeenCalledTimes(3));
   });
 
   it('disables submit when the total is not 100%', async () => {

@@ -81,8 +81,8 @@ export default function Dashboard({ userId }: Props) {
         </button>
       </div>
 
-      <div className="bg-primary rounded-2xl p-6 text-primary-foreground shadow-lg">
-        <h2 className="text-sm font-medium opacity-80 mb-1">Balance del Mes</h2>
+      <div className="bg-primary rounded-2xl p-6 text-primary-foreground shadow-warm-md">
+        <h2 className="font-heading text-sm font-medium opacity-80 mb-1">Balance del Mes</h2>
         <p className="text-4xl font-bold mb-6">S/ {(balance / 100).toFixed(2)}</p>
         
         <div className="flex justify-between border-t border-primary-foreground/20 pt-4">
@@ -97,35 +97,39 @@ export default function Dashboard({ userId }: Props) {
         </div>
       </div>
       
-      <Card>
+      <Card className="shadow-warm-sm">
         <CardHeader>
           <CardTitle className="text-lg">Presupuestos (50/30/20)</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
-          {(() => {
-            const spentByBucket = calculateSpentByBucket(movements, distCategories);
-            return distCategories.map(cat => {
-              const budget = Math.round(totalIncome * (cat.percentage / 100));
-              const spent = spentByBucket[cat.id] ?? 0;
+          {distCategories.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No hay categorías de distribución configuradas todavía.</p>
+          ) : (
+            (() => {
+              const spentByBucket = calculateSpentByBucket(movements, distCategories);
+              return distCategories.map(cat => {
+                const budget = Math.round(totalIncome * (cat.percentage / 100));
+                const spent = spentByBucket[cat.id] ?? 0;
 
-              const progress = budget > 0 ? (spent / budget) * 100 : 0;
-              const isOver = progress > 100;
+                const progress = budget > 0 ? (spent / budget) * 100 : 0;
+                const isOver = progress > 100;
 
-              return (
-                <div key={cat.id}>
-                  <div className="flex justify-between items-baseline text-sm mb-2">
-                    <span className="font-medium text-base text-foreground">{cat.name} ({cat.percentage}%)</span>
-                    <span className="text-muted-foreground">S/ {(spent/100).toFixed(2)} de S/ {(budget/100).toFixed(2)}</span>
+                return (
+                  <div key={cat.id}>
+                    <div className="flex justify-between items-baseline text-sm mb-2">
+                      <span className="font-medium text-base text-foreground">{cat.name} ({cat.percentage}%)</span>
+                      <span className="text-muted-foreground">S/ {(spent/100).toFixed(2)} de S/ {(budget/100).toFixed(2)}</span>
+                    </div>
+                    <Progress
+                      value={Math.min(progress, 100)}
+                      className={isOver ? '[&>div]:bg-destructive' : '[&>div]:bg-primary'}
+                    />
+                    {isOver && <p className="text-sm text-destructive mt-1">¡Presupuesto excedido!</p>}
                   </div>
-                  <Progress
-                    value={Math.min(progress, 100)}
-                    className={isOver ? '[&>div]:bg-destructive' : '[&>div]:bg-primary'}
-                  />
-                  {isOver && <p className="text-sm text-destructive mt-1">¡Presupuesto excedido!</p>}
-                </div>
-              );
-            });
-          })()}
+                );
+              });
+            })()
+          )}
         </CardContent>
       </Card>
     </motion.div>

@@ -6,6 +6,9 @@ import { LocalMovementRepository } from '../../infrastructure/repositories/local
 import { SavingsGoal } from '../../core/domain/models/types';
 import { calculateSavingsGoalProgress } from '../../core/use-cases/calculateSavingsGoalProgress';
 import { Progress } from '@/components/ui/progress';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Props {
   userId: string;
@@ -59,27 +62,34 @@ export default function SavingsGoalList({ userId }: Props) {
     }
   };
 
-  if (loading) return <div className="text-center py-4 text-muted-foreground">Cargando...</div>;
-
-  if (goals.length === 0) {
+  if (loading) {
     return (
-      <div className="text-center py-8 bg-card rounded-xl shadow-sm border border-border">
-        <p className="text-muted-foreground">No tenés metas de ahorro registradas.</p>
+      <div className="space-y-4">
+        <Skeleton className="h-28 w-full rounded-xl" />
+        <Skeleton className="h-28 w-full rounded-xl" />
       </div>
     );
   }
 
+  if (goals.length === 0) {
+    return (
+      <Card className="animate-fade-slide-up py-8 text-center shadow-warm-sm">
+        <p className="text-muted-foreground">No tenés metas de ahorro registradas.</p>
+      </Card>
+    );
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="animate-fade-slide-up space-y-4">
       {goals.map(goal => {
         const progress = Math.min((goal.currentAmount / goal.target_amount) * 100, 100);
         const isExpired = goal.deadline && new Date(goal.deadline) < new Date() && progress < 100;
 
         return (
-          <div key={goal.id} className="bg-card p-5 rounded-xl shadow-sm border border-border relative overflow-hidden">
-            <div className="flex justify-between items-start mb-2">
+          <Card key={goal.id} className="relative shadow-warm-sm">
+            <div className="flex items-start justify-between px-5">
               <div>
-                <h3 className="font-bold text-foreground">{goal.name}</h3>
+                <h3 className="font-heading font-bold text-foreground">{goal.name}</h3>
                 {goal.deadline && (
                   <p className="text-sm text-muted-foreground mt-1">
                     Límite: {new Date(goal.deadline).toLocaleDateString()}
@@ -87,15 +97,17 @@ export default function SavingsGoalList({ userId }: Props) {
                   </p>
                 )}
               </div>
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => handleDelete(goal.id)}
-                className="text-destructive hover:text-destructive/80 text-sm font-medium"
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
               >
                 Borrar
-              </button>
+              </Button>
             </div>
 
-            <div className="mt-4 space-y-1">
+            <div className="mt-4 space-y-1 px-5">
               <div className="flex justify-between text-sm">
                 <span className="text-primary font-medium">S/ {(goal.currentAmount / 100).toFixed(2)}</span>
                 <span className="text-muted-foreground">de S/ {(goal.target_amount / 100).toFixed(2)}</span>
@@ -105,7 +117,7 @@ export default function SavingsGoalList({ userId }: Props) {
                 className={isExpired ? '[&>div]:bg-destructive' : '[&>div]:bg-primary'}
               />
             </div>
-          </div>
+          </Card>
         );
       })}
     </div>

@@ -55,7 +55,7 @@ export default function LoginScreen() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-2">
             <span className="text-3xl">🌿</span>
           </div>
-          <h1 className="text-4xl font-extrabold text-foreground tracking-tight">ez-life</h1>
+          <h1 className="text-4xl font-extrabold text-foreground tracking-tight font-heading">ez-life</h1>
           <p className="text-muted-foreground text-base">Tu finanzas, sin complicaciones.</p>
         </div>
 

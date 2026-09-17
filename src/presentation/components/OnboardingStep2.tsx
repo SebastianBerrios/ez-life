@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
 import { LocalMovementRepository } from '../../infrastructure/repositories/local/LocalMovementRepository';
 import { validateDeletion } from '../../core/use-cases/validateDeletion';
 import { DomainError } from '../../core/domain/errors/DomainError';
 import { uuidv7 } from 'uuidv7';
 import { Info, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 interface Props {
   profileId: string;
@@ -37,9 +39,16 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
   const catRepo = new LocalCategoryRepository();
   const movementRepo = new LocalMovementRepository();
 
+  // Guards the seed effect below against React 18 Strict Mode's dev
+  // double-invoke, which would otherwise seed the 3 default buckets twice
+  // (see Step3Categories' seedStartedRef for the same pattern).
+  const seedStartedRef = useRef(false);
+
   // On first entry, seed the 3 default buckets as real DB rows right away —
   // their IDs must exist before Step 3 can reference them for the category seed.
   useEffect(() => {
+    if (seedStartedRef.current) return;
+    seedStartedRef.current = true;
     const init = async () => {
       const existing = await catRepo.getDistributionCategories(profileId);
       if (existing.length > 0) {
@@ -155,7 +164,7 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         {/* Header */}
         <div className="px-6 pt-6 pb-4">
-          <h2 className="text-2xl font-bold text-foreground">Tu distribución de ingresos</h2>
+          <h2 className="text-2xl font-bold text-foreground font-heading">Tu distribución de ingresos</h2>
           <p className="text-sm text-muted-foreground mt-1">
             Definí en qué categorías querés distribuir lo que ganás cada mes. Podés agregar, renombrar o eliminar las que necesites.
           </p>
@@ -184,9 +193,9 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
                 Una regla simple para organizar tus ingresos en categorías:
               </p>
               <div className="space-y-2">
-                <TutorialItem emoji="🏠" label="50% — Necesidades" description="Alquiler, comida, transporte, servicios." color="text-emerald-600 dark:text-emerald-400" />
-                <TutorialItem emoji="🎉" label="30% — Gustos" description="Salidas, streaming, ropa, hobbies." color="text-amber-600 dark:text-amber-400" />
-                <TutorialItem emoji="💰" label="20% — Ahorro" description="Fondo de emergencia, inversiones, metas." color="text-blue-600 dark:text-blue-400" />
+                <TutorialItem emoji="🏠" label="50% — Necesidades" description="Alquiler, comida, transporte, servicios." color="text-primary" />
+                <TutorialItem emoji="🎉" label="30% — Gustos" description="Salidas, streaming, ropa, hobbies." color="text-warning" />
+                <TutorialItem emoji="💰" label="20% — Ahorro" description="Fondo de emergencia, inversiones, metas." color="text-foreground" />
               </div>
               <p className="text-sm text-muted-foreground">
                 Es solo un punto de partida — agregá, renombrá o eliminá categorías según tu realidad. Solo asegurate de que sumen 100%.
@@ -201,22 +210,22 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
             {buckets.map((bucket, idx) => (
               <div key={bucket.id} className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <input
+                  <Input
                     type="text"
                     aria-label={`Nombre de la categoría ${idx + 1}`}
                     value={bucket.name}
                     onChange={(e) => updateBucket(bucket.id, { name: e.target.value })}
                     placeholder="Nombre de la categoría"
-                    className="flex-1 h-11 bg-background border border-input rounded-xl py-2.5 px-3 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
+                    className="flex-1"
                   />
-                  <input
+                  <Input
                     type="number"
                     aria-label={`Porcentaje de la categoría ${idx + 1}`}
                     min="0"
                     max="100"
                     value={bucket.percentage}
                     onChange={(e) => updateBucket(bucket.id, { percentage: Number(e.target.value) })}
-                    className="w-20 h-11 bg-background border border-input rounded-xl py-2.5 px-3 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
+                    className="w-20"
                   />
                   <span className="text-sm text-muted-foreground">%</span>
                   <label className="flex items-center gap-1 text-xs text-muted-foreground shrink-0 cursor-pointer">
@@ -230,14 +239,16 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
                     />
                     Ahorro
                   </label>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => handleDeleteBucket(bucket.id)}
                     aria-label={`Eliminar categoría ${bucket.name || idx + 1}`}
-                    className="text-destructive hover:text-destructive/80 h-11 w-11 flex items-center justify-center shrink-0"
+                    className="text-destructive hover:text-destructive/80 shrink-0"
                   >
                     <Trash2 className="w-4 h-4" />
-                  </button>
+                  </Button>
                 </div>
                 {deleteErrors[bucket.id] && (
                   <p className="text-sm text-destructive">{deleteErrors[bucket.id]}</p>
@@ -246,25 +257,22 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
             ))}
           </div>
 
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={handleAddBucket}
-            className="w-full h-11 px-4 border border-dashed border-border rounded-xl text-base font-medium text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+            className="w-full border-dashed text-muted-foreground hover:text-foreground"
           >
             + Nueva categoría de distribución
-          </button>
+          </Button>
 
-          <div className={`text-base font-medium px-4 py-3 rounded-xl ${isValid ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-destructive/10 text-destructive'}`}>
+          <div className={`text-base font-medium px-4 py-3 rounded-xl ${isValid ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive'}`}>
             Total: {total}% {isValid ? '✓ Perfecto' : '— Debe sumar exactamente 100%'}
           </div>
 
-          <button
-            type="submit"
-            disabled={!isValid || isSubmitting}
-            className="w-full h-12 px-4 rounded-xl text-base font-semibold text-primary-foreground bg-primary hover:bg-primary/90 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
+          <Button type="submit" size="lg" disabled={!isValid || isSubmitting} className="w-full">
             {isSubmitting ? 'Guardando...' : 'Guardar distribución'}
-          </button>
+          </Button>
         </form>
       </div>
     </div>

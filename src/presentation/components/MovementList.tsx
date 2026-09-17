@@ -4,6 +4,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { LocalMovementRepository } from '../../infrastructure/repositories/local/LocalMovementRepository';
 import { Movement } from '../../core/domain/models/types';
 import { calculateMonthlyCycle } from '../../core/use-cases/calculateMonthlyCycle';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Props {
   userId: string;
@@ -43,21 +46,32 @@ export default function MovementList({ userId }: Props) {
     }
   };
 
-  if (loading) return <div className="text-center py-4 text-muted-foreground">Cargando...</div>;
-
-  if (movements.length === 0) {
+  if (loading) {
     return (
-      <div className="text-center py-8 bg-card rounded-xl shadow-sm border border-border">
-        <p className="text-muted-foreground">No hay movimientos en este mes.</p>
+      <div className="space-y-3">
+        <Skeleton className="h-20 w-full rounded-xl" />
+        <Skeleton className="h-20 w-full rounded-xl" />
+        <Skeleton className="h-20 w-full rounded-xl" />
       </div>
     );
   }
 
+  if (movements.length === 0) {
+    return (
+      <Card className="animate-fade-slide-up py-8 text-center shadow-warm-sm">
+        <p className="text-muted-foreground">No hay movimientos en este mes.</p>
+      </Card>
+    );
+  }
+
   return (
-    <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+    <Card className="animate-fade-slide-up overflow-hidden py-0 shadow-warm-sm">
       <ul className="divide-y divide-border">
         {movements.map(m => (
-          <li key={m.id} className="p-5 hover:bg-muted flex justify-between items-center">
+          <li
+            key={m.id}
+            className="flex items-center justify-between p-5 transition-colors hover:bg-muted"
+          >
             <div>
               <p className="text-base font-medium text-foreground">{m.description || 'Sin descripción'}</p>
               <p className="text-sm text-muted-foreground">
@@ -68,16 +82,18 @@ export default function MovementList({ userId }: Props) {
               <span className={`text-base font-bold ${m.type === 'INCOME' ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'}`}>
                 {m.type === 'INCOME' ? '+' : '-'} S/ {(m.amount / 100).toFixed(2)}
               </span>
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => handleDelete(m.id)}
-                className="text-destructive hover:text-destructive/80 text-sm font-medium"
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
               >
                 Eliminar
-              </button>
+              </Button>
             </div>
           </li>
         ))}
       </ul>
-    </div>
+    </Card>
   );
 }

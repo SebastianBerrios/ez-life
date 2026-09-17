@@ -8,7 +8,8 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { buildMovementsCsv, buildMovementsPdfTable } from '../../core/use-cases/exportMovements';
 import { ThemeToggle } from './ThemeToggle';
-import { Edit2, Download, FileText, Bell, LogOut } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Edit2, Download, FileText, Bell, LogOut, Loader2 } from 'lucide-react';
 import { getSupabaseBrowserClient } from '../../infrastructure/supabase/client';
 
 interface Props {
@@ -167,21 +168,23 @@ export default function SettingsScreen({ userId, onEditDistribution, onEditCateg
         </p>
 
         <div className="space-y-3">
-          <button
+          <Button
+            variant="outline"
             onClick={onEditDistribution}
-            className="w-full h-11 flex items-center justify-center gap-2 px-4 border border-border rounded-xl text-base font-medium text-foreground bg-background hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="w-full text-base"
           >
             <Edit2 className="w-4 h-4" />
             Editar distribución (%)
-          </button>
+          </Button>
 
-          <button
+          <Button
+            variant="outline"
             onClick={onEditCategories}
-            className="w-full h-11 flex items-center justify-center gap-2 px-4 border border-border rounded-xl text-base font-medium text-foreground bg-background hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="w-full text-base"
           >
             <Edit2 className="w-4 h-4" />
             Gestionar categorías de gasto
-          </button>
+          </Button>
         </div>
       </Section>
 
@@ -191,22 +194,24 @@ export default function SettingsScreen({ userId, onEditDistribution, onEditCateg
           Descargá todo tu historial de movimientos en CSV (Excel) o PDF.
         </p>
         <div className="flex gap-3">
-          <button
+          <Button
+            variant="default"
             onClick={handleExportCSV}
             disabled={exporting}
-            className="flex-1 h-11 flex items-center justify-center gap-2 px-4 rounded-xl text-base font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex-1 text-base"
           >
-            <Download className="w-4 h-4" />
-            {exporting ? '...' : 'CSV'}
-          </button>
-          <button
+            {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            CSV
+          </Button>
+          <Button
+            variant="destructive"
             onClick={handleExportPDF}
             disabled={exporting}
-            className="flex-1 h-11 flex items-center justify-center gap-2 px-4 rounded-xl text-base font-medium text-white bg-rose-600 hover:bg-rose-700 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex-1 text-base"
           >
-            <FileText className="w-4 h-4" />
-            {exporting ? '...' : 'PDF'}
-          </button>
+            {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+            PDF
+          </Button>
         </div>
       </Section>
 
@@ -269,13 +274,14 @@ export default function SettingsScreen({ userId, onEditDistribution, onEditCateg
         <p className="text-sm text-muted-foreground">
           Al cerrar sesión, tus datos locales se conservan en este dispositivo.
         </p>
-        <button
+        <Button
+          variant="destructive"
           onClick={handleLogout}
-          className="w-full h-11 flex items-center justify-center gap-2 px-4 rounded-xl text-base font-medium text-destructive border border-destructive/30 bg-destructive/5 hover:bg-destructive/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="w-full text-base"
         >
           <LogOut className="w-4 h-4" />
           Cerrar sesión
-        </button>
+        </Button>
       </Section>
     </div>
   );

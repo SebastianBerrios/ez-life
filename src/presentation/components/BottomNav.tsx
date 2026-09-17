@@ -33,7 +33,7 @@ export default function Navigation({ currentRoute, onNavigate, onNewMovement, av
     <>
       {/* ── Mobile Bottom Nav ─────────────────────────────────── */}
       <nav
-        className="md:hidden fixed bottom-0 w-full bg-card border-t border-border pb-safe shadow-[0_-2px_10px_rgba(0,0,0,0.06)] z-40"
+        className="md:hidden fixed bottom-0 w-full bg-card border-t border-border pb-safe shadow-warm-md z-40"
         aria-label="Navegación principal"
       >
         <div className="flex justify-around items-center h-16">
@@ -66,7 +66,7 @@ export default function Navigation({ currentRoute, onNavigate, onNewMovement, av
         <div className="flex items-center justify-between px-5 py-5 shrink-0">
           <div className="flex items-center gap-2">
             <span className="text-xl">🌿</span>
-            <h1 className="text-xl font-extrabold text-foreground tracking-tight">ez-life</h1>
+            <h1 className="text-xl font-extrabold text-foreground tracking-tight font-heading">ez-life</h1>
           </div>
           <div className="flex items-center gap-1">
             {onOpenNotifications && (
