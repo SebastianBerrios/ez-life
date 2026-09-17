@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { LocalSavingsGoalRepository } from '../../infrastructure/repositories/local/LocalSavingsGoalRepository';
 import { validateMovementAmount } from '../../core/use-cases/validateMovementAmount';
 import { DomainError } from '../../core/domain/errors/DomainError';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -59,12 +58,9 @@ export default function SavingsGoalForm({ userId, onComplete, onCancel }: Props)
   };
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>Nueva Meta de Ahorro</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} data-testid="goal-form" className="space-y-5">
+    <div className="w-full">
+      <h2 className="mb-4 font-heading text-base leading-none font-medium">Nueva Meta de Ahorro</h2>
+      <form onSubmit={handleSubmit} data-testid="goal-form" className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="name">Nombre de la Meta</Label>
             <Input
@@ -143,7 +139,6 @@ export default function SavingsGoalForm({ userId, onComplete, onCancel }: Props)
             </Button>
           </div>
         </form>
-      </CardContent>
-    </Card>
+    </div>
   );
 }

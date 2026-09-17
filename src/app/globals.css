@@ -12,7 +12,6 @@
 
 @layer base {
   .theme {
-    --font-heading: var(--font-sans);
     --font-sans: var(--font-sans);
   }
   :root {
@@ -46,12 +45,18 @@
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
 
+    --warning: 38 92% 45%;
+    --warning-foreground: 25 25% 15%;
+
     --border: 35 18% 84%;
     --input: 35 18% 84%;
     --ring: 155 38% 40%;
 
     /* More rounded = warmer feel */
     --radius: 1rem;
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
   }
 
   .dark {
@@ -80,6 +85,9 @@
 
     --destructive: 0 55% 42%;
     --destructive-foreground: 0 0% 98%;
+
+    --warning: 38 80% 55%;
+    --warning-foreground: 25 15% 10%;
 
     --border: 222 12% 24%;
     --input: 222 12% 24%;

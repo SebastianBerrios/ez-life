@@ -13,12 +13,20 @@ import AnalysisScreen from './AnalysisScreen';
 import SettingsScreen from './SettingsScreen';
 import NotificationHistory from './NotificationHistory';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Bell } from 'lucide-react';
 import { useRecurrenceEvaluator } from '../hooks/useRecurrenceEvaluator';
 import { useSyncManager } from '../hooks/useSyncManager';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useNotificationEvaluator } from '../hooks/useNotificationEvaluator';
 import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
+
+// Shared chrome for the app's dialogs (movement form, goal form,
+// notification history) — always centered on the viewport, never a
+// bottom sheet, with a single padding layer (the form/list content
+// inside renders chrome-less so it doesn't double up with this).
+const SHEET_DIALOG_CONTENT_CLASS =
+  'bg-card max-w-md rounded-2xl border border-border p-5 shadow-xl max-h-[85vh] overflow-y-auto sm:p-6';
 
 export default function MainFlow() {
   const [step, setStep] = useState<'loading' | 'login' | 'onboarding-wizard' | 'app'>('loading');
@@ -154,7 +162,7 @@ export default function MainFlow() {
         <header className="flex justify-between items-center py-2 md:hidden">
           <div className="flex items-center gap-2">
             <span className="text-xl">🌿</span>
-            <h1 className="text-2xl font-extrabold text-foreground tracking-tight">ez-life</h1>
+            <h1 className="text-2xl font-extrabold text-foreground tracking-tight font-heading">ez-life</h1>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -236,23 +244,21 @@ export default function MainFlow() {
             </button>
           </div>
 
-          {showMovementForm && (
-            <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm">
-              <div className="bg-card w-full md:max-w-lg md:rounded-2xl max-h-[90vh] overflow-y-auto rounded-t-2xl p-5 md:p-6 shadow-xl border border-border">
-                <MovementForm
-                  userId={profileId}
-                  onComplete={() => setShowMovementForm(false)}
-                  onCancel={() => setShowMovementForm(false)}
-                />
-              </div>
-            </div>
-          )}
+          <Dialog open={showMovementForm} onOpenChange={(open) => !open && setShowMovementForm(false)}>
+            <DialogContent className={SHEET_DIALOG_CONTENT_CLASS}>
+              <MovementForm
+                userId={profileId}
+                onComplete={() => setShowMovementForm(false)}
+                onCancel={() => setShowMovementForm(false)}
+              />
+            </DialogContent>
+          </Dialog>
         </>
       )}
 
-      {showGoalForm && profileId && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-card w-full md:max-w-lg md:rounded-2xl max-h-[90vh] overflow-y-auto rounded-t-2xl p-5 md:p-6 shadow-xl border border-border">
+      {profileId && (
+        <Dialog open={showGoalForm} onOpenChange={(open) => !open && setShowGoalForm(false)}>
+          <DialogContent className={SHEET_DIALOG_CONTENT_CLASS}>
             <SavingsGoalForm
               userId={profileId}
               onComplete={() => {
@@ -261,19 +267,19 @@ export default function MainFlow() {
               }}
               onCancel={() => setShowGoalForm(false)}
             />
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
 
-      {showNotifications && profileId && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-card w-full md:max-w-lg md:rounded-2xl max-h-[90vh] overflow-y-auto rounded-t-2xl p-5 md:p-6 shadow-xl border border-border">
+      {profileId && (
+        <Dialog open={showNotifications} onOpenChange={(open) => !open && setShowNotifications(false)}>
+          <DialogContent showCloseButton={false} className={SHEET_DIALOG_CONTENT_CLASS}>
             <NotificationHistory
               userId={profileId}
               onClose={() => setShowNotifications(false)}
             />
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
     </Layout>
   );

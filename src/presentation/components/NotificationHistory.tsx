@@ -3,7 +3,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { LocalNotificationRepository } from '../../infrastructure/repositories/local/LocalNotificationRepository';
 import { Notification } from '../../core/domain/models/types';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { X, BellOff } from 'lucide-react';
 
@@ -43,14 +42,14 @@ export default function NotificationHistory({ userId, onClose }: Props) {
   };
 
   return (
-    <Card className="w-full">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle>Notificaciones</CardTitle>
+    <div className="w-full">
+      <div className="mb-4 flex flex-row items-center justify-between">
+        <h2 className="font-heading text-base leading-none font-medium">Notificaciones</h2>
         <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Cerrar">
           <X className="w-4 h-4" />
         </Button>
-      </CardHeader>
-      <CardContent>
+      </div>
+      <div>
         {loading && (
           <div className="text-center py-4 text-muted-foreground">Cargando...</div>
         )}
@@ -63,7 +62,7 @@ export default function NotificationHistory({ userId, onClose }: Props) {
         )}
 
         {!loading && notifications.length > 0 && (
-          <ul className="divide-y divide-border -mx-4">
+          <ul className="-mx-5 divide-y divide-border sm:-mx-6">
             {notifications.map(n => {
               const isUnread = !n.read_at;
               return (
@@ -88,19 +87,21 @@ export default function NotificationHistory({ userId, onClose }: Props) {
                     </p>
                   </div>
                   {isUnread && (
-                    <button
+                    <Button
+                      variant="link"
+                      size="sm"
                       onClick={() => handleMarkRead(n.id)}
-                      className="text-xs font-medium text-primary hover:text-primary/80 shrink-0"
+                      className="h-auto shrink-0 p-0 text-xs font-medium text-primary transition-colors hover:text-primary/80"
                     >
                       Marcar leída
-                    </button>
+                    </Button>
                   )}
                 </li>
               );
             })}
           </ul>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

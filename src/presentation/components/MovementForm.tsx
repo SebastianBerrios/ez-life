@@ -7,12 +7,12 @@ import { LocalSavingsGoalRepository } from '../../infrastructure/repositories/lo
 import { validateMovementAmount } from '../../core/use-cases/validateMovementAmount';
 import { DomainError } from '../../core/domain/errors/DomainError';
 import { DistributionCategory, ExpenseCategory, ExpenseSubcategory, SavingsGoal } from '../../core/domain/models/types';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Props {
   userId: string;
@@ -151,12 +151,9 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
     selectedBucket?.is_savings === true;
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>Registrar Movimiento</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} data-testid="movement-form" className="space-y-5">
+    <div className="w-full">
+      <h2 className="mb-4 font-heading text-base leading-none font-medium">Registrar Movimiento</h2>
+      <form onSubmit={handleSubmit} data-testid="movement-form" className="space-y-5">
           {/* Type toggle — visual tab style */}
           <div className="space-y-2">
             <Label>Tipo</Label>
@@ -202,7 +199,7 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
                   </SelectContent>
                 </Select>
               ) : (
-                <div className="h-11 bg-muted rounded-xl animate-pulse" />
+                <Skeleton className="h-11 w-full rounded-xl" />
               )}
             </div>
           )}
@@ -226,7 +223,7 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
                   </SelectContent>
                 </Select>
               ) : (
-                <div className="h-11 bg-muted rounded-xl animate-pulse" />
+                <Skeleton className="h-11 w-full rounded-xl" />
               )}
               {dataLoaded && expenseCategories.length === 0 && (
                 <p className="text-sm text-muted-foreground">
@@ -255,7 +252,7 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
                   </SelectContent>
                 </Select>
               ) : (
-                <div className="h-11 bg-muted rounded-xl animate-pulse" />
+                <Skeleton className="h-11 w-full rounded-xl" />
               )}
             </div>
           )}
@@ -364,7 +361,6 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
             </Button>
           </div>
         </form>
-      </CardContent>
-    </Card>
+    </div>
   );
 }
