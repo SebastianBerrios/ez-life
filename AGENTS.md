@@ -14,13 +14,13 @@ App de finanzas personales y familiares. Offline-first con sincronización a Sup
 
 - TypeScript strict mode. No `any` salvo justificación en comentario.
 - Nombres en inglés: variables, funciones, tipos, componentes, commits.
-- UI copy en español, centralizado a mano en los componentes. Sin librería de i18n en v1 (ver `docs/constitution.md` regla 6).
+- UI copy en español, centralizado a mano en los componentes. Sin librería de i18n en v1 (ver `.specify/memory/constitution.md`, Principio VI).
 - Commits: conventional commits en inglés (`feat:`, `fix:`, `docs:`, etc.).
 - Componentes: PascalCase. Hooks: `use` prefix. Utilities: camelCase.
 
 ## Reglas
 
-- Lee docs/constitution.md y la spec activa antes de tocar código.
+- Lee `.specify/memory/constitution.md` y la spec activa antes de tocar código.
 - No agregar dependencias runtime sin justificación en la spec.
 - No escribir lógica de negocio dentro de componentes React.
 - No usar `float` para valores monetarios. Siempre enteros (céntimos).

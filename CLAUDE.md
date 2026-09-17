@@ -24,13 +24,14 @@ tested without a real browser or mocks.
 
 ## Spec-driven workflow
 
-Feature specs live in `specs/<NNN>-<slug>/` (e.g. `specs/003-onboarding-wizard-and-categories/spec.md`),
-not `docs/specs/` as `AGENTS.md` states — check `specs/` for the current
-numbering. `docs/constitution.md` is the project's binding rule set (spec
-required before code, logic/UI separation, offline-first requirement, money as
-integer cents, dependency budget). Read the active spec and the constitution
-before non-trivial changes; code without a spec is considered unauthorized by
-this project's own convention.
+This project uses spec-kit. Feature specs live in `specs/<NNN>-<slug>/` (e.g.
+`specs/003-onboarding-wizard-and-categories/spec.md`) — check `specs/` for the
+current numbering; specs predating the spec-kit migration are archived under
+`specs-legacy/`. `.specify/memory/constitution.md` is the project's binding
+rule set (spec required before code, logic/UI separation, offline-first
+requirement, money as integer cents, dependency budget). Read the active spec
+and the constitution before non-trivial changes; code without a spec is
+considered unauthorized by this project's own convention.
 
 ## Architecture: layered (domain / infrastructure / presentation)
 
