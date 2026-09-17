@@ -21,6 +21,26 @@ export interface DistributionBreakdown {
   categories: CategoryBreakdown[];
 }
 
+/**
+ * Total spent (EXPENSE movements only) per distribution bucket, keyed by
+ * bucket id. Shared by `Dashboard.tsx` (budget-vs-spent display) and
+ * `evaluateNotifications` (80%-of-budget alerts) so the "spent per bucket"
+ * formula lives in exactly one place.
+ */
+export function calculateSpentByBucket(
+  movements: Movement[],
+  distributionCategories: DistributionCategory[]
+): Record<UUID, number> {
+  const expenses = movements.filter(m => m.type === 'EXPENSE');
+
+  return distributionCategories.reduce<Record<UUID, number>>((acc, bucket) => {
+    acc[bucket.id] = expenses
+      .filter(m => m.distribution_category_id === bucket.id)
+      .reduce((sum, m) => sum + m.amount, 0);
+    return acc;
+  }, {});
+}
+
 export function calculateCategoryBreakdown(
   movements: Movement[],
   distributionCategories: DistributionCategory[],

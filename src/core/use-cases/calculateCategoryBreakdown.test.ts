@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateCategoryBreakdown } from './calculateCategoryBreakdown';
+import { calculateCategoryBreakdown, calculateSpentByBucket } from './calculateCategoryBreakdown';
 import type { DistributionCategory, ExpenseCategory, ExpenseSubcategory, Movement } from '../domain/models/types';
 
 describe('calculateCategoryBreakdown', () => {
@@ -51,5 +51,35 @@ describe('calculateCategoryBreakdown', () => {
     const result = calculateCategoryBreakdown([], buckets, [], []);
 
     expect(result).toEqual([{ id: 'b1', name: 'Necesidades', percentage: 100, spent: 0, categories: [] }]);
+  });
+});
+
+describe('calculateSpentByBucket', () => {
+  it('sums EXPENSE movements per bucket, ignoring INCOME', () => {
+    const buckets = [
+      { id: 'b1', name: 'Necesidades', percentage: 50 },
+      { id: 'b2', name: 'Gustos', percentage: 30 },
+    ] as Pick<DistributionCategory, 'id' | 'name' | 'percentage'>[] as DistributionCategory[];
+
+    const movements = [
+      { type: 'EXPENSE', amount: 1000, distribution_category_id: 'b1' },
+      { type: 'EXPENSE', amount: 500, distribution_category_id: 'b1' },
+      { type: 'EXPENSE', amount: 300, distribution_category_id: 'b2' },
+      { type: 'INCOME', amount: 99999, distribution_category_id: 'b1' },
+    ] as Partial<Movement>[] as Movement[];
+
+    const result = calculateSpentByBucket(movements, buckets);
+
+    expect(result).toEqual({ b1: 1500, b2: 300 });
+  });
+
+  it('returns a zeroed entry for buckets with no expenses', () => {
+    const buckets = [
+      { id: 'b1', name: 'Necesidades', percentage: 100 },
+    ] as Pick<DistributionCategory, 'id' | 'name' | 'percentage'>[] as DistributionCategory[];
+
+    const result = calculateSpentByBucket([], buckets);
+
+    expect(result).toEqual({ b1: 0 });
   });
 });

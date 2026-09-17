@@ -1,9 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { LocalMovementRepository } from '../../infrastructure/repositories/local/LocalMovementRepository';
+import { LocalProfileRepository } from '../../infrastructure/repositories/local/LocalProfileRepository';
+import { Profile } from '../../core/domain/models/types';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { buildMovementsCsv, buildMovementsPdfTable } from '../../core/use-cases/exportMovements';
 import { ThemeToggle } from './ThemeToggle';
 import { Edit2, Download, FileText, Bell, LogOut } from 'lucide-react';
 import { getSupabaseBrowserClient } from '../../infrastructure/supabase/client';
@@ -17,6 +20,39 @@ interface Props {
 
 export default function SettingsScreen({ userId, onEditDistribution, onEditCategories, onLogout }: Props) {
   const [exporting, setExporting] = useState(false);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [notificationHour, setNotificationHour] = useState<string>('');
+  const [inappEnabled, setInappEnabled] = useState(true);
+  const [pushEnabled, setPushEnabled] = useState(false);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const profileRepo = new LocalProfileRepository();
+        const data = await profileRepo.get(userId);
+        if (data) {
+          setProfile(data);
+          setNotificationHour(data.notification_hour !== undefined ? String(data.notification_hour) : '');
+          setInappEnabled(data.inapp_enabled !== false);
+          setPushEnabled(data.push_enabled === true);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    loadProfile();
+  }, [userId]);
+
+  const saveProfile = async (changes: Partial<Profile>) => {
+    try {
+      const profileRepo = new LocalProfileRepository();
+      const current = profile ?? { id: userId, created_at: new Date(), updated_at: new Date() };
+      const updated = await profileRepo.save({ ...current, ...changes, id: userId });
+      setProfile(updated);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const handleExportCSV = async () => {
     setExporting(true);
@@ -24,16 +60,7 @@ export default function SettingsScreen({ userId, onEditDistribution, onEditCateg
       const repo = new LocalMovementRepository();
       const moves = await repo.getAll(userId);
 
-      const headers = ['Fecha', 'Tipo', 'Monto', 'Descripcion'];
-      const rows = moves.map(m => {
-        const date = new Date(m.date).toLocaleDateString();
-        const type = m.type === 'INCOME' ? 'Ingreso' : 'Egreso';
-        const amount = (m.amount / 100).toFixed(2).replace('.', ',');
-        const desc = m.description || '';
-        return `${date};${type};${amount};${desc}`;
-      });
-
-      const csvContent = [headers.join(';'), ...rows].join('\n');
+      const csvContent = buildMovementsCsv(moves);
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -60,18 +87,12 @@ export default function SettingsScreen({ userId, onEditDistribution, onEditCateg
       doc.setFontSize(18);
       doc.text('Reporte de Movimientos - ez-life', 14, 22);
 
-      const rows = moves.map(m => {
-        const date = new Date(m.date).toLocaleDateString();
-        const type = m.type === 'INCOME' ? 'Ingreso' : 'Egreso';
-        const amount = `S/ ${(m.amount / 100).toFixed(2)}`;
-        const desc = m.description || '-';
-        return [date, type, amount, desc];
-      });
+      const { head, body } = buildMovementsPdfTable(moves);
 
       autoTable(doc, {
         startY: 30,
-        head: [['Fecha', 'Tipo', 'Monto', 'Descripción']],
-        body: rows,
+        head,
+        body,
         theme: 'striped',
         headStyles: { fillColor: [37, 99, 235] }
       });
@@ -85,20 +106,40 @@ export default function SettingsScreen({ userId, onEditDistribution, onEditCateg
     }
   };
 
-  const handleEnableNotifications = async () => {
-    if (!('Notification' in window)) {
-      alert('Tu navegador no soporta notificaciones.');
+  const handleNotificationHourChange = async (value: string) => {
+    setNotificationHour(value);
+    if (value === '') {
+      await saveProfile({ notification_hour: undefined });
       return;
     }
-    const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-      new Notification('ez-life', {
-        body: '¡Notificaciones activadas! Te avisaremos cuando empiece un nuevo mes.',
-        icon: '/favicon.ico'
-      });
-    } else {
-      alert('Permiso de notificaciones denegado.');
+    const hour = Number(value);
+    if (Number.isNaN(hour) || hour < 0 || hour > 23) return;
+    await saveProfile({ notification_hour: hour });
+  };
+
+  const handleToggleInapp = async (checked: boolean) => {
+    setInappEnabled(checked);
+    await saveProfile({ inapp_enabled: checked });
+  };
+
+  const handleTogglePush = async (checked: boolean) => {
+    if (checked) {
+      if (!('Notification' in window)) {
+        alert('Tu navegador no soporta notificaciones.');
+        setPushEnabled(false);
+        return;
+      }
+      if (Notification.permission !== 'granted') {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          alert('Permiso de notificaciones denegado.');
+          setPushEnabled(false);
+          return;
+        }
+      }
     }
+    setPushEnabled(checked);
+    await saveProfile({ push_enabled: checked });
   };
 
   const handleLogout = async () => {
@@ -172,15 +213,55 @@ export default function SettingsScreen({ userId, onEditDistribution, onEditCateg
       {/* Notifications */}
       <Section title="Notificaciones">
         <p className="text-sm text-muted-foreground">
-          Recibí alertas cuando empiece un nuevo ciclo mensual o superes un presupuesto.
+          Recibí alertas cuando superes el 80% de un presupuesto, cumplas una meta de ahorro,
+          o un recordatorio diario para registrar tus movimientos.
         </p>
-        <button
-          onClick={handleEnableNotifications}
-          className="w-full h-11 flex items-center justify-center gap-2 px-4 border border-border rounded-xl text-base font-medium text-foreground bg-background hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <Bell className="w-4 h-4" />
-          Activar Notificaciones
-        </button>
+
+        <div className="space-y-2">
+          <label htmlFor="notificationHour" className="text-sm font-medium text-foreground">
+            Hora del recordatorio diario
+          </label>
+          <select
+            id="notificationHour"
+            value={notificationHour}
+            onChange={(e) => handleNotificationHourChange(e.target.value)}
+            className="w-full h-11 px-3 border border-input rounded-xl bg-background text-foreground text-base focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            <option value="">Desactivado</option>
+            {Array.from({ length: 24 }, (_, hour) => (
+              <option key={hour} value={hour}>
+                {String(hour).padStart(2, '0')}:00
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <input
+            id="inappEnabled"
+            type="checkbox"
+            className="h-4 w-4 rounded border-input accent-primary"
+            checked={inappEnabled}
+            onChange={(e) => handleToggleInapp(e.target.checked)}
+          />
+          <label htmlFor="inappEnabled" className="text-sm text-foreground cursor-pointer">
+            Notificaciones in-app
+          </label>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <input
+            id="pushEnabled"
+            type="checkbox"
+            className="h-4 w-4 rounded border-input accent-primary"
+            checked={pushEnabled}
+            onChange={(e) => handleTogglePush(e.target.checked)}
+          />
+          <label htmlFor="pushEnabled" className="text-sm text-foreground cursor-pointer flex items-center gap-1.5">
+            <Bell className="w-3.5 h-3.5" />
+            Notificaciones push del navegador
+          </label>
+        </div>
       </Section>
 
       {/* Account / Logout */}

@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { LocalSavingsGoalRepository } from '../../infrastructure/repositories/local/LocalSavingsGoalRepository';
 import { LocalMovementRepository } from '../../infrastructure/repositories/local/LocalMovementRepository';
 import { SavingsGoal } from '../../core/domain/models/types';
+import { calculateSavingsGoalProgress } from '../../core/use-cases/calculateSavingsGoalProgress';
 import { Progress } from '@/components/ui/progress';
 
 interface Props {
@@ -29,11 +30,8 @@ export default function SavingsGoalList({ userId }: Props) {
       ]);
 
       const goalsWithProgress = allGoals.map(goal => {
-        const currentAmount = allMoves
-          .filter(m => m.type === 'EXPENSE' && m.savings_goal_id === goal.id)
-          .reduce((acc, m) => acc + m.amount, 0);
-
-        return { ...goal, currentAmount };
+        const { currentAmountCents } = calculateSavingsGoalProgress(goal, allMoves);
+        return { ...goal, currentAmount: currentAmountCents };
       });
 
       setGoals(goalsWithProgress);

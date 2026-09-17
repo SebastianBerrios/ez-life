@@ -7,6 +7,7 @@ import type {
   ExpenseSubcategory,
   SavingsGoal,
   Movement,
+  Notification,
 } from '../../core/domain/models/types';
 
 interface SyncQueueItem {
@@ -24,6 +25,7 @@ export class EzLifeDB extends Dexie {
   expense_subcategories!: Table<ExpenseSubcategory, string>;
   savings_goals!: Table<SavingsGoal, string>;
   movements!: Table<Movement, string>;
+  notifications!: Table<Notification, string>;
   sync_queue!: Table<SyncQueueItem, string>;
 
   constructor() {
@@ -41,13 +43,28 @@ export class EzLifeDB extends Dexie {
       // Automatic upgrade handled by Dexie
     });
 
+    this.version(5).stores({
+      profiles: 'id',
+      income_sources: 'id, user_id',
+      distribution_categories: 'id, user_id',
+      expense_categories: 'id, user_id, distribution_category_id',
+      expense_subcategories: 'id, category_id',
+      savings_goals: 'id, user_id',
+      movements: 'id, user_id, date',
+      notifications: 'id, user_id, created_at',
+      sync_queue: 'id, created_at'
+    }).upgrade(() => {
+      // Automatic upgrade handled by Dexie
+    });
+
     this.setupHooks();
   }
 
   private setupHooks() {
     const tablesToSync = [
       'profiles', 'income_sources', 'distribution_categories',
-      'expense_categories', 'expense_subcategories', 'savings_goals', 'movements'
+      'expense_categories', 'expense_subcategories', 'savings_goals', 'movements',
+      'notifications'
     ];
 
     tablesToSync.forEach(tableName => {

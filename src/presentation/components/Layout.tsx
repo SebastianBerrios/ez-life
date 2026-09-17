@@ -10,9 +10,10 @@ interface Props {
   onNewMovement?: () => void;
   avatarUrl?: string;
   onLogout?: () => void;
+  onOpenNotifications?: () => void;
 }
 
-export default function Layout({ children, currentRoute, onNavigate, onNewMovement, avatarUrl, onLogout }: Props) {
+export default function Layout({ children, currentRoute, onNavigate, onNewMovement, avatarUrl, onLogout, onOpenNotifications }: Props) {
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row">
       <Navigation
@@ -21,6 +22,7 @@ export default function Layout({ children, currentRoute, onNavigate, onNewMoveme
         onNewMovement={onNewMovement}
         avatarUrl={avatarUrl}
         onLogout={onLogout}
+        onOpenNotifications={onOpenNotifications}
       />
 
       <main className="flex-1 w-full pb-20 md:pb-0 md:ml-56 lg:ml-64">

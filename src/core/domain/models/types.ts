@@ -9,6 +9,9 @@ export interface BaseEntity {
 export interface Profile extends BaseEntity {
   id: UUID;
   last_recurrence_eval_month?: string; // YYYY-MM
+  notification_hour?: number; // 0-23, local hour for the daily reminder (RF-16)
+  push_enabled?: boolean; // browser Notification API opt-in
+  inapp_enabled?: boolean; // in-app notification history opt-in
 }
 
 export interface IncomeSource extends BaseEntity {
@@ -61,4 +64,17 @@ export interface Movement extends BaseEntity {
   income_source_id?: UUID;
   savings_goal_id?: UUID;
   is_recurring: boolean;
+}
+
+export type NotificationType = 'budget_over_80' | 'goal_completed' | 'daily_reminder';
+
+export interface Notification extends BaseEntity {
+  id: UUID;
+  user_id: UUID;
+  type: NotificationType;
+  title: string;
+  body: string;
+  read_at?: Date;
+  related_id?: string; // bucket id (budget_over_80) or goal id (goal_completed)
+  cycle_key?: string; // 'YYYY-MM' for budget_over_80, 'YYYY-MM-DD' for daily_reminder, undefined for goal_completed
 }

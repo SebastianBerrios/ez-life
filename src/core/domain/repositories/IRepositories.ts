@@ -1,4 +1,4 @@
-import { UUID, Profile, IncomeSource, DistributionCategory, ExpenseCategory, ExpenseSubcategory, SavingsGoal, Movement } from '../models/types';
+import { UUID, Profile, IncomeSource, DistributionCategory, ExpenseCategory, ExpenseSubcategory, SavingsGoal, Movement, Notification } from '../models/types';
 
 export interface IProfileRepository {
   get(id: UUID): Promise<Profile | undefined>;
@@ -41,4 +41,10 @@ export interface IMovementRepository {
   countByExpenseCategory(categoryId: UUID): Promise<number>;
   countByExpenseSubcategory(subcategoryId: UUID): Promise<number>;
   countBySavingsGoal(goalId: UUID): Promise<number>;
+}
+
+export interface INotificationRepository {
+  save(notification: Omit<Notification, 'created_at' | 'updated_at'>): Promise<Notification>;
+  getAllByUser(userId: UUID): Promise<Notification[]>;
+  markRead(id: UUID): Promise<void>;
 }

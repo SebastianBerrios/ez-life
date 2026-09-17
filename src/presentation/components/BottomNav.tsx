@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Plus, LogOut, LayoutDashboard, ArrowLeftRight, PieChart, Target, Settings } from 'lucide-react';
+import { Plus, LogOut, LayoutDashboard, ArrowLeftRight, PieChart, Target, Settings, Bell } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { getSupabaseBrowserClient } from '../../infrastructure/supabase/client';
 
@@ -11,6 +11,7 @@ interface Props {
   onNewMovement?: () => void;
   avatarUrl?: string;
   onLogout?: () => void;
+  onOpenNotifications?: () => void;
 }
 
 const navItems = [
@@ -21,7 +22,7 @@ const navItems = [
   { id: 'settings', label: 'Ajustes', Icon: Settings },
 ];
 
-export default function Navigation({ currentRoute, onNavigate, onNewMovement, avatarUrl, onLogout }: Props) {
+export default function Navigation({ currentRoute, onNavigate, onNewMovement, avatarUrl, onLogout, onOpenNotifications }: Props) {
   const handleLogout = async () => {
     const supabase = getSupabaseBrowserClient();
     await supabase.auth.signOut();
@@ -67,7 +68,18 @@ export default function Navigation({ currentRoute, onNavigate, onNewMovement, av
             <span className="text-xl">🌿</span>
             <h1 className="text-xl font-extrabold text-foreground tracking-tight">ez-life</h1>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-1">
+            {onOpenNotifications && (
+              <button
+                onClick={onOpenNotifications}
+                aria-label="Ver notificaciones"
+                className="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-muted text-muted-foreground transition-colors"
+              >
+                <Bell className="w-4 h-4" />
+              </button>
+            )}
+            <ThemeToggle />
+          </div>
         </div>
 
         {/* New movement button */}
