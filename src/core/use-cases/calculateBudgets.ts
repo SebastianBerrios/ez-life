@@ -13,9 +13,13 @@ export function calculateBudgets(totalIncomeCents: number, categories: Distribut
   });
 
   if (remainingCents > 0 && budgets.length > 0) {
-    const highestCat = budgets.reduce((prev, curr) => 
-      (prev.percentage > curr.percentage) ? prev : curr
-    );
+    // Tie-break deterministically: highest percentage wins; on a tie, the
+    // lexicographically smallest id wins, regardless of array/DB order.
+    const highestCat = budgets.reduce((prev, curr) => {
+      if (curr.percentage > prev.percentage) return curr;
+      if (curr.percentage === prev.percentage && curr.id.localeCompare(prev.id) < 0) return curr;
+      return prev;
+    });
     highestCat.budget += Math.round(remainingCents);
   }
   

@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import { LocalSavingsGoalRepository } from '../../infrastructure/repositories/local/LocalSavingsGoalRepository';
+import { validateMovementAmount } from '../../core/use-cases/validateMovementAmount';
+import { DomainError } from '../../core/domain/errors/DomainError';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,14 +21,26 @@ export default function SavingsGoalForm({ userId, onComplete, onCancel }: Props)
   const [targetAmount, setTargetAmount] = useState('');
   const [deadline, setDeadline] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [amountError, setAmountError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const amountInCents = Math.round(parseFloat(targetAmount.replace(/,/g, '')) * 100);
+    try {
+      validateMovementAmount(amountInCents);
+    } catch (err) {
+      if (err instanceof DomainError) {
+        setAmountError(err.message);
+      }
+      return;
+    }
+    setAmountError(null);
+
     setIsSubmitting(true);
 
     try {
       const repo = new LocalSavingsGoalRepository();
-      const amountInCents = Math.round(parseFloat(targetAmount.replace(/,/g, '')) * 100);
 
       await repo.save({
         id: '', // Handled by repo UUID generation
@@ -94,9 +108,13 @@ export default function SavingsGoalForm({ userId, onComplete, onCancel }: Props)
                 onChange={(e) => {
                   const val = e.target.value.replace(/[^0-9.]/g, '');
                   setTargetAmount(val);
+                  if (amountError) setAmountError(null);
                 }}
               />
             </div>
+            {amountError && (
+              <p className="text-sm text-destructive">{amountError}</p>
+            )}
           </div>
 
           <div className="space-y-2">

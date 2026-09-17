@@ -35,4 +35,28 @@ describe('calculateBudgets', () => {
     const totalBudget = result.reduce((acc, curr) => acc + curr.budget, 0);
     expect(totalBudget).toBe(10001);
   });
+
+  it('breaks a percentage tie by lexicographically smallest id, regardless of array order', () => {
+    const totalIncomeCents = 101;
+    const baseCategory = {
+      user_id: 'user-1',
+      is_default: true,
+      is_savings: false,
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+
+    // Both categories tie at 50%; id 'a' is lexicographically smaller than 'z'.
+    // Input order deliberately puts the "loser" first to prove order doesn't decide it.
+    const categories: DistributionCategory[] = [
+      { ...baseCategory, id: 'z-category', name: 'Z', percentage: 50 },
+      { ...baseCategory, id: 'a-category', name: 'A', percentage: 50 },
+    ];
+
+    const result = calculateBudgets(totalIncomeCents, categories);
+
+    // 50.5 -> 50 each, remainder = 1, must go to 'a-category' (smaller id).
+    expect(result.find(c => c.id === 'a-category')?.budget).toBe(51);
+    expect(result.find(c => c.id === 'z-category')?.budget).toBe(50);
+  });
 });
