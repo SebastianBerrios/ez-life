@@ -20,9 +20,9 @@ describe('MovementForm', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (LocalCategoryRepository as any).mockImplementation(function() {
       return {
-        getDistributionCategories: vi.fn().mockResolvedValue([{ id: 'cat-id', name: 'Ahorro e Inversión', percentage: 20, is_default: true }]),
-        getExpenseCategories: vi.fn().mockResolvedValue([{ id: 'exp-cat-id', name: 'Alimentación' }]),
-        getSubcategories: vi.fn().mockResolvedValue([{ id: 'sub-id', name: 'Desayuno' }])
+        getDistributionCategories: vi.fn().mockResolvedValue([{ id: 'cat-id', name: 'Ahorro e Inversión', percentage: 20, is_default: true, is_savings: true }]),
+        getExpenseCategories: vi.fn().mockResolvedValue([{ id: 'exp-cat-id', distribution_category_id: 'cat-id', name: 'Alimentación' }]),
+        getSubcategories: vi.fn().mockResolvedValue([{ id: 'sub-id', category_id: 'exp-cat-id', name: 'Desayuno' }])
       };
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -52,7 +52,7 @@ describe('MovementForm', () => {
     const descInput = screen.getByLabelText(/descripción/i);
     await user.type(descInput, 'Cena familiar');
 
-    // Select Savings Goal (shown because category name includes 'ahorro')
+    // Select Savings Goal (shown because the selected bucket has is_savings: true)
     const goalSelect = await screen.findByLabelText(/Meta de Ahorro/i);
     await user.click(goalSelect);
     const goalOption = await screen.findByRole('option', { name: /Viaje/i });

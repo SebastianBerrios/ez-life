@@ -2,6 +2,11 @@
 
 import React, { useState } from 'react';
 import { LocalSavingsGoalRepository } from '../../infrastructure/repositories/local/LocalSavingsGoalRepository';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Loader2 } from 'lucide-react';
 
 interface Props {
   userId: string;
@@ -18,17 +23,17 @@ export default function SavingsGoalForm({ userId, onComplete, onCancel }: Props)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
     try {
       const repo = new LocalSavingsGoalRepository();
       const amountInCents = Math.round(parseFloat(targetAmount.replace(/,/g, '')) * 100);
-      
+
       await repo.save({
         id: '', // Handled by repo UUID generation
         user_id: userId,
         name,
         target_amount: amountInCents,
-        deadline: deadline ? new Date(deadline) : undefined
+        deadline: deadline ? new Date(deadline) : undefined,
       });
 
       onComplete();
@@ -40,83 +45,87 @@ export default function SavingsGoalForm({ userId, onComplete, onCancel }: Props)
   };
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow-md w-full mb-4">
-      <h2 className="text-xl font-bold text-gray-900 mb-4">Nueva Meta de Ahorro</h2>
-      
-      <form onSubmit={handleSubmit} data-testid="goal-form" className="space-y-4">
-        <div>
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700">Nombre de la Meta</label>
-          <input
-            type="text"
-            id="name"
-            required
-            className="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md py-2 px-3 border"
-            placeholder="Ej. Viaje a Cancún"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label htmlFor="targetAmount" className="block text-sm font-medium text-gray-700">Monto Objetivo</label>
-          <div className="mt-1 relative rounded-md shadow-sm">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <span className="text-gray-500 sm:text-sm">S/</span>
-            </div>
-            <input
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle>Nueva Meta de Ahorro</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} data-testid="goal-form" className="space-y-5">
+          <div className="space-y-2">
+            <Label htmlFor="name">Nombre de la Meta</Label>
+            <Input
               type="text"
-              id="targetAmount"
+              id="name"
               required
-              className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 border"
-              placeholder="0.00"
-              value={targetAmount}
-              onFocus={() => {
-                if (targetAmount) {
-                  setTargetAmount(targetAmount.replace(/,/g, ''));
-                }
-              }}
-              onBlur={() => {
-                if (targetAmount && !isNaN(Number(targetAmount))) {
-                  setTargetAmount(Number(targetAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-                }
-              }}
-              onChange={(e) => {
-                const val = e.target.value.replace(/[^0-9.]/g, '');
-                setTargetAmount(val);
-              }}
+              placeholder="Ej. Viaje a Cancún"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
             />
           </div>
-        </div>
 
-        <div>
-          <label htmlFor="deadline" className="block text-sm font-medium text-gray-700">Fecha límite (Opcional)</label>
-          <input
-            type="date"
-            id="deadline"
-            className="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md py-2 px-3 border"
-            value={deadline}
-            onChange={(e) => setDeadline(e.target.value)}
-          />
-        </div>
+          <div className="space-y-2">
+            <Label htmlFor="targetAmount">Monto Objetivo</Label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <span className="text-muted-foreground text-base font-medium">S/</span>
+              </div>
+              <Input
+                type="text"
+                id="targetAmount"
+                required
+                className="pl-9"
+                placeholder="0.00"
+                value={targetAmount}
+                onFocus={() => {
+                  if (targetAmount) {
+                    setTargetAmount(targetAmount.replace(/,/g, ''));
+                  }
+                }}
+                onBlur={() => {
+                  if (targetAmount && !isNaN(Number(targetAmount))) {
+                    setTargetAmount(
+                      Number(targetAmount).toLocaleString('en-US', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })
+                    );
+                  }
+                }}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9.]/g, '');
+                  setTargetAmount(val);
+                }}
+              />
+            </div>
+          </div>
 
-        <div className="flex space-x-3 pt-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={isSubmitting}
-            className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            Crear Meta
-          </button>
-        </div>
-      </form>
-    </div>
+          <div className="space-y-2">
+            <Label htmlFor="deadline">Fecha límite (Opcional)</Label>
+            <Input
+              type="date"
+              id="deadline"
+              value={deadline}
+              onChange={(e) => setDeadline(e.target.value)}
+            />
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onCancel}
+              disabled={isSubmitting}
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isSubmitting} className="flex-1">
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Crear Meta
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   );
 }

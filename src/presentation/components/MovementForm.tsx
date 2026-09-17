@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { LocalMovementRepository } from '../../infrastructure/repositories/local/LocalMovementRepository';
 import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
 import { LocalSavingsGoalRepository } from '../../infrastructure/repositories/local/LocalSavingsGoalRepository';
@@ -23,15 +23,15 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
   const [amount, setAmount] = useState<string>('');
   const [description, setDescription] = useState<string>('');
 
-  // Distribution category
+  // Distribution category (bucket) — filters which expense categories are selectable below.
   const [distCategoryId, setDistCategoryId] = useState<string>('');
   const [distCategories, setDistCategories] = useState<DistributionCategory[]>([]);
 
   // Expense category + subcategory
   const [expenseCategoryId, setExpenseCategoryId] = useState<string>('');
-  const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
+  const [allExpenseCategories, setAllExpenseCategories] = useState<ExpenseCategory[]>([]);
   const [expenseSubcategoryId, setExpenseSubcategoryId] = useState<string>('');
-  const [subcategories, setSubcategories] = useState<ExpenseSubcategory[]>([]);
+  const [subcategoriesByCategory, setSubcategoriesByCategory] = useState<Record<string, ExpenseSubcategory[]>>({});
 
   // Savings goal
   const [savingsGoalId, setSavingsGoalId] = useState<string>('');
@@ -42,8 +42,8 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
   const [dataLoaded, setDataLoaded] = useState(false);
 
   // Load all static data on mount.
-  // IMPORTANT: distCategoryId must be set BEFORE dataLoaded=true so the Select
-  // never renders with an empty value (which would show the raw UUID).
+  // IMPORTANT: distCategoryId/expenseCategoryId must be set BEFORE dataLoaded=true
+  // so the Selects never render with an empty value (which would show the raw UUID).
   useEffect(() => {
     const loadData = async () => {
       const catRepo = new LocalCategoryRepository();
@@ -55,26 +55,71 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
         goalRepo.getAll(userId),
       ]);
 
+      const subsEntries = await Promise.all(
+        expCats.map(async (c) => [c.id, await catRepo.getSubcategories(c.id)] as const)
+      );
+      const subsMap = Object.fromEntries(subsEntries);
+
+      // A category with no subcategories yet has nothing to classify a movement
+      // under — keep it out of the picker until it has at least one.
+      const selectableCats = expCats.filter(c => (subsMap[c.id]?.length ?? 0) > 0);
+
       setDistCategories(cats);
-      setExpenseCategories(expCats);
+      setAllExpenseCategories(selectableCats);
+      setSubcategoriesByCategory(subsMap);
       setSavingsGoals(goals);
-      // Set selected values BEFORE enabling Select render
-      if (cats.length > 0) setDistCategoryId(cats[0].id);
-      if (expCats.length > 0) setExpenseCategoryId(expCats[0].id);
+
+      const firstBucket = cats[0];
+      if (firstBucket) setDistCategoryId(firstBucket.id);
+      const firstCategoryInBucket = selectableCats.find(c => c.distribution_category_id === firstBucket?.id);
+      if (firstCategoryInBucket) setExpenseCategoryId(firstCategoryInBucket.id);
       setDataLoaded(true);
     };
     loadData();
   }, [userId]);
 
-  // Load subcategories whenever the selected expense category changes.
-  useEffect(() => {
-    if (!expenseCategoryId) {
-      setSubcategories([]);
-      return;
-    }
-    const catRepo = new LocalCategoryRepository();
-    catRepo.getSubcategories(expenseCategoryId).then(setSubcategories);
-  }, [expenseCategoryId]);
+  const expenseCategories = useMemo(
+    () => allExpenseCategories.filter(c => c.distribution_category_id === distCategoryId),
+    [allExpenseCategories, distCategoryId]
+  );
+
+  const subcategories = useMemo(
+    () => subcategoriesByCategory[expenseCategoryId] ?? [],
+    [subcategoriesByCategory, expenseCategoryId]
+  );
+
+  // `@base-ui/react`'s Select.Value only renders a label instead of the raw
+  // value when Select.Root receives `items` — without it, it falls back to
+  // printing the value itself (the UUID). Each cascade level builds its own.
+  const bucketItems = useMemo(
+    () => distCategories.map(c => ({ value: c.id, label: c.name })),
+    [distCategories]
+  );
+
+  const expenseCategoryItems = useMemo(
+    () => expenseCategories.map(c => ({ value: c.id, label: c.name })),
+    [expenseCategories]
+  );
+
+  const subcategoryItems = useMemo(
+    () => subcategories.map(s => ({ value: s.id, label: s.name })),
+    [subcategories]
+  );
+
+  const savingsGoalItems = useMemo(
+    () => [
+      { value: 'unassigned', label: '— Sin asignar —' },
+      ...savingsGoals.map(g => ({ value: g.id, label: g.name })),
+    ],
+    [savingsGoals]
+  );
+
+  const handleDistCategoryChange = (id: string) => {
+    setDistCategoryId(id);
+    const nextCategories = allExpenseCategories.filter(c => c.distribution_category_id === id);
+    setExpenseCategoryId(nextCategories[0]?.id ?? '');
+    setExpenseSubcategoryId('');
+  };
 
   const handleExpenseCategoryChange = (id: string) => {
     setExpenseCategoryId(id);
@@ -111,11 +156,11 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
     }
   };
 
-  const selectedCategory = distCategories.find(c => c.id === distCategoryId);
+  const selectedBucket = distCategories.find(c => c.id === distCategoryId);
   const showSavingsGoal =
     type === 'EXPENSE' &&
     savingsGoals.length > 0 &&
-    selectedCategory?.name.toLowerCase().includes('ahorro');
+    selectedBucket?.is_savings === true;
 
   return (
     <Card className="w-full">
@@ -123,7 +168,7 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
         <CardTitle>Registrar Movimiento</CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} data-testid="movement-form" className="space-y-4">
+        <form onSubmit={handleSubmit} data-testid="movement-form" className="space-y-5">
           {/* Type toggle — visual tab style */}
           <div className="space-y-2">
             <Label>Tipo</Label>
@@ -131,7 +176,7 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
               <button
                 type="button"
                 onClick={() => setType('EXPENSE')}
-                className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                className={`h-11 px-3 rounded-lg text-base font-medium transition-colors ${
                   type === 'EXPENSE'
                     ? 'bg-card text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground'
@@ -142,7 +187,7 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
               <button
                 type="button"
                 onClick={() => setType('INCOME')}
-                className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                className={`h-11 px-3 rounded-lg text-base font-medium transition-colors ${
                   type === 'INCOME'
                     ? 'bg-card text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground'
@@ -153,12 +198,12 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
             </div>
           </div>
 
-          {/* Distribution category — only render Select once data is loaded to avoid UUID flash */}
+          {/* Distribution category — first level of the cascade, filters the category list below */}
           {type === 'EXPENSE' && (
             <div className="space-y-2">
               <Label htmlFor="distCat">Categoría (50/30/20)</Label>
               {dataLoaded ? (
-                <Select value={distCategoryId} onValueChange={(val) => setDistCategoryId(val || '')} required>
+                <Select items={bucketItems} value={distCategoryId} onValueChange={(val) => handleDistCategoryChange(val || '')} required>
                   <SelectTrigger id="distCat">
                     <SelectValue placeholder="Seleccionar categoría" />
                   </SelectTrigger>
@@ -169,17 +214,18 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
                   </SelectContent>
                 </Select>
               ) : (
-                <div className="h-10 bg-muted rounded-xl animate-pulse" />
+                <div className="h-11 bg-muted rounded-xl animate-pulse" />
               )}
             </div>
           )}
 
-          {/* Expense category — cascaded, only for EXPENSE type */}
+          {/* Expense category — cascaded, filtered by the selected bucket */}
           {type === 'EXPENSE' && (
             <div className="space-y-2">
               <Label htmlFor="expenseCat">Categoría de gasto</Label>
               {dataLoaded ? (
                 <Select
+                  items={expenseCategoryItems}
                   value={expenseCategoryId}
                   onValueChange={(val) => handleExpenseCategoryChange(val || '')}
                 >
@@ -193,7 +239,12 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
                   </SelectContent>
                 </Select>
               ) : (
-                <div className="h-10 bg-muted rounded-xl animate-pulse" />
+                <div className="h-11 bg-muted rounded-xl animate-pulse" />
+              )}
+              {dataLoaded && expenseCategories.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Esta categoría todavía no tiene categorías de gasto con subcategorías. Agregalas desde Ajustes.
+                </p>
               )}
             </div>
           )}
@@ -204,6 +255,7 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
               <Label htmlFor="expenseSubcat">Subcategoría</Label>
               {dataLoaded ? (
                 <Select
+                  items={subcategoryItems}
                   value={expenseSubcategoryId}
                   onValueChange={(val) => setExpenseSubcategoryId(val || '')}
                 >
@@ -217,16 +269,16 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
                   </SelectContent>
                 </Select>
               ) : (
-                <div className="h-10 bg-muted rounded-xl animate-pulse" />
+                <div className="h-11 bg-muted rounded-xl animate-pulse" />
               )}
             </div>
           )}
 
-          {/* Savings goal */}
+          {/* Savings goal — shown when the selected bucket is flagged as the savings bucket */}
           {showSavingsGoal && dataLoaded && (
             <div className="space-y-2">
               <Label htmlFor="savingsGoal">Meta de Ahorro (Opcional)</Label>
-              <Select value={savingsGoalId} onValueChange={(val) => setSavingsGoalId(val || '')}>
+              <Select items={savingsGoalItems} value={savingsGoalId} onValueChange={(val) => setSavingsGoalId(val || '')}>
                 <SelectTrigger id="savingsGoal">
                   <SelectValue placeholder="— Sin asignar —" />
                 </SelectTrigger>
@@ -245,7 +297,7 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
             <Label htmlFor="amount">Monto</Label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <span className="text-muted-foreground text-sm font-medium">S/</span>
+                <span className="text-muted-foreground text-base font-medium">S/</span>
               </div>
               <Input
                 type="text"
