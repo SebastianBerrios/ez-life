@@ -8,7 +8,10 @@ import Dashboard from './Dashboard';
 import MovementList from './MovementList';
 import MovementForm from './MovementForm';
 import SavingsGoalList from './SavingsGoalList';
+import SavingsGoalForm from './SavingsGoalForm';
+import AnalysisScreen from './AnalysisScreen';
 import SettingsScreen from './SettingsScreen';
+import { Button } from '@/components/ui/button';
 import { useRecurrenceEvaluator } from '../hooks/useRecurrenceEvaluator';
 import { useSyncManager } from '../hooks/useSyncManager';
 import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
@@ -19,6 +22,8 @@ export default function MainFlow() {
   const [currentRoute, setCurrentRoute] = useState('dashboard');
   const [profileId, setProfileId] = useState<string | null>(null);
   const [showMovementForm, setShowMovementForm] = useState(false);
+  const [showGoalForm, setShowGoalForm] = useState(false);
+  const [goalsRefreshKey, setGoalsRefreshKey] = useState(0);
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
 
   // Background Jobs
@@ -108,7 +113,13 @@ export default function MainFlow() {
       <OnboardingWizard
         profileId={profileId ?? ''}
         startStep={wizardStartStep}
-        onComplete={() => setStep('app')}
+        onComplete={(finalProfileId) => {
+          // The wizard may have created/edited data under its own locally
+          // generated profileId (Step 1 skip-login path) — sync it back so
+          // Dashboard/MovementForm query the right user, not a stale one.
+          setProfileId(finalProfileId);
+          setStep('app');
+        }}
       />
     );
   }
@@ -122,7 +133,7 @@ export default function MainFlow() {
       avatarUrl={avatarUrl}
       onLogout={() => setStep('login')}
     >
-      <div className="p-4 space-y-6">
+      <div className="p-5 space-y-6">
         {/* Mobile header */}
         <header className="flex justify-between items-center py-2 md:hidden">
           <div className="flex items-center gap-2">
@@ -158,18 +169,31 @@ export default function MainFlow() {
           </div>
         )}
 
+        {currentRoute === 'analysis' && profileId && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-bold text-foreground">Análisis</h2>
+            </div>
+            <AnalysisScreen userId={profileId} />
+          </div>
+        )}
+
         {currentRoute === 'goals' && profileId && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-bold text-foreground">Mis Metas</h2>
+              <Button size="sm" onClick={() => setShowGoalForm(true)}>
+                + Nueva meta
+              </Button>
             </div>
-            <SavingsGoalList userId={profileId} />
+            <SavingsGoalList key={goalsRefreshKey} userId={profileId} />
           </div>
         )}
 
         {currentRoute === 'settings' && profileId && (
           <SettingsScreen
             userId={profileId}
+            onEditDistribution={() => { setWizardStartStep(2); setStep('onboarding-wizard'); }}
             onEditCategories={() => { setWizardStartStep(3); setStep('onboarding-wizard'); }}
             onLogout={() => setStep('login')}
           />
@@ -191,7 +215,7 @@ export default function MainFlow() {
 
           {showMovementForm && (
             <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm">
-              <div className="bg-card w-full md:max-w-lg md:rounded-2xl max-h-[90vh] overflow-y-auto rounded-t-2xl p-4 md:p-6 shadow-xl border border-border">
+              <div className="bg-card w-full md:max-w-lg md:rounded-2xl max-h-[90vh] overflow-y-auto rounded-t-2xl p-5 md:p-6 shadow-xl border border-border">
                 <MovementForm
                   userId={profileId}
                   onComplete={() => setShowMovementForm(false)}
@@ -201,6 +225,21 @@ export default function MainFlow() {
             </div>
           )}
         </>
+      )}
+
+      {showGoalForm && profileId && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-card w-full md:max-w-lg md:rounded-2xl max-h-[90vh] overflow-y-auto rounded-t-2xl p-5 md:p-6 shadow-xl border border-border">
+            <SavingsGoalForm
+              userId={profileId}
+              onComplete={() => {
+                setShowGoalForm(false);
+                setGoalsRefreshKey(k => k + 1);
+              }}
+              onCancel={() => setShowGoalForm(false)}
+            />
+          </div>
+        </div>
       )}
     </Layout>
   );
