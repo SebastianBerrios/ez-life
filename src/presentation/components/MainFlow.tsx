@@ -11,9 +11,13 @@ import SavingsGoalList from './SavingsGoalList';
 import SavingsGoalForm from './SavingsGoalForm';
 import AnalysisScreen from './AnalysisScreen';
 import SettingsScreen from './SettingsScreen';
+import NotificationHistory from './NotificationHistory';
 import { Button } from '@/components/ui/button';
+import { Bell } from 'lucide-react';
 import { useRecurrenceEvaluator } from '../hooks/useRecurrenceEvaluator';
 import { useSyncManager } from '../hooks/useSyncManager';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { useNotificationEvaluator } from '../hooks/useNotificationEvaluator';
 import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
 
 export default function MainFlow() {
@@ -25,10 +29,13 @@ export default function MainFlow() {
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [goalsRefreshKey, setGoalsRefreshKey] = useState(0);
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   // Background Jobs
   useRecurrenceEvaluator(profileId);
   useSyncManager();
+  useNotificationEvaluator(profileId);
+  const isOnline = useOnlineStatus();
 
   React.useEffect(() => {
     import('../../infrastructure/supabase/client').then(({ getSupabaseBrowserClient }) => {
@@ -101,6 +108,21 @@ export default function MainFlow() {
     return <LoginScreen />;
   }
 
+  if (step === 'onboarding-wizard' && !isOnline) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <div className="max-w-sm w-full bg-destructive/10 border border-destructive/20 rounded-2xl p-6 text-center space-y-2">
+          <p className="text-base font-medium text-destructive">
+            Necesitás conexión a internet para completar la configuración inicial.
+          </p>
+          <p className="text-sm text-destructive">
+            Tu progreso está guardado — apenas vuelva la conexión podés continuar donde quedaste.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (step === 'onboarding-wizard') {
     return (
       <OnboardingWizard
@@ -125,6 +147,7 @@ export default function MainFlow() {
       onNewMovement={() => setShowMovementForm(true)}
       avatarUrl={avatarUrl}
       onLogout={() => setStep('login')}
+      onOpenNotifications={() => setShowNotifications(true)}
     >
       <div className="p-5 space-y-6">
         {/* Mobile header */}
@@ -134,6 +157,13 @@ export default function MainFlow() {
             <h1 className="text-2xl font-extrabold text-foreground tracking-tight">ez-life</h1>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowNotifications(true)}
+              aria-label="Ver notificaciones"
+              className="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-muted text-muted-foreground transition-colors"
+            >
+              <Bell className="w-4 h-4" />
+            </button>
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -230,6 +260,17 @@ export default function MainFlow() {
                 setGoalsRefreshKey(k => k + 1);
               }}
               onCancel={() => setShowGoalForm(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {showNotifications && profileId && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-card w-full md:max-w-lg md:rounded-2xl max-h-[90vh] overflow-y-auto rounded-t-2xl p-5 md:p-6 shadow-xl border border-border">
+            <NotificationHistory
+              userId={profileId}
+              onClose={() => setShowNotifications(false)}
             />
           </div>
         </div>

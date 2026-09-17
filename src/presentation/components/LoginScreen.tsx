@@ -1,7 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { getSupabaseBrowserClient } from '../../infrastructure/supabase/client';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 // Google brand SVG (official multicolor mark)
 function GoogleIcon() {
@@ -25,9 +26,25 @@ function GitHubIcon() {
 }
 
 export default function LoginScreen() {
+  const isOnline = useOnlineStatus();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const handleLogin = async (provider: 'google' | 'github') => {
-    const supabase = getSupabaseBrowserClient();
-    await supabase.auth.signInWithOAuth({ provider });
+    if (!isOnline) {
+      setErrorMessage('Se requiere conexión a internet para iniciar sesión por primera vez.');
+      return;
+    }
+
+    setErrorMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { error } = await supabase.auth.signInWithOAuth({ provider });
+      if (error) {
+        setErrorMessage(error.message);
+      }
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'No se pudo iniciar sesión. Intentá de nuevo.');
+    }
   };
 
   return (
@@ -61,6 +78,10 @@ export default function LoginScreen() {
             <GitHubIcon />
             GitHub
           </button>
+
+          {errorMessage && (
+            <p className="text-sm text-destructive text-center">{errorMessage}</p>
+          )}
         </div>
 
         <p className="text-center text-sm text-muted-foreground">
