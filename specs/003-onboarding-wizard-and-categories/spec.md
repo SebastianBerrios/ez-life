@@ -1,5 +1,9 @@
 # Spec 003 — Onboarding Wizard & Expense Categories
 
+> [!NOTE]
+> Entrega histórica — ver `specs/001-ezlife-mvp/spec.md` para el estado
+> vigente de requisitos.
+
 ## Contexto
 
 Esta entrega unifica los bugs pendientes de la spec 002 (nunca implementados) con dos features nuevos que el usuario requiere: un wizard de onboarding multi-step completo y la gestión de categorías/subcategorías de gasto en el formulario de movimientos.
@@ -54,6 +58,13 @@ Esta entrega unifica los bugs pendientes de la spec 002 (nunca implementados) co
 
 - Sin nuevas dependencias runtime.
 - No se toca lógica de negocio ni repositorios (ya están completos).
+
+  > [!NOTE]
+  > Esto resultó ser falso: `specs/004-category-hierarchy-and-analysis/spec.md`
+  > encontró que la relación categoría de gasto ↔ categoría de distribución
+  > nunca existió en el modelo de datos, y requirió cambios de modelo y
+  > repositorio en esa entrega siguiente.
+
 - Todos los tests existentes deben seguir pasando (`pnpm test`).
 - `pnpm lint` sin errores al terminar.
 - No se escriben tests unitarios para los nuevos componentes UI del wizard (costo alto, ROI bajo para UI de onboarding).

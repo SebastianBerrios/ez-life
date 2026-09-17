@@ -14,7 +14,7 @@ App de finanzas personales y familiares. Offline-first con sincronización a Sup
 
 - TypeScript strict mode. No `any` salvo justificación en comentario.
 - Nombres en inglés: variables, funciones, tipos, componentes, commits.
-- UI copy en español. Strings de UI a través de i18n (nunca hardcodeados).
+- UI copy en español, centralizado a mano en los componentes. Sin librería de i18n en v1 (ver `docs/constitution.md` regla 6).
 - Commits: conventional commits en inglés (`feat:`, `fix:`, `docs:`, etc.).
 - Componentes: PascalCase. Hooks: `use` prefix. Utilities: camelCase.
 
@@ -24,7 +24,7 @@ App de finanzas personales y familiares. Offline-first con sincronización a Sup
 - No agregar dependencias runtime sin justificación en la spec.
 - No escribir lógica de negocio dentro de componentes React.
 - No usar `float` para valores monetarios. Siempre enteros (céntimos).
-- No escribir código sin spec aprobada en `docs/specs/`.
+- No escribir código sin spec aprobada en `specs/`.
 
 ## Al terminar cualquier tarea
 

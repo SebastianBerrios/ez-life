@@ -1,5 +1,9 @@
 # Spec 002 — UI/UX Fixes & Polish
 
+> [!NOTE]
+> Entrega histórica — ver `specs/001-ezlife-mvp/spec.md` para el estado
+> vigente de requisitos.
+
 ## Contexto
 
 Revisión multi-dispositivo detectó 10 problemas entre bugs funcionales y deudas de diseño.

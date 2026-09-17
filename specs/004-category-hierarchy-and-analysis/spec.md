@@ -1,5 +1,9 @@
 # Spec 004 — Jerarquía real de categorías y vista de Análisis
 
+> [!NOTE]
+> Entrega histórica — ver `specs/001-ezlife-mvp/spec.md` para el estado
+> vigente de requisitos.
+
 ## Contexto
 
 Auditoría del código actual (ver sesión de grilling previa a este spec) encontró que
@@ -22,6 +26,13 @@ implementó, porque depende de la misma relación jerárquica para tener sentido
 > y ya están resueltos — el spec.md de 003 quedó desactualizado. No requieren
 > trabajo; se puede optimizar al pasar por esos archivos si surge la oportunidad,
 > pero no es un objetivo de esta entrega.
+>
+> **Corrección posterior**: de estos 6 ítems, 5 efectivamente estaban
+> resueltos. El ítem del "flash de UUID" reapareció y fue reabierto por
+> `specs/005-select-labels-goals-density/spec.md` con una causa raíz
+> distinta — no una condición de carrera de datos como se pensaba acá, sino
+> un bug estructural en el wrapper compartido `src/components/ui/select.tsx`
+> que nunca resuelve labels sin la prop `items`.
 
 ---
 

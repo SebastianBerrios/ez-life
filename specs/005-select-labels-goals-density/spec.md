@@ -1,5 +1,9 @@
 # Spec 005 — Labels en selects, alta de metas de ahorro, densidad de UI
 
+> [!NOTE]
+> Entrega histórica — ver `specs/001-ezlife-mvp/spec.md` para el estado
+> vigente de requisitos.
+
 ## Contexto
 
 Usuario reportó tres problemas al probar la app en el navegador (screenshot de
@@ -38,6 +42,13 @@ el resto de la app.
 **Archivos afectados**: `src/components/ui/select.tsx` (fix),
 `src/presentation/components/MovementForm.tsx` (pasar los `items`/labels en
 sus 4 selects: bucket, categoría, subcategoría, meta de ahorro).
+
+> [!NOTE]
+> **Corrección posterior**: la implementación real terminó resolviendo el bug
+> en el call site (`MovementForm.tsx` arma los `items` a mano) y no en el
+> primitivo `src/components/ui/select.tsx` como se decidió arriba. La
+> relocalización del fix al primitivo queda pendiente — ver
+> `specs/006-qa-remediation/spec.md` RF-28.
 
 ---
 

@@ -1,10 +1,10 @@
-# Constitution — ez-life
+# Constitución — ez-life
 
-1. **Stack**: TypeScript, React, Next.js, Supabase. Every new runtime dependency requires justification in the spec.
-2. **Spec → Code**: Every feature MUST have a spec in `docs/specs/` BEFORE writing code. Code without spec is unauthorized.
-3. **Logic ≠ UI**: Business rules live in pure functions/hooks with zero UI imports. Components only render and delegate.
-4. **Tests**: Every use case has at least one unit test. Pure logic: Vitest. UI behavior: Testing Library. No e2e until spec requires it.
-5. **Persistence**: Offline-first — IndexedDB is the local source of truth. Supabase syncs to the cloud via a custom sync layer. The app MUST work fully without connectivity. Persistence is behind a repository interface.
-6. **Language**: Code, types, variables, and commits in English. UI copy in Spanish (i18n-ready from day one). README and docs in Spanish.
-7. **Simplicity**: If a library adds less than 50 lines of value, write it by hand. Fewer dependencies, fewer problems.
-8. **Money**: All monetary values stored as integers (céntimos). Never floats. v1 operates in PEN only.
+1. **Stack**: TypeScript, React, Next.js, Supabase. Toda nueva dependencia runtime requiere justificación en la spec correspondiente.
+2. **Spec → Código**: Toda funcionalidad DEBE tener una spec en `specs/` ANTES de escribir código. Código sin spec no está autorizado.
+3. **Lógica ≠ UI**: Las reglas de negocio viven en funciones puras/hooks sin imports de UI. Los componentes solo renderizan y delegan.
+4. **Tests**: Todo caso de uso tiene al menos un test unitario (Vitest). El comportamiento de UI que implica wiring o flujo de datos (conectar un formulario, cambiar qué se llama al hacer submit, agregar una ruta) requiere test con Testing Library. Los cambios puramente de estilo visual o de tokens (spacing, tipografía, colores, tamaños) no requieren test nuevo. Sin e2e hasta que una spec lo requiera explícitamente.
+5. **Persistencia**: Offline-first — IndexedDB es la fuente de verdad local. Supabase sincroniza a la nube mediante una capa de sync custom. La app DEBE funcionar completamente sin conectividad, con una única excepción explícita: el login inicial vía OAuth requiere conexión (ver `specs/001-ezlife-mvp/spec.md` RF-01/RNF-01). La persistencia vive detrás de una interfaz de repositorio.
+6. **Idioma**: Código, tipos, variables y commits en inglés. El copy de UI va en español, centralizado a mano en los componentes — v1 NO usa una librería de i18n: agregar una violaría las reglas 1 y 7 (nueva dependencia sin justificación suficiente frente al valor que aporta hoy). Esto se documenta como deuda técnica explícita, no como una violación activa de esta constitución. README y docs en español.
+7. **Simplicidad**: Si una librería aporta menos de 50 líneas de valor, se escribe a mano. Menos dependencias, menos problemas.
+8. **Dinero**: Todos los valores monetarios se almacenan como enteros (céntimos). Nunca floats. v1 opera solo en PEN.
