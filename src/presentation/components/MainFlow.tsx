@@ -98,14 +98,7 @@ export default function MainFlow() {
   }
 
   if (step === 'login') {
-    return (
-      <LoginScreen
-        onSkip={() => {
-          setWizardStartStep(1);
-          setStep('onboarding-wizard');
-        }}
-      />
-    );
+    return <LoginScreen />;
   }
 
   if (step === 'onboarding-wizard') {

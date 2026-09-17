@@ -24,11 +24,7 @@ function GitHubIcon() {
   );
 }
 
-interface Props {
-  onSkip?: () => void;
-}
-
-export default function LoginScreen({ onSkip }: Props) {
+export default function LoginScreen() {
   const handleLogin = async (provider: 'google' | 'github') => {
     const supabase = getSupabaseBrowserClient();
     await supabase.auth.signInWithOAuth({ provider });
@@ -52,7 +48,7 @@ export default function LoginScreen({ onSkip }: Props) {
 
           <button
             onClick={() => handleLogin('google')}
-            className="w-full flex items-center justify-center gap-3 py-3 px-4 border border-border rounded-xl text-sm font-medium text-foreground bg-background hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="w-full h-12 flex items-center justify-center gap-3 px-4 border border-border rounded-xl text-base font-medium text-foreground bg-background hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <GoogleIcon />
             Google
@@ -60,23 +56,14 @@ export default function LoginScreen({ onSkip }: Props) {
 
           <button
             onClick={() => handleLogin('github')}
-            className="w-full flex items-center justify-center gap-3 py-3 px-4 border border-border rounded-xl text-sm font-medium text-foreground bg-background hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="w-full h-12 flex items-center justify-center gap-3 px-4 border border-border rounded-xl text-base font-medium text-foreground bg-background hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <GitHubIcon />
             GitHub
           </button>
-
-          {onSkip && (
-            <button
-              onClick={onSkip}
-              className="w-full flex justify-center py-2 px-4 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg"
-            >
-              Omitir (modo dev)
-            </button>
-          )}
         </div>
 
-        <p className="text-center text-xs text-muted-foreground">
+        <p className="text-center text-sm text-muted-foreground">
           Al continuar, aceptás los términos y la política de privacidad.
         </p>
       </div>
