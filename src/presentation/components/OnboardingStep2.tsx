@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
+import { LocalMovementRepository } from '../../infrastructure/repositories/local/LocalMovementRepository';
 import { validateDeletion } from '../../core/use-cases/validateDeletion';
 import { DomainError } from '../../core/domain/errors/DomainError';
 import { uuidv7 } from 'uuidv7';
@@ -34,6 +35,7 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
   const [deleteErrors, setDeleteErrors] = useState<Record<string, string>>({});
 
   const catRepo = new LocalCategoryRepository();
+  const movementRepo = new LocalMovementRepository();
 
   // On first entry, seed the 3 default buckets as real DB rows right away —
   // their IDs must exist before Step 3 can reference them for the category seed.
@@ -74,17 +76,37 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
     setBuckets(prev => [...prev, { id: uuidv7(), name: '', percentage: 0, is_default: false, is_savings: false }]);
   };
 
+  // Mutually-exclusive, radio-like semantics: marking one bucket as the
+  // savings bucket unmarks every other one, so exactly one is always true.
+  // There is no "unmark" action — the invariant is enforced by construction.
+  const handleSetSavingsBucket = (id: string) => {
+    setBuckets(prev => prev.map(b => ({ ...b, is_savings: b.id === id })));
+  };
+
   const handleDeleteBucket = async (id: string) => {
     if (buckets.length <= 1) {
       setDeleteErrors(prev => ({ ...prev, [id]: 'Necesitás al menos una categoría de distribución.' }));
       return;
     }
 
-    const attachedCount = await catRepo.countExpenseCategoriesByDistribution(id);
+    const attachedCategoriesCount = await catRepo.countExpenseCategoriesByDistribution(id);
     try {
       validateDeletion(
-        attachedCount,
-        `No se puede eliminar: tiene ${attachedCount} categoría${attachedCount > 1 ? 's' : ''} de gasto asociada${attachedCount > 1 ? 's' : ''}.`
+        attachedCategoriesCount,
+        `No se puede eliminar: tiene ${attachedCategoriesCount} categoría${attachedCategoriesCount > 1 ? 's' : ''} de gasto asociada${attachedCategoriesCount > 1 ? 's' : ''}.`
+      );
+    } catch (err) {
+      if (err instanceof DomainError) {
+        setDeleteErrors(prev => ({ ...prev, [id]: err.message }));
+      }
+      return;
+    }
+
+    const attachedMovementsCount = await movementRepo.countByDistributionCategory(id);
+    try {
+      validateDeletion(
+        attachedMovementsCount,
+        `No se puede eliminar: tiene ${attachedMovementsCount} movimiento${attachedMovementsCount > 1 ? 's' : ''} asociado${attachedMovementsCount > 1 ? 's' : ''}.`
       );
     } catch (err) {
       if (err instanceof DomainError) {
@@ -197,6 +219,17 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
                     className="w-20 h-11 bg-background border border-input rounded-xl py-2.5 px-3 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
                   />
                   <span className="text-sm text-muted-foreground">%</span>
+                  <label className="flex items-center gap-1 text-xs text-muted-foreground shrink-0 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="savingsBucket"
+                      aria-label={`Marcar categoría ${idx + 1} como ahorro`}
+                      checked={bucket.is_savings}
+                      onChange={() => handleSetSavingsBucket(bucket.id)}
+                      className="h-4 w-4 accent-primary"
+                    />
+                    Ahorro
+                  </label>
                   <button
                     type="button"
                     onClick={() => handleDeleteBucket(bucket.id)}
