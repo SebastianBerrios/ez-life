@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Plus, LogOut, LayoutDashboard, ArrowLeftRight, Target, Settings } from 'lucide-react';
+import { Plus, LogOut, LayoutDashboard, ArrowLeftRight, PieChart, Target, Settings } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { getSupabaseBrowserClient } from '../../infrastructure/supabase/client';
 
@@ -16,6 +16,7 @@ interface Props {
 const navItems = [
   { id: 'dashboard', label: 'Resumen', Icon: LayoutDashboard },
   { id: 'movements', label: 'Movimientos', Icon: ArrowLeftRight },
+  { id: 'analysis', label: 'Análisis', Icon: PieChart },
   { id: 'goals', label: 'Metas', Icon: Target },
   { id: 'settings', label: 'Ajustes', Icon: Settings },
 ];

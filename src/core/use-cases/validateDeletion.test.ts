@@ -11,4 +11,8 @@ describe('validateDeletion', () => {
   it('should not throw if count is 0', () => {
     expect(() => validateDeletion(0)).not.toThrow();
   });
+
+  it('should use a custom message when provided', () => {
+    expect(() => validateDeletion(1, 'Custom message')).toThrowError('Custom message');
+  });
 });

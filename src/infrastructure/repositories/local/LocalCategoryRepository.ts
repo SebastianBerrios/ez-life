@@ -40,6 +40,12 @@ export class LocalCategoryRepository implements ICategoryRepository {
     if (existing) await db.expense_categories.put({ ...existing, deleted_at: new Date(), updated_at: new Date() });
   }
 
+  async countExpenseCategoriesByDistribution(distributionCategoryId: UUID): Promise<number> {
+    return await db.expense_categories
+      .filter(c => c.distribution_category_id === distributionCategoryId && !c.deleted_at)
+      .count();
+  }
+
   async getSubcategories(categoryId: UUID): Promise<ExpenseSubcategory[]> {
     return await db.expense_subcategories.where('category_id').equals(categoryId).filter(x => !x.deleted_at).toArray();
   }

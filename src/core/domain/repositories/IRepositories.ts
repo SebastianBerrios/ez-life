@@ -19,6 +19,7 @@ export interface ICategoryRepository {
   getExpenseCategories(userId: UUID): Promise<ExpenseCategory[]>;
   saveExpenseCategory(category: Omit<ExpenseCategory, 'created_at' | 'updated_at'>): Promise<ExpenseCategory>;
   deleteExpenseCategory(id: UUID): Promise<void>;
+  countExpenseCategoriesByDistribution(distributionCategoryId: UUID): Promise<number>;
 
   getSubcategories(categoryId: UUID): Promise<ExpenseSubcategory[]>;
   saveSubcategory(subcategory: Omit<ExpenseSubcategory, 'created_at' | 'updated_at'>): Promise<ExpenseSubcategory>;

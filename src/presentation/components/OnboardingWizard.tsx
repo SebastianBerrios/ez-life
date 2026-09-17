@@ -1,21 +1,32 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
 import { LocalMovementRepository } from '../../infrastructure/repositories/local/LocalMovementRepository';
-import { ExpenseCategory, ExpenseSubcategory } from '../../core/domain/models/types';
+import { validateDeletion } from '../../core/use-cases/validateDeletion';
+import { DomainError } from '../../core/domain/errors/DomainError';
+import { DistributionCategory, ExpenseCategory, ExpenseSubcategory, UUID } from '../../core/domain/models/types';
 import { uuidv7 } from 'uuidv7';
 import OnboardingStep1 from './OnboardingStep1';
 import OnboardingStep2 from './OnboardingStep2';
 
 // ---------------------------------------------------------------------------
-// Seed data for Step 3 (populated only when no expense categories exist)
+// Seed data for Step 3 (populated only when no expense categories exist).
+// Mapped to buckets structurally (highest-% non-savings bucket, then the
+// next one) rather than by name, since bucket names are user-editable.
 // ---------------------------------------------------------------------------
 const DEFAULT_CATEGORIES = [
-  { name: 'Alimentación', subcategories: ['Desayuno', 'Almuerzo', 'Cena', 'Snack'] },
-  { name: 'Ocio',         subcategories: ['Deporte', 'Cine', 'Fiesta', 'Restaurante'] },
-  { name: 'Transporte',   subcategories: ['Combustible', 'Taxi/Uber', 'Transporte público'] },
+  { bucket: 'primary' as const, name: 'Alimentación', subcategories: ['Desayuno', 'Almuerzo', 'Cena', 'Snack'] },
+  { bucket: 'secondary' as const, name: 'Ocio', subcategories: ['Deporte', 'Cine', 'Fiesta', 'Restaurante'] },
+  { bucket: 'primary' as const, name: 'Transporte', subcategories: ['Combustible', 'Taxi/Uber', 'Transporte público'] },
 ];
+
+function pickSeedBuckets(buckets: DistributionCategory[]): { primary: UUID; secondary: UUID } {
+  const nonSavings = [...buckets].filter(b => !b.is_savings).sort((a, b) => b.percentage - a.percentage);
+  const primary = nonSavings[0]?.id ?? buckets[0]?.id ?? '';
+  const secondary = nonSavings[1]?.id ?? primary;
+  return { primary, secondary };
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -23,7 +34,7 @@ const DEFAULT_CATEGORIES = [
 interface Props {
   profileId: string;
   startStep?: 1 | 2 | 3;
-  onComplete: () => void;
+  onComplete: (profileId: string) => void;
 }
 
 interface CategoryWithSubs {
@@ -60,7 +71,7 @@ function ProgressBar({ currentStep }: { currentStep: 1 | 2 | 3 }) {
               >
                 {isCompleted ? '✓' : step.number}
               </div>
-              <span className={`text-xs font-medium ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
+              <span className={`text-sm font-medium ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
                 {step.label}
               </span>
             </div>
@@ -79,7 +90,7 @@ function ProgressBar({ currentStep }: { currentStep: 1 | 2 | 3 }) {
 }
 
 // ---------------------------------------------------------------------------
-// Step 3 — Expense category management
+// Step 3 — Expense category management, grouped by distribution bucket
 // ---------------------------------------------------------------------------
 function Step3Categories({
   profileId,
@@ -88,13 +99,16 @@ function Step3Categories({
   profileId: string;
   onComplete: () => void;
 }) {
+  const [buckets, setBuckets] = useState<DistributionCategory[]>([]);
   const [items, setItems] = useState<CategoryWithSubs[]>([]);
   const [loading, setLoading] = useState(true);
-  const [seeded, setSeeded] = useState(false);
+  // Guards the seed effect below against React 18 Strict Mode's dev
+  // double-invoke, which replays effect setup on the same mounted instance.
+  const seedStartedRef = useRef(false);
 
-  // New category input
-  const [newCatName, setNewCatName] = useState('');
-  const [addingCat, setAddingCat] = useState(false);
+  // New category input — keyed by bucketId (each bucket section has its own inline add-input)
+  const [newCatName, setNewCatName] = useState<Record<string, string>>({});
+  const [addingCatFor, setAddingCatFor] = useState<string | null>(null);
 
   // New subcategory input — keyed by categoryId
   const [newSubName, setNewSubName] = useState<Record<string, string>>({});
@@ -106,8 +120,9 @@ function Step3Categories({
   const catRepo = new LocalCategoryRepository();
   const movRepo = new LocalMovementRepository();
 
-  // Load all categories + their subcategories
+  // Load buckets + categories + their subcategories
   const loadAll = useCallback(async () => {
+    const loadedBuckets = await catRepo.getDistributionCategories(profileId);
     const cats = await catRepo.getExpenseCategories(profileId);
     const withSubs: CategoryWithSubs[] = await Promise.all(
       cats.map(async (cat) => ({
@@ -115,20 +130,33 @@ function Step3Categories({
         subcategories: await catRepo.getSubcategories(cat.id),
       }))
     );
+    setBuckets(loadedBuckets);
     setItems(withSubs);
     setLoading(false);
-    return cats;
-  }, [profileId]); // eslint-disable-line react-hooks/exhaustive-deps
+    return { cats, loadedBuckets };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileId]);
 
-  // Seed on first load if no categories exist
+  // Seed on first load if no expense categories exist yet.
+  // The ref guard is checked and set synchronously, before any `await` —
+  // a `useState`-based guard is racy here because Strict Mode's second
+  // invocation starts before the first invocation's state update commits,
+  // so both async closures would see the old "not seeded" value.
   useEffect(() => {
+    if (seedStartedRef.current) return;
+    seedStartedRef.current = true;
     const init = async () => {
-      const cats = await loadAll();
-      if (cats.length === 0 && !seeded) {
-        setSeeded(true);
+      const { cats, loadedBuckets } = await loadAll();
+      if (cats.length === 0 && loadedBuckets.length > 0) {
+        const { primary, secondary } = pickSeedBuckets(loadedBuckets);
         for (const def of DEFAULT_CATEGORIES) {
           const catId = uuidv7();
-          await catRepo.saveExpenseCategory({ id: catId, user_id: profileId, name: def.name });
+          await catRepo.saveExpenseCategory({
+            id: catId,
+            user_id: profileId,
+            distribution_category_id: def.bucket === 'primary' ? primary : secondary,
+            name: def.name,
+          });
           for (const subName of def.subcategories) {
             await catRepo.saveSubcategory({ id: uuidv7(), category_id: catId, name: subName });
           }
@@ -137,25 +165,28 @@ function Step3Categories({
       }
     };
     init();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const handleAddCategory = async () => {
-    const name = newCatName.trim();
+  const handleAddCategory = async (bucketId: string) => {
+    const name = (newCatName[bucketId] || '').trim();
     if (!name) return;
     const catId = uuidv7();
-    await catRepo.saveExpenseCategory({ id: catId, user_id: profileId, name });
-    setNewCatName('');
-    setAddingCat(false);
+    await catRepo.saveExpenseCategory({ id: catId, user_id: profileId, distribution_category_id: bucketId, name });
+    setNewCatName(prev => ({ ...prev, [bucketId]: '' }));
+    setAddingCatFor(null);
     await loadAll();
   };
 
   const handleDeleteCategory = async (categoryId: string) => {
     const count = await movRepo.countByExpenseCategory(categoryId);
-    if (count > 0) {
-      setErrors(prev => ({
-        ...prev,
-        [categoryId]: `No se puede eliminar: tiene ${count} movimiento${count > 1 ? 's' : ''} asociado${count > 1 ? 's' : ''}.`,
-      }));
+    try {
+      validateDeletion(
+        count,
+        `No se puede eliminar: tiene ${count} movimiento${count > 1 ? 's' : ''} asociado${count > 1 ? 's' : ''}.`
+      );
+    } catch (err) {
+      if (err instanceof DomainError) setErrors(prev => ({ ...prev, [categoryId]: err.message }));
       return;
     }
     setErrors(prev => { const next = { ...prev }; delete next[categoryId]; return next; });
@@ -173,14 +204,23 @@ function Step3Categories({
   };
 
   const handleDeleteSubcategory = async (subcategoryId: string, categoryId: string) => {
-    const count = await movRepo.countByExpenseSubcategory(subcategoryId);
-    if (count > 0) {
-      setErrors(prev => ({
-        ...prev,
-        [subcategoryId]: `No se puede eliminar: tiene ${count} movimiento${count > 1 ? 's' : ''} asociado${count > 1 ? 's' : ''}.`,
-      }));
+    const categoryItem = items.find(i => i.category.id === categoryId);
+    if (categoryItem && categoryItem.subcategories.length <= 1) {
+      setErrors(prev => ({ ...prev, [subcategoryId]: 'No se puede eliminar: la categoría necesita al menos una subcategoría.' }));
       return;
     }
+
+    const count = await movRepo.countByExpenseSubcategory(subcategoryId);
+    try {
+      validateDeletion(
+        count,
+        `No se puede eliminar: tiene ${count} movimiento${count > 1 ? 's' : ''} asociado${count > 1 ? 's' : ''}.`
+      );
+    } catch (err) {
+      if (err instanceof DomainError) setErrors(prev => ({ ...prev, [subcategoryId]: err.message }));
+      return;
+    }
+
     setErrors(prev => { const next = { ...prev }; delete next[subcategoryId]; return next; });
     await catRepo.deleteSubcategory(subcategoryId);
     // Reload just this category's subs
@@ -201,146 +241,156 @@ function Step3Categories({
 
   return (
     <div className="max-w-md mx-auto px-4 space-y-4">
-      <div className="bg-card border border-border rounded-2xl shadow-sm p-6 space-y-4">
+      <div className="bg-card border border-border rounded-2xl shadow-sm p-6 space-y-5">
         <div>
           <h2 className="text-2xl font-bold text-foreground">Categorías de gasto</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Organizá tus gastos en categorías y subcategorías.
+            Organizá tus gastos en categorías y subcategorías, agrupadas por cada categoría de distribución.
           </p>
         </div>
 
-        {/* Category list */}
-        <div className="space-y-3">
-          {items.map(({ category, subcategories }) => (
-            <div key={category.id} className="border border-border rounded-xl p-4 space-y-2">
-              {/* Category header */}
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-foreground">{category.name}</span>
-                <button
-                  onClick={() => handleDeleteCategory(category.id)}
-                  className="text-destructive hover:text-destructive/80 text-xs font-medium"
-                  aria-label={`Eliminar categoría ${category.name}`}
-                >
-                  Eliminar
-                </button>
+        {/* One section per distribution bucket */}
+        {buckets.map(bucket => {
+          const bucketItems = items.filter(i => i.category.distribution_category_id === bucket.id);
+          return (
+            <div key={bucket.id} className="space-y-3">
+              <h3 className="text-sm font-bold text-foreground/70 uppercase tracking-wide">
+                {bucket.name} <span className="font-normal normal-case text-muted-foreground">({bucket.percentage}%)</span>
+              </h3>
+
+              <div className="space-y-3">
+                {bucketItems.map(({ category, subcategories }) => (
+                  <div key={category.id} className="border border-border rounded-xl p-5 space-y-2">
+                    {/* Category header */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-base font-semibold text-foreground">{category.name}</span>
+                      <button
+                        onClick={() => handleDeleteCategory(category.id)}
+                        className="text-destructive hover:text-destructive/80 text-sm font-medium"
+                        aria-label={`Eliminar categoría ${category.name}`}
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+
+                    {errors[category.id] && (
+                      <p className="text-sm text-destructive">{errors[category.id]}</p>
+                    )}
+
+                    {/* Subcategory list */}
+                    <ul className="pl-3 space-y-1">
+                      {subcategories.map(sub => (
+                        <li key={sub.id}>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">• {sub.name}</span>
+                            <button
+                              onClick={() => handleDeleteSubcategory(sub.id, category.id)}
+                              className="text-destructive/70 hover:text-destructive text-sm ml-2"
+                              aria-label={`Eliminar subcategoría ${sub.name}`}
+                            >
+                              ×
+                            </button>
+                          </div>
+                          {errors[sub.id] && (
+                            <p className="text-sm text-destructive">{errors[sub.id]}</p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+
+                    {/* Add subcategory inline */}
+                    {addingSubFor === category.id ? (
+                      <div className="flex gap-2 mt-1">
+                        <input
+                          autoFocus
+                          type="text"
+                          placeholder="Nombre de subcategoría"
+                          value={newSubName[category.id] || ''}
+                          onChange={(e) =>
+                            setNewSubName(prev => ({ ...prev, [category.id]: e.target.value }))
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') { e.preventDefault(); handleAddSubcategory(category.id); }
+                            if (e.key === 'Escape') setAddingSubFor(null);
+                          }}
+                          className="flex-1 h-10 bg-background border border-input rounded-lg py-1.5 px-3 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
+                        />
+                        <button
+                          onClick={() => handleAddSubcategory(category.id)}
+                          className="h-10 px-3 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+                        >
+                          Agregar
+                        </button>
+                        <button
+                          onClick={() => setAddingSubFor(null)}
+                          className="h-10 px-3 bg-muted text-muted-foreground rounded-lg text-sm hover:bg-muted/80 transition-colors"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setAddingSubFor(category.id)}
+                        className="text-sm text-primary hover:text-primary/80 font-medium mt-1"
+                      >
+                        + Agregar subcategoría
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
 
-              {/* Category-level error */}
-              {errors[category.id] && (
-                <p className="text-xs text-destructive">{errors[category.id]}</p>
-              )}
-
-              {/* Subcategory list */}
-              <ul className="pl-3 space-y-1">
-                {subcategories.map(sub => (
-                  <li key={sub.id} className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">• {sub.name}</span>
-                    <button
-                      onClick={() => handleDeleteSubcategory(sub.id, category.id)}
-                      className="text-destructive/70 hover:text-destructive text-xs ml-2"
-                      aria-label={`Eliminar subcategoría ${sub.name}`}
-                    >
-                      ×
-                    </button>
-                  </li>
-                ))}
-                {errors[subcategories.find(s => errors[s.id])?.id ?? ''] && (
-                  <li className="text-xs text-destructive">
-                    {errors[subcategories.find(s => errors[s.id])?.id ?? '']}
-                  </li>
-                )}
-              </ul>
-
-              {/* Add subcategory inline */}
-              {addingSubFor === category.id ? (
-                <div className="flex gap-2 mt-1">
+              {/* Add category, scoped to this bucket */}
+              {addingCatFor === bucket.id ? (
+                <div className="flex gap-2">
                   <input
                     autoFocus
                     type="text"
-                    placeholder="Nombre de subcategoría"
-                    value={newSubName[category.id] || ''}
-                    onChange={(e) =>
-                      setNewSubName(prev => ({ ...prev, [category.id]: e.target.value }))
-                    }
+                    placeholder="Nombre de categoría"
+                    value={newCatName[bucket.id] || ''}
+                    onChange={(e) => setNewCatName(prev => ({ ...prev, [bucket.id]: e.target.value }))}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') { e.preventDefault(); handleAddSubcategory(category.id); }
-                      if (e.key === 'Escape') setAddingSubFor(null);
+                      if (e.key === 'Enter') { e.preventDefault(); handleAddCategory(bucket.id); }
+                      if (e.key === 'Escape') setAddingCatFor(null);
                     }}
-                    className="flex-1 bg-background border border-input rounded-lg py-1.5 px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
+                    className="flex-1 h-11 bg-background border border-input rounded-xl py-2 px-3 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
                   />
                   <button
-                    onClick={() => handleAddSubcategory(category.id)}
-                    className="py-1.5 px-3 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+                    onClick={() => handleAddCategory(bucket.id)}
+                    className="h-11 px-4 bg-primary text-primary-foreground rounded-xl text-base font-medium hover:bg-primary/90 transition-colors"
                   >
                     Agregar
                   </button>
                   <button
-                    onClick={() => setAddingSubFor(null)}
-                    className="py-1.5 px-3 bg-muted text-muted-foreground rounded-lg text-sm hover:bg-muted/80 transition-colors"
+                    onClick={() => setAddingCatFor(null)}
+                    className="h-11 px-3 bg-muted text-muted-foreground rounded-xl text-base hover:bg-muted/80 transition-colors"
                   >
                     ×
                   </button>
                 </div>
               ) : (
                 <button
-                  onClick={() => setAddingSubFor(category.id)}
-                  className="text-xs text-primary hover:text-primary/80 font-medium mt-1"
+                  onClick={() => setAddingCatFor(bucket.id)}
+                  className="w-full h-11 px-4 border border-dashed border-border rounded-xl text-base font-medium text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
                 >
-                  + Agregar subcategoría
+                  + Nueva categoría en {bucket.name}
                 </button>
               )}
             </div>
-          ))}
-        </div>
-
-        {/* Add category */}
-        {addingCat ? (
-          <div className="flex gap-2">
-            <input
-              autoFocus
-              type="text"
-              placeholder="Nombre de categoría"
-              value={newCatName}
-              onChange={(e) => setNewCatName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') { e.preventDefault(); handleAddCategory(); }
-                if (e.key === 'Escape') setAddingCat(false);
-              }}
-              className="flex-1 bg-background border border-input rounded-xl py-2 px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
-            />
-            <button
-              onClick={handleAddCategory}
-              className="py-2 px-4 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors"
-            >
-              Agregar
-            </button>
-            <button
-              onClick={() => setAddingCat(false)}
-              className="py-2 px-3 bg-muted text-muted-foreground rounded-xl text-sm hover:bg-muted/80 transition-colors"
-            >
-              ×
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setAddingCat(true)}
-            className="w-full py-2.5 px-4 border border-dashed border-border rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
-          >
-            + Nueva categoría
-          </button>
-        )}
+          );
+        })}
 
         {/* Finish button */}
         <button
           onClick={onComplete}
           disabled={!canFinish}
-          className="w-full py-3 px-4 rounded-xl text-sm font-semibold text-primary-foreground bg-primary hover:bg-primary/90 transition-colors disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="w-full h-12 px-4 rounded-xl text-base font-semibold text-primary-foreground bg-primary hover:bg-primary/90 transition-colors disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           Finalizar configuración
         </button>
 
         {!canFinish && (
-          <p className="text-xs text-muted-foreground text-center">
+          <p className="text-sm text-muted-foreground text-center">
             Necesitás al menos una categoría con una subcategoría para continuar.
           </p>
         )}
@@ -362,11 +412,17 @@ export default function OnboardingWizard({ profileId, startStep = 1, onComplete 
   };
 
   const handleStep2Complete = () => {
+    // Entered directly to edit distribution (e.g. from Settings) — return
+    // right away instead of dragging the user into category management too.
+    if (startStep === 2) {
+      onComplete(wizardProfileId);
+      return;
+    }
     setCurrentStep(3);
   };
 
   const handleStep3Complete = () => {
-    onComplete();
+    onComplete(wizardProfileId);
   };
 
   return (

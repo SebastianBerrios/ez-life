@@ -24,11 +24,13 @@ export interface DistributionCategory extends BaseEntity {
   name: string;
   percentage: number; // 1-100
   is_default: boolean;
+  is_savings: boolean; // identifies the "savings" bucket for goal assignment (RF-14), not a name match
 }
 
 export interface ExpenseCategory extends BaseEntity {
   id: UUID;
   user_id: UUID;
+  distribution_category_id: UUID; // every expense category belongs to exactly one distribution bucket (RF-08)
   name: string;
 }
 

@@ -6,11 +6,18 @@ describe('calculateBudgets', () => {
   it('should distribute total income exactly and allocate the remainder to the highest percentage', () => {
     // 10001 cents total income
     const totalIncomeCents = 10001;
-    const categories = [
-      { id: '1', percentage: 50 },
-      { id: '2', percentage: 30 },
-      { id: '3', percentage: 20 },
-    ] as Pick<DistributionCategory, 'id' | 'percentage'>[];
+    const baseCategory = {
+      user_id: 'user-1',
+      is_default: true,
+      is_savings: false,
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+    const categories: DistributionCategory[] = [
+      { ...baseCategory, id: '1', name: 'Necesidades', percentage: 50 },
+      { ...baseCategory, id: '2', name: 'Gustos', percentage: 30 },
+      { ...baseCategory, id: '3', name: 'Ahorro', percentage: 20 },
+    ];
 
     const result = calculateBudgets(totalIncomeCents, categories);
 

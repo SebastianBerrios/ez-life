@@ -28,11 +28,11 @@ export class EzLifeDB extends Dexie {
 
   constructor() {
     super('ezlife-db');
-    this.version(3).stores({
+    this.version(4).stores({
       profiles: 'id',
       income_sources: 'id, user_id',
       distribution_categories: 'id, user_id',
-      expense_categories: 'id, user_id',
+      expense_categories: 'id, user_id, distribution_category_id',
       expense_subcategories: 'id, category_id',
       savings_goals: 'id, user_id',
       movements: 'id, user_id, date',
