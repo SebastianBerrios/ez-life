@@ -1,8 +1,12 @@
 import { createBrowserClient } from '@supabase/ssr';
 
+// mvp-lab is a shared Supabase project across several apps, one Postgres
+// schema each (see mvp-lab-infra/OPERATIONS.md) — ez-life's tables live under
+// `ez_life`, never `public`.
 export function getSupabaseBrowserClient() {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 'dummy-key'
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 'dummy-key',
+    { db: { schema: 'ez_life' } }
   );
 }

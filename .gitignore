@@ -73,3 +73,6 @@ next-env.d.ts
 
 # codegraph (per-worktree local index, never shared/committed)
 /.codegraph/
+
+# supabase CLI local link state (machine-specific, never shared/committed)
+/supabase/.temp/

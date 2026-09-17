@@ -3,8 +3,9 @@ import { db } from '../../db/db';
 import { LocalProfileRepository } from './LocalProfileRepository';
 import { LocalIncomeSourceRepository } from './LocalIncomeSourceRepository';
 import { LocalCategoryRepository } from './LocalCategoryRepository';
+import { LocalDebtRepository } from './LocalDebtRepository';
 import { uuidv7 } from 'uuidv7';
-import type { IncomeSource } from '../../../core/domain/models/types';
+import type { IncomeSource, Debt } from '../../../core/domain/models/types';
 
 describe('Local Repositories', () => {
   beforeEach(async () => {
@@ -77,6 +78,57 @@ describe('Local Repositories', () => {
 
       await catRepo.deleteExpenseCategory(category.id);
       expect(await catRepo.countExpenseCategoriesByDistribution(bucket.id)).toBe(0);
+    });
+  });
+
+  describe('LocalDebtRepository', () => {
+    it('creates a debt in either direction with an auto UUID', async () => {
+      const repo = new LocalDebtRepository();
+      const userId = uuidv7();
+
+      const lent = await repo.save({
+        id: '', user_id: userId, counterparty_name: 'Juan', direction: 'lent', origin: 'manual',
+        amount: 10000, settled_amount: 0,
+      } as Omit<Debt, 'created_at' | 'updated_at'>);
+
+      expect(lent.id).toBeDefined();
+      expect(lent.direction).toBe('lent');
+
+      const all = await repo.getAll(userId);
+      expect(all).toHaveLength(1);
+    });
+
+    it('accumulates partial settlements and never exceeds the debt amount (FR-003, FR-004)', async () => {
+      const repo = new LocalDebtRepository();
+      const userId = uuidv7();
+
+      const debt = await repo.save({
+        id: '', user_id: userId, counterparty_name: 'Ana', direction: 'borrowed', origin: 'manual',
+        amount: 10000, settled_amount: 0,
+      } as Omit<Debt, 'created_at' | 'updated_at'>);
+
+      const afterFirst = await repo.recordSettlement(debt.id, 4000);
+      expect(afterFirst.settled_amount).toBe(4000);
+
+      const afterSecond = await repo.recordSettlement(debt.id, 6000);
+      expect(afterSecond.settled_amount).toBe(10000);
+
+      await expect(repo.recordSettlement(debt.id, 1)).rejects.toThrow();
+    });
+
+    it('soft deletes a debt', async () => {
+      const repo = new LocalDebtRepository();
+      const userId = uuidv7();
+
+      const debt = await repo.save({
+        id: '', user_id: userId, counterparty_name: 'Luis', direction: 'lent', origin: 'manual',
+        amount: 5000, settled_amount: 0,
+      } as Omit<Debt, 'created_at' | 'updated_at'>);
+
+      await repo.delete(debt.id);
+
+      expect(await repo.getAll(userId)).toHaveLength(0);
+      expect(await repo.getById(debt.id)).toBeUndefined();
     });
   });
 });

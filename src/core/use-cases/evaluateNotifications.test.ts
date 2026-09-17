@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { evaluateNotifications } from './evaluateNotifications';
 import type { BudgetedCategory } from './calculateBudgets';
-import type { Notification, SavingsGoal } from '../domain/models/types';
+import type { Debt, Notification, SavingsGoal, SharedMovement } from '../domain/models/types';
 
 describe('evaluateNotifications', () => {
   const userId = 'user-1';
@@ -42,8 +42,25 @@ describe('evaluateNotifications', () => {
       budgetedCategories: [],
       spentByBucketId: {},
       savingsGoals: [],
+      debts: [] as Debt[],
+      sharedMovements: [] as SharedMovement[],
       notificationHour: undefined,
       existingNotifications: [] as Notification[],
+      ...overrides,
+    };
+  }
+
+  function makeDebt(overrides: Partial<Debt>): Debt {
+    return {
+      id: 'debt-1',
+      user_id: userId,
+      counterparty_name: 'Juan',
+      direction: 'lent',
+      origin: 'manual',
+      amount: 10000,
+      settled_amount: 0,
+      created_at: new Date(),
+      updated_at: new Date(),
       ...overrides,
     };
   }
@@ -231,6 +248,110 @@ describe('evaluateNotifications', () => {
       const result = evaluateNotifications(baseParams({
         notificationHour: 8,
         existingNotifications: [existing],
+      }));
+
+      expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('loan_due_soon', () => {
+    it('fires when the due date is within the reminder window and the debt is not fully settled', () => {
+      const debt = makeDebt({ due_date: new Date(2024, 5, 17) }); // 2 days out
+      const result = evaluateNotifications(baseParams({ debts: [debt] }));
+
+      expect(result).toHaveLength(1);
+      expect(result[0].type).toBe('loan_due_soon');
+      expect(result[0].related_id).toBe('debt-1');
+      expect(result[0].cycle_key).toBe('2024-06-15');
+      expect(result[0].body).toContain('Juan');
+    });
+
+    it('fires on the due date itself', () => {
+      const debt = makeDebt({ due_date: new Date(2024, 5, 15) });
+      const result = evaluateNotifications(baseParams({ debts: [debt] }));
+
+      expect(result).toHaveLength(1);
+    });
+
+    it('does not fire when the due date is further away than the reminder window', () => {
+      const debt = makeDebt({ due_date: new Date(2024, 5, 25) });
+      const result = evaluateNotifications(baseParams({ debts: [debt] }));
+
+      expect(result).toHaveLength(0);
+    });
+
+    it('does not fire once the due date has already passed', () => {
+      const debt = makeDebt({ due_date: new Date(2024, 5, 10) });
+      const result = evaluateNotifications(baseParams({ debts: [debt] }));
+
+      expect(result).toHaveLength(0);
+    });
+
+    it('does not fire for a debt without a due date', () => {
+      const debt = makeDebt({ due_date: undefined });
+      const result = evaluateNotifications(baseParams({ debts: [debt] }));
+
+      expect(result).toHaveLength(0);
+    });
+
+    it('does not fire for a debt that is already fully settled (Principio X)', () => {
+      const debt = makeDebt({ due_date: new Date(2024, 5, 16), amount: 10000, settled_amount: 10000 });
+      const result = evaluateNotifications(baseParams({ debts: [debt] }));
+
+      expect(result).toHaveLength(0);
+    });
+
+    it('does not duplicate an existing loan_due_soon for the same debt and day', () => {
+      const debt = makeDebt({ due_date: new Date(2024, 5, 16) });
+      const existing: Notification = {
+        id: 'n1',
+        user_id: userId,
+        type: 'loan_due_soon',
+        title: 't',
+        body: 'b',
+        related_id: 'debt-1',
+        cycle_key: '2024-06-15',
+        created_at: now,
+        updated_at: now,
+      };
+
+      const result = evaluateNotifications(baseParams({ debts: [debt], existingNotifications: [existing] }));
+
+      expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('shared_movement_added', () => {
+    const baseSharedMovement: SharedMovement = {
+      id: 'sm-1', shared_space_id: 'space-1', created_by: 'other-user', type: 'expense',
+      total_amount_cents: 10000, split_mode: 'percentage',
+      splits: [{ user_id: userId, share_cents: 5000 }], linked_movement_ids: [],
+      date: new Date(), created_at: new Date(), updated_at: new Date(),
+    };
+
+    it('fires when another member registered a shared movement while I was away', () => {
+      const result = evaluateNotifications(baseParams({ sharedMovements: [baseSharedMovement] }));
+
+      expect(result).toHaveLength(1);
+      expect(result[0].type).toBe('shared_movement_added');
+      expect(result[0].related_id).toBe('sm-1');
+    });
+
+    it('does not fire for a shared movement I registered myself', () => {
+      const own = { ...baseSharedMovement, created_by: userId };
+      const result = evaluateNotifications(baseParams({ sharedMovements: [own] }));
+
+      expect(result).toHaveLength(0);
+    });
+
+    it('does not duplicate an existing notification for the same shared movement', () => {
+      const existing: Notification = {
+        id: 'n1', user_id: userId, type: 'shared_movement_added', title: 't', body: 'b',
+        related_id: 'sm-1', cycle_key: undefined, created_at: now, updated_at: now,
+      };
+
+      const result = evaluateNotifications(baseParams({
+        sharedMovements: [baseSharedMovement], existingNotifications: [existing],
       }));
 
       expect(result).toHaveLength(0);

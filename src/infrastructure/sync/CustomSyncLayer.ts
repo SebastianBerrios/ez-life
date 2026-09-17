@@ -18,7 +18,7 @@ export class CustomSyncLayer {
       const tablesToSync = [
         'profiles', 'income_sources', 'distribution_categories',
         'expense_categories', 'expense_subcategories', 'savings_goals', 'movements',
-        'notifications'
+        'notifications', 'debts', 'shared_spaces', 'memberships', 'shared_invites'
       ];
 
       for (const tableName of tablesToSync) {

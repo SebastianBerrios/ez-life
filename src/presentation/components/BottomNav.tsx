@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Plus, LogOut, LayoutDashboard, ArrowLeftRight, PieChart, Target, Settings, Bell } from 'lucide-react';
+import { Plus, LogOut, LayoutDashboard, ArrowLeftRight, PieChart, Target, Settings, Bell, HandCoins, Users } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { getSupabaseBrowserClient } from '../../infrastructure/supabase/client';
 
@@ -19,6 +19,8 @@ const navItems = [
   { id: 'movements', label: 'Movimientos', Icon: ArrowLeftRight },
   { id: 'analysis', label: 'Análisis', Icon: PieChart },
   { id: 'goals', label: 'Metas', Icon: Target },
+  { id: 'debts', label: 'Préstamos', Icon: HandCoins },
+  { id: 'shared-space', label: 'Espacio', Icon: Users },
   { id: 'settings', label: 'Ajustes', Icon: Settings },
 ];
 

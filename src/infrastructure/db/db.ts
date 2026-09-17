@@ -8,6 +8,11 @@ import type {
   SavingsGoal,
   Movement,
   Notification,
+  Debt,
+  SharedSpace,
+  Membership,
+  SharedInvite,
+  SharedMovement,
 } from '../../core/domain/models/types';
 
 interface SyncQueueItem {
@@ -26,6 +31,11 @@ export class EzLifeDB extends Dexie {
   savings_goals!: Table<SavingsGoal, string>;
   movements!: Table<Movement, string>;
   notifications!: Table<Notification, string>;
+  debts!: Table<Debt, string>;
+  shared_spaces!: Table<SharedSpace, string>;
+  memberships!: Table<Membership, string>;
+  shared_invites!: Table<SharedInvite, string>;
+  shared_movements!: Table<SharedMovement, string>;
   sync_queue!: Table<SyncQueueItem, string>;
 
   constructor() {
@@ -57,6 +67,64 @@ export class EzLifeDB extends Dexie {
       // Automatic upgrade handled by Dexie
     });
 
+    this.version(6).stores({
+      profiles: 'id',
+      income_sources: 'id, user_id',
+      distribution_categories: 'id, user_id',
+      expense_categories: 'id, user_id, distribution_category_id',
+      expense_subcategories: 'id, category_id',
+      savings_goals: 'id, user_id',
+      movements: 'id, user_id, date',
+      notifications: 'id, user_id, created_at',
+      debts: 'id, user_id, due_date',
+      sync_queue: 'id, created_at'
+    }).upgrade(() => {
+      // Automatic upgrade handled by Dexie
+    });
+
+    // shared_spaces/memberships/shared_invites/shared_movements are
+    // deliberately NOT in the hook-driven tablesToSync below: writes to
+    // those go through server-side RPCs only (contracts/rpc-functions.md) —
+    // there is no direct-insert RLS policy for them to push against.
+    // They're still pulled down by CustomSyncLayer so other members'
+    // changes arrive locally.
+    this.version(7).stores({
+      profiles: 'id',
+      income_sources: 'id, user_id',
+      distribution_categories: 'id, user_id',
+      expense_categories: 'id, user_id, distribution_category_id',
+      expense_subcategories: 'id, category_id',
+      savings_goals: 'id, user_id',
+      movements: 'id, user_id, date',
+      notifications: 'id, user_id, created_at',
+      debts: 'id, user_id, due_date',
+      shared_spaces: 'id, status',
+      memberships: 'id, shared_space_id, user_id',
+      shared_invites: 'id, shared_space_id, code',
+      sync_queue: 'id, created_at'
+    }).upgrade(() => {
+      // Automatic upgrade handled by Dexie
+    });
+
+    this.version(8).stores({
+      profiles: 'id',
+      income_sources: 'id, user_id',
+      distribution_categories: 'id, user_id',
+      expense_categories: 'id, user_id, distribution_category_id',
+      expense_subcategories: 'id, category_id',
+      savings_goals: 'id, user_id',
+      movements: 'id, user_id, date',
+      notifications: 'id, user_id, created_at',
+      debts: 'id, user_id, due_date',
+      shared_spaces: 'id, status',
+      memberships: 'id, shared_space_id, user_id',
+      shared_invites: 'id, shared_space_id, code',
+      shared_movements: 'id, shared_space_id, date',
+      sync_queue: 'id, created_at'
+    }).upgrade(() => {
+      // Automatic upgrade handled by Dexie
+    });
+
     this.setupHooks();
   }
 
@@ -64,7 +132,7 @@ export class EzLifeDB extends Dexie {
     const tablesToSync = [
       'profiles', 'income_sources', 'distribution_categories',
       'expense_categories', 'expense_subcategories', 'savings_goals', 'movements',
-      'notifications'
+      'notifications', 'debts'
     ];
 
     tablesToSync.forEach(tableName => {

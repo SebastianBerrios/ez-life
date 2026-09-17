@@ -9,7 +9,14 @@ import MovementList from './MovementList';
 import MovementForm from './MovementForm';
 import SavingsGoalList from './SavingsGoalList';
 import SavingsGoalForm from './SavingsGoalForm';
+import DebtList from './DebtList';
+import DebtForm from './DebtForm';
+import SharedSpaceScreen from './SharedSpaceScreen';
+import SharedSpaceCreate from './SharedSpaceCreate';
+import SharedSpaceJoin from './SharedSpaceJoin';
+import SharedMovementForm from './SharedMovementForm';
 import AnalysisScreen from './AnalysisScreen';
+import { Membership } from '../../core/domain/models/types';
 import SettingsScreen from './SettingsScreen';
 import NotificationHistory from './NotificationHistory';
 import { Button } from '@/components/ui/button';
@@ -36,6 +43,12 @@ export default function MainFlow() {
   const [showMovementForm, setShowMovementForm] = useState(false);
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [goalsRefreshKey, setGoalsRefreshKey] = useState(0);
+  const [showDebtForm, setShowDebtForm] = useState(false);
+  const [debtsRefreshKey, setDebtsRefreshKey] = useState(0);
+  const [showSharedSpaceCreate, setShowSharedSpaceCreate] = useState(false);
+  const [showSharedSpaceJoin, setShowSharedSpaceJoin] = useState(false);
+  const [sharedSpacesRefreshKey, setSharedSpacesRefreshKey] = useState(0);
+  const [addMovementTarget, setAddMovementTarget] = useState<{ spaceId: string; members: Membership[] } | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -57,6 +70,16 @@ export default function MainFlow() {
           // Read avatar from OAuth metadata (Google / GitHub)
           const avatar = session.user.user_metadata?.avatar_url as string | undefined;
           setAvatarUrl(avatar);
+
+          // Explicit, app-triggered enrollment (never a trigger on
+          // auth.users, never a client-side insert) — this is what actually
+          // makes this authenticated session an ez-life *member*, not just
+          // an authenticated mvp-lab fleet user (Principio IX). Idempotent
+          // server-side; best-effort here since it needs connectivity and
+          // must never block offline-first local usage if it fails.
+          supabase.rpc('enroll_self').then(({ error }: { error: unknown }) => {
+            if (error) console.error('enroll_self failed:', error);
+          });
 
           try {
             const catRepo = new LocalCategoryRepository();
@@ -221,6 +244,33 @@ export default function MainFlow() {
           </div>
         )}
 
+        {currentRoute === 'debts' && profileId && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-bold text-foreground">Préstamos</h2>
+              <Button size="sm" onClick={() => setShowDebtForm(true)}>
+                + Nuevo préstamo
+              </Button>
+            </div>
+            <DebtList key={debtsRefreshKey} userId={profileId} />
+          </div>
+        )}
+
+        {currentRoute === 'shared-space' && profileId && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-bold text-foreground">Espacio Compartido</h2>
+            </div>
+            <SharedSpaceScreen
+              userId={profileId}
+              refreshKey={sharedSpacesRefreshKey}
+              onCreate={() => setShowSharedSpaceCreate(true)}
+              onJoin={() => setShowSharedSpaceJoin(true)}
+              onAddMovement={(spaceId, members) => setAddMovementTarget({ spaceId, members })}
+            />
+          </div>
+        )}
+
         {currentRoute === 'settings' && profileId && (
           <SettingsScreen
             userId={profileId}
@@ -266,6 +316,66 @@ export default function MainFlow() {
                 setGoalsRefreshKey(k => k + 1);
               }}
               onCancel={() => setShowGoalForm(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {profileId && (
+        <Dialog open={showDebtForm} onOpenChange={(open) => !open && setShowDebtForm(false)}>
+          <DialogContent className={SHEET_DIALOG_CONTENT_CLASS}>
+            <DebtForm
+              userId={profileId}
+              onComplete={() => {
+                setShowDebtForm(false);
+                setDebtsRefreshKey(k => k + 1);
+              }}
+              onCancel={() => setShowDebtForm(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {profileId && (
+        <Dialog open={showSharedSpaceCreate} onOpenChange={(open) => !open && setShowSharedSpaceCreate(false)}>
+          <DialogContent className={SHEET_DIALOG_CONTENT_CLASS}>
+            <SharedSpaceCreate
+              onComplete={() => {
+                setShowSharedSpaceCreate(false);
+                setSharedSpacesRefreshKey(k => k + 1);
+              }}
+              onCancel={() => setShowSharedSpaceCreate(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {profileId && (
+        <Dialog open={showSharedSpaceJoin} onOpenChange={(open) => !open && setShowSharedSpaceJoin(false)}>
+          <DialogContent className={SHEET_DIALOG_CONTENT_CLASS}>
+            <SharedSpaceJoin
+              onComplete={() => {
+                setShowSharedSpaceJoin(false);
+                setSharedSpacesRefreshKey(k => k + 1);
+              }}
+              onCancel={() => setShowSharedSpaceJoin(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {profileId && addMovementTarget && (
+        <Dialog open={!!addMovementTarget} onOpenChange={(open) => !open && setAddMovementTarget(null)}>
+          <DialogContent className={SHEET_DIALOG_CONTENT_CLASS}>
+            <SharedMovementForm
+              spaceId={addMovementTarget.spaceId}
+              currentUserId={profileId}
+              members={addMovementTarget.members}
+              onComplete={() => {
+                setAddMovementTarget(null);
+                setSharedSpacesRefreshKey(k => k + 1);
+              }}
+              onCancel={() => setAddMovementTarget(null)}
             />
           </DialogContent>
         </Dialog>

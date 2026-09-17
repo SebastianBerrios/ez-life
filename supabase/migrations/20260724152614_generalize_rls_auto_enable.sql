@@ -1,0 +1,3 @@
+-- Empty baseline stub: generalize_rls_auto_enable
+-- Foreign migration owned by another app on the shared mvp-lab ledger
+-- (mvp-lab-infra/OPERATIONS.md §4). No-op here, never applied/owned by ez-life.

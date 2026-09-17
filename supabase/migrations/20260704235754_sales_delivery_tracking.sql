@@ -1,0 +1,3 @@
+-- Empty baseline stub: sales_delivery_tracking
+-- Foreign migration owned by another app on the shared mvp-lab ledger
+-- (mvp-lab-infra/OPERATIONS.md §4). No-op here, never applied/owned by ez-life.

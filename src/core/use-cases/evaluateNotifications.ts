@@ -1,4 +1,4 @@
-import { Notification, SavingsGoal, UUID } from '../domain/models/types';
+import { Debt, Notification, SavingsGoal, SharedMovement, UUID } from '../domain/models/types';
 import { BudgetedCategory } from './calculateBudgets';
 
 interface SavingsGoalWithProgress {
@@ -12,6 +12,8 @@ export interface EvaluateNotificationsParams {
   budgetedCategories: BudgetedCategory[];
   spentByBucketId: Record<UUID, number>;
   savingsGoals: SavingsGoalWithProgress[];
+  debts: Debt[];
+  sharedMovements: SharedMovement[];
   notificationHour: number | undefined;
   existingNotifications: Notification[];
 }
@@ -19,6 +21,8 @@ export interface EvaluateNotificationsParams {
 export type NewNotification = Omit<Notification, 'id' | 'created_at' | 'updated_at'>;
 
 const BUDGET_ALERT_THRESHOLD = 0.8;
+const LOAN_DUE_SOON_DAYS_THRESHOLD = 3;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function cycleMonthKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -57,6 +61,8 @@ export function evaluateNotifications(params: EvaluateNotificationsParams): NewN
     budgetedCategories,
     spentByBucketId,
     savingsGoals,
+    debts,
+    sharedMovements,
     notificationHour,
     existingNotifications,
   } = params;
@@ -114,6 +120,45 @@ export function evaluateNotifications(params: EvaluateNotificationsParams): NewN
         cycle_key: dayKey,
       });
     }
+  }
+
+  // 4. loan_due_soon — re-fires once per day (like daily_reminder) while the
+  // due date is within the reminder window and the debt isn't fully settled.
+  for (const debt of debts) {
+    if (!debt.due_date) continue;
+    if (debt.settled_amount >= debt.amount) continue;
+
+    const daysUntilDue = Math.ceil((debt.due_date.getTime() - now.getTime()) / MS_PER_DAY);
+    if (daysUntilDue < 0 || daysUntilDue > LOAN_DUE_SOON_DAYS_THRESHOLD) continue;
+
+    const dayKey = cycleDayKey(now);
+    if (hasEquivalent(existingNotifications, 'loan_due_soon', debt.id, dayKey)) continue;
+
+    const directionLabel = debt.direction === 'lent' ? 'te debe' : 'le debés';
+    notifications.push({
+      user_id: userId,
+      type: 'loan_due_soon',
+      title: 'Préstamo por vencer',
+      body: `${debt.counterparty_name} ${directionLabel} — el préstamo vence pronto.`,
+      related_id: debt.id,
+      cycle_key: dayKey,
+    });
+  }
+
+  // 5. shared_movement_added — once per movement someone else registered
+  // (mirrors goal_completed: a lifetime, one-time event, no cycle_key).
+  for (const movement of sharedMovements) {
+    if (movement.created_by === userId) continue;
+    if (hasEquivalent(existingNotifications, 'shared_movement_added', movement.id, undefined)) continue;
+
+    notifications.push({
+      user_id: userId,
+      type: 'shared_movement_added',
+      title: 'Nuevo movimiento compartido',
+      body: 'Alguien registró un movimiento en tu espacio compartido.',
+      related_id: movement.id,
+      cycle_key: undefined,
+    });
   }
 
   return notifications;
