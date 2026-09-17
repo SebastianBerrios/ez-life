@@ -57,20 +57,20 @@ export default function MovementList({ userId }: Props) {
     <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
       <ul className="divide-y divide-border">
         {movements.map(m => (
-          <li key={m.id} className="p-4 hover:bg-muted flex justify-between items-center">
+          <li key={m.id} className="p-5 hover:bg-muted flex justify-between items-center">
             <div>
-              <p className="text-sm font-medium text-foreground">{m.description || 'Sin descripción'}</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-base font-medium text-foreground">{m.description || 'Sin descripción'}</p>
+              <p className="text-sm text-muted-foreground">
                 {new Date(m.date).toLocaleDateString()}
               </p>
             </div>
             <div className="flex items-center space-x-4">
-              <span className={`text-sm font-bold ${m.type === 'INCOME' ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'}`}>
+              <span className={`text-base font-bold ${m.type === 'INCOME' ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'}`}>
                 {m.type === 'INCOME' ? '+' : '-'} S/ {(m.amount / 100).toFixed(2)}
               </span>
               <button
                 onClick={() => handleDelete(m.id)}
-                className="text-destructive hover:text-destructive/80 text-xs font-medium"
+                className="text-destructive hover:text-destructive/80 text-sm font-medium"
               >
                 Eliminar
               </button>

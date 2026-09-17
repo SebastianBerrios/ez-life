@@ -52,12 +52,12 @@ export default function OnboardingStep1({ onComplete }: Props) {
       <form onSubmit={handleSubmit} className="space-y-4">
 
         <div>
-          <label htmlFor="income" className="block text-sm font-medium text-foreground">
+          <label htmlFor="income" className="block text-base font-medium text-foreground">
             Sueldo o Ingreso Base (Mensual)
           </label>
-          <div className="mt-1 relative rounded-md shadow-sm">
+          <div className="mt-1.5 relative rounded-md shadow-sm">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <span className="text-muted-foreground sm:text-sm">S/</span>
+              <span className="text-muted-foreground text-base">S/</span>
             </div>
             <input
               type="number"
@@ -66,7 +66,7 @@ export default function OnboardingStep1({ onComplete }: Props) {
               required
               step="0.01"
               min="0"
-              className="focus:ring-ring focus:border-ring block w-full pl-10 sm:text-sm border-input rounded-xl py-2.5 border bg-background text-foreground focus:outline-none focus:ring-2 transition-colors"
+              className="focus:ring-ring focus:border-ring block w-full h-11 pl-10 text-base border-input rounded-xl py-2.5 border bg-background text-foreground focus:outline-none focus:ring-2 transition-colors"
               placeholder="0.00"
               value={income}
               onChange={(e) => setIncome(e.target.value)}
@@ -77,7 +77,7 @@ export default function OnboardingStep1({ onComplete }: Props) {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring transition-colors disabled:opacity-50"
+          className="w-full h-11 flex justify-center items-center py-2.5 px-4 border border-transparent rounded-xl shadow-sm text-base font-semibold text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring transition-colors disabled:opacity-50"
         >
           {isSubmitting ? 'Guardando...' : 'Continuar'}
         </button>
