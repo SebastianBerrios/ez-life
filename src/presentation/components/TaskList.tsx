@@ -11,6 +11,15 @@ interface Props {
   userId: string;
 }
 
+// ControlPage's "hoy" agenda (FR-008) — same-calendar-day comparison done in
+// UTC, consistent with how HabitCompletion/date-only fields are compared
+// elsewhere (evaluateHabitStreak.ts), to avoid a local-timezone shift.
+function isDueToday(dueDate: Date, today: Date): boolean {
+  return dueDate.getUTCFullYear() === today.getUTCFullYear()
+    && dueDate.getUTCMonth() === today.getUTCMonth()
+    && dueDate.getUTCDate() === today.getUTCDate();
+}
+
 export default function TaskList({ userId }: Props) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,7 +27,8 @@ export default function TaskList({ userId }: Props) {
   const loadTasks = useCallback(async () => {
     try {
       const repo = new LocalTaskRepository();
-      setTasks(await repo.getAll(userId));
+      const today = new Date();
+      setTasks((await repo.getAll(userId)).filter(t => isDueToday(t.due_date, today)));
     } catch (err) {
       console.error(err);
     } finally {

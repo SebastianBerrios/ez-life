@@ -20,9 +20,12 @@ describe('OnboardingStep1', () => {
 
     vi.mocked(LocalProfileRepository).mockImplementation(function() { return { save: mockSaveProfile } as unknown as InstanceType<typeof LocalProfileRepository>; });
     vi.mocked(LocalIncomeSourceRepository).mockImplementation(function() { return { save: mockSaveIncome } as unknown as InstanceType<typeof LocalIncomeSourceRepository>; });
-    vi.mocked(uuidv7).mockReturnValue('fake-uuid');
+    // uuidv7 is only used for the income row's own id, never for the user id —
+    // regression guard for the bug where this component minted its own random
+    // user id instead of using the authenticated session's real id.
+    vi.mocked(uuidv7).mockReturnValue('fake-income-row-id');
 
-    render(<OnboardingStep1 onComplete={mockOnComplete} />);
+    render(<OnboardingStep1 profileId="real-session-id" onComplete={mockOnComplete} />);
 
     // Check elements exist
     const incomeInput = screen.getByLabelText(/sueldo o ingreso base/i);
@@ -34,19 +37,19 @@ describe('OnboardingStep1', () => {
     // Submit
     fireEvent.submit(submitBtn.closest('form')!);
 
-    // Verify
+    // Verify: the real session profileId is used, never a freshly minted uuid.
     await waitFor(() => {
       expect(mockSaveProfile).toHaveBeenCalledWith(expect.objectContaining({
-        id: 'fake-uuid'
+        id: 'real-session-id'
       }));
     });
-    
+
     expect(mockSaveIncome).toHaveBeenCalledWith(expect.objectContaining({
       name: 'Sueldo Base',
       amount: 500050, // Converted to cents
-      user_id: 'fake-uuid' // Uses profile ID
+      user_id: 'real-session-id' // Uses the real session profile id, not a generated one
     }));
 
-    expect(mockOnComplete).toHaveBeenCalledWith('fake-uuid');
+    expect(mockOnComplete).toHaveBeenCalledWith('real-session-id');
   });
 });

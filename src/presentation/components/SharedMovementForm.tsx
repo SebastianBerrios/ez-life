@@ -101,15 +101,15 @@ export default function SharedMovementForm({ spaceId, currentUserId, members, on
       <form onSubmit={handleSubmit} data-testid="shared-movement-form" className="space-y-5">
         <div className="space-y-2">
           <Label htmlFor="movementType">Tipo</Label>
-          <select
-            id="movementType"
-            value={type}
-            onChange={(e) => setType(e.target.value as SharedMovementType)}
-            className="border-input bg-transparent flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none"
-          >
-            <option value="expense">Gasto</option>
-            <option value="income">Ingreso</option>
-          </select>
+          <Select value={type} onValueChange={(val) => setType((val ?? 'expense') as SharedMovementType)}>
+            <SelectTrigger id="movementType" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="expense">Gasto</SelectItem>
+              <SelectItem value="income">Ingreso</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="space-y-2">

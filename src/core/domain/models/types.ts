@@ -201,3 +201,38 @@ export interface Debt extends BaseEntity {
   due_date?: Date;
   interest_rate?: number; // informational only (spec.md Assumptions) — never recalculated
 }
+
+// InstallmentLoan/InstallmentPayment (spec 002, US3) — a separate entity from
+// Debt on purpose (research.md #3): bank/caja loans with a lender-defined
+// installment schedule. The app never computes an amortization table — every
+// number (amount, installment_count, installment_amount) comes verbatim from
+// the user, who copies it from their lender (FR-011, FR-012).
+export type InstallmentLoanStatus = 'active' | 'settled';
+export type InstallmentPaymentKind = 'installment' | 'principal';
+export type InstallmentAdjustmentType = 'reduce_term' | 'reduce_installment_amount';
+
+export interface InstallmentLoan extends BaseEntity {
+  id: UUID;
+  user_id: UUID;
+  lender_name: string;
+  amount: number; // in cents, total originally borrowed (FR-011)
+  installment_count: number; // originally pactado, never changes on its own
+  remaining_installments: number; // 0 <= remaining_installments <= installment_count
+  installment_amount: number; // in cents, current — can change via a principal payment (FR-016/FR-017)
+  interest_rate?: number; // optional, purely informational, never used to calculate anything (FR-013)
+  status: InstallmentLoanStatus; // derived: 'settled' once remaining_installments = 0 (FR-025), never reverts
+}
+
+// Append-only payment log (FR-026) — analogous to HabitCompletion. Recording
+// one is bookkeeping only (Principio X, FR-027): it NEVER creates, updates,
+// or references a Movement, same guarantee applyDebtSettlement already gives
+// for Debt.
+export interface InstallmentPayment extends BaseEntity {
+  id: UUID;
+  installment_loan_id: UUID;
+  kind: InstallmentPaymentKind;
+  amount: number; // in cents
+  date: Date;
+  adjustment_type?: InstallmentAdjustmentType; // only when kind = 'principal' (FR-016)
+  resulting_value?: number; // the value the user typed in themselves — never calculated (FR-017); only when kind = 'principal'
+}

@@ -1,32 +1,48 @@
 'use client';
 
 import React from 'react';
-import { Plus, LogOut, LayoutDashboard, ArrowLeftRight, PieChart, Target, Settings, Bell, HandCoins, Users, Flame, ListChecks } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { Plus, LogOut, LayoutDashboard, ArrowLeftRight, PieChart, Target, Settings, Bell, HandCoins, Users, ListChecks, MoreHorizontal } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { getSupabaseBrowserClient } from '../../infrastructure/supabase/client';
 
 interface Props {
   currentRoute: string;
   onNavigate: (route: string) => void;
+  onOpenMore?: () => void;
   onNewMovement?: () => void;
   avatarUrl?: string;
   onLogout?: () => void;
   onOpenNotifications?: () => void;
 }
 
-const navItems = [
+export interface NavItem {
+  id: string;
+  label: string;
+  Icon: LucideIcon;
+}
+
+export const navItems: NavItem[] = [
   { id: 'dashboard', label: 'Resumen', Icon: LayoutDashboard },
   { id: 'movements', label: 'Movimientos', Icon: ArrowLeftRight },
   { id: 'analysis', label: 'Análisis', Icon: PieChart },
   { id: 'goals', label: 'Metas', Icon: Target },
   { id: 'debts', label: 'Préstamos', Icon: HandCoins },
   { id: 'shared-space', label: 'Espacio', Icon: Users },
-  { id: 'habits', label: 'Hábitos', Icon: Flame },
-  { id: 'objectives', label: 'Objetivos', Icon: ListChecks },
+  { id: 'control', label: 'Control', Icon: ListChecks },
+  { id: 'create', label: 'Crear', Icon: Plus },
   { id: 'settings', label: 'Ajustes', Icon: Settings },
 ];
 
-export default function Navigation({ currentRoute, onNavigate, onNewMovement, avatarUrl, onLogout, onOpenNotifications }: Props) {
+// Historia 1+2 (spec 002-mobile-nav-loans-ux): mobile queda con 4 destinos
+// fijos + un botón "Más" (5 total). `control` (antes `habits`) concentra el
+// seguimiento de metas/tareas/hábitos y queda fijo; `create` (antes
+// `objectives`) concentra el alta/edición y vive en "Más".
+const PRIMARY_ROUTE_IDS = ['dashboard', 'movements', 'debts', 'control'];
+export const primaryNavItems: NavItem[] = navItems.filter((item) => PRIMARY_ROUTE_IDS.includes(item.id));
+export const overflowNavItems: NavItem[] = navItems.filter((item) => !PRIMARY_ROUTE_IDS.includes(item.id));
+
+export default function Navigation({ currentRoute, onNavigate, onOpenMore, onNewMovement, avatarUrl, onLogout, onOpenNotifications }: Props) {
   const handleLogout = async () => {
     const supabase = getSupabaseBrowserClient();
     await supabase.auth.signOut();
@@ -41,11 +57,12 @@ export default function Navigation({ currentRoute, onNavigate, onNewMovement, av
         aria-label="Navegación principal"
       >
         <div className="flex justify-around items-center h-16">
-          {navItems.map(({ id, label, Icon }) => {
+          {primaryNavItems.map(({ id, label, Icon }) => {
             const active = currentRoute === id;
             return (
               <button
                 key={id}
+                data-route-id={id}
                 onClick={() => onNavigate(id)}
                 aria-current={active ? 'page' : undefined}
                 className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors
@@ -58,6 +75,14 @@ export default function Navigation({ currentRoute, onNavigate, onNewMovement, av
               </button>
             );
           })}
+          <button
+            data-route-id="more"
+            onClick={() => onOpenMore?.()}
+            className="flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors text-muted-foreground hover:text-foreground"
+          >
+            <MoreHorizontal className="w-5 h-5" strokeWidth={1.8} />
+            <span className="text-[10px] font-medium">Más</span>
+          </button>
         </div>
       </nav>
 
@@ -106,6 +131,7 @@ export default function Navigation({ currentRoute, onNavigate, onNewMovement, av
             return (
               <button
                 key={id}
+                data-route-id={id}
                 onClick={() => onNavigate(id)}
                 aria-current={active ? 'page' : undefined}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-sm

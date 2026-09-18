@@ -1,15 +1,25 @@
-import { db } from '../db/db';
+import { db, type SyncQueueItem } from '../db/db';
 import { getSupabaseBrowserClient } from '../supabase/client';
+import { emitSyncCompleted } from './syncEvents';
 
 const supabase = getSupabaseBrowserClient();
 
 export class CustomSyncLayer {
-  private isSyncing = false;
+  // A concurrent caller must await the SAME in-flight cycle rather than
+  // getting an immediately-resolved no-op — otherwise a caller that needs to
+  // know sync actually finished (e.g. "does this device need onboarding?")
+  // can race ahead of a cycle kicked off elsewhere and read stale local data.
+  private syncPromise: Promise<void> | null = null;
 
   async sync(): Promise<void> {
-    if (this.isSyncing) return;
-    this.isSyncing = true;
+    if (this.syncPromise) return this.syncPromise;
+    this.syncPromise = this.performSync().finally(() => {
+      this.syncPromise = null;
+    });
+    return this.syncPromise;
+  }
 
+  private async performSync(): Promise<void> {
     try {
       // 1. Pull: Obtener cambios remotos
       const lastSyncStr = localStorage.getItem('last_sync') || new Date(0).toISOString();
@@ -64,7 +74,30 @@ export class CustomSyncLayer {
       const pendingQueue = await db.sync_queue.orderBy('created_at').toArray();
       let pushHadErrors = false;
 
+      // Each queue entry is a full snapshot, not a diff, keyed by its own
+      // random id rather than the source row's id — so a row updated twice
+      // before its first snapshot pushes ends up with two+ queue entries.
+      // Keep only the newest snapshot per (table, row id): it already is
+      // the complete authoritative state, so an older superseded entry is
+      // discarded unconditionally, even if it was the one that kept failing
+      // (e.g. a since-corrected bad value that would otherwise retry forever).
+      const latestByRow = new Map<string, SyncQueueItem>();
       for (const item of pendingQueue) {
+        const key = `${item.table_name}:${item.data.id}`;
+        const existing = latestByRow.get(key);
+        if (!existing || item.created_at > existing.created_at) latestByRow.set(key, item);
+      }
+      const supersededIds = pendingQueue
+        .filter(item => latestByRow.get(`${item.table_name}:${item.data.id}`)?.id !== item.id)
+        .map(item => item.id);
+      if (supersededIds.length > 0) {
+        await db.sync_queue.bulkDelete(supersededIds);
+      }
+      const dedupedQueue = Array.from(latestByRow.values()).sort(
+        (a, b) => a.created_at.getTime() - b.created_at.getTime()
+      );
+
+      for (const item of dedupedQueue) {
         // `profiles` can only ever be created remotely by the enroll_self()
         // RPC (Principio IX) — a client `.upsert()` always attempts an
         // INSERT ... ON CONFLICT under the hood, which needs INSERT
@@ -96,7 +129,7 @@ export class CustomSyncLayer {
     } catch (err) {
       console.error('Sync failed:', err);
     } finally {
-      this.isSyncing = false;
+      emitSyncCompleted();
     }
   }
 }

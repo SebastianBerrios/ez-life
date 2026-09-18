@@ -1,4 +1,4 @@
-import { DayOfWeek, HabitCompletion } from '../domain/models/types';
+import { DayOfWeek, Habit, HabitCompletion } from '../domain/models/types';
 
 const DAY_CODES: DayOfWeek[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
@@ -86,6 +86,28 @@ export function evaluateFixedDaysStreak(days: HabitDayResult[]): StreakResult {
   }
 
   return { streak, tokensAvailable };
+}
+
+function startOfWeekUTC(d: Date): Date {
+  const daysSinceMonday = (d.getUTCDay() + 6) % 7; // calendar week is Monday-Sunday
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - daysSinceMonday));
+}
+
+/**
+ * ControlPage's "hoy" agenda (FR-008): a fixed-days habit is scheduled today
+ * when today's day-of-week is in its fixed_days, regardless of whether it was
+ * already completed today. A frequency habit is scheduled today as long as
+ * this calendar week's completions haven't yet reached its target.
+ */
+export function isHabitScheduledToday(habit: Habit, completions: HabitCompletion[], today: Date): boolean {
+  if (habit.schedule_mode === 'fixed_days' && habit.fixed_days) {
+    return habit.fixed_days.includes(DAY_CODES[today.getUTCDay()]);
+  }
+
+  const weekStart = startOfWeekUTC(today);
+  const weekEnd = new Date(Date.UTC(weekStart.getUTCFullYear(), weekStart.getUTCMonth(), weekStart.getUTCDate() + 7));
+  const completionsThisWeek = completions.filter(c => c.date >= weekStart && c.date < weekEnd).length;
+  return completionsThisWeek < (habit.frequency_target ?? 1);
 }
 
 export interface HabitWeekResult {

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { LocalTaskRepository } from '../../infrastructure/repositories/local/LocalTaskRepository';
+import { Task } from '../../core/domain/models/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,13 +10,18 @@ import { Loader2 } from 'lucide-react';
 
 interface Props {
   userId: string;
+  existing?: Task;
   onComplete: () => void;
   onCancel: () => void;
 }
 
-export default function TaskForm({ userId, onComplete, onCancel }: Props) {
-  const [title, setTitle] = useState('');
-  const [dueDate, setDueDate] = useState('');
+function toDateInputValue(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+export default function TaskForm({ userId, existing, onComplete, onCancel }: Props) {
+  const [title, setTitle] = useState(existing?.title ?? '');
+  const [dueDate, setDueDate] = useState(existing ? toDateInputValue(existing.due_date) : '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,11 +33,12 @@ export default function TaskForm({ userId, onComplete, onCancel }: Props) {
     try {
       const repo = new LocalTaskRepository();
       await repo.save({
-        id: '',
+        id: existing?.id ?? '',
         user_id: userId,
         title,
         due_date: new Date(dueDate),
-        status: 'pending',
+        status: existing?.status ?? 'pending',
+        done_at: existing?.done_at,
       });
 
       onComplete();
@@ -44,7 +51,7 @@ export default function TaskForm({ userId, onComplete, onCancel }: Props) {
 
   return (
     <div className="w-full">
-      <h2 className="mb-4 font-heading text-base leading-none font-medium">Nueva Tarea</h2>
+      <h2 className="mb-4 font-heading text-base leading-none font-medium">{existing ? 'Editar Tarea' : 'Nueva Tarea'}</h2>
       <form onSubmit={handleSubmit} data-testid="task-form" className="space-y-5">
         <div className="space-y-2">
           <Label htmlFor="taskTitle">Título</Label>
@@ -64,7 +71,7 @@ export default function TaskForm({ userId, onComplete, onCancel }: Props) {
           </Button>
           <Button type="submit" disabled={isSubmitting} className="flex-1">
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Crear
+            {existing ? 'Guardar cambios' : 'Crear'}
           </Button>
         </div>
       </form>

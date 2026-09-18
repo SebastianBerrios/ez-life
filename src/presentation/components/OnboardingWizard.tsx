@@ -26,9 +26,14 @@ const DEFAULT_CATEGORIES = [
   { bucket: 'savings' as const, name: 'Ahorro', subcategories: ['Fondo de emergencia', 'Inversiones'] },
 ];
 
-function pickSeedBuckets(buckets: DistributionCategory[]): { primary: UUID; secondary: UUID; savings: UUID } {
+// Returns undefined per slot when no bucket exists yet for it, rather than
+// falling back to '' — an empty-string distribution_category_id used to
+// slip through as a "valid" id and only fail much later, at push time,
+// against Postgres's NOT NULL constraint (see repairDanglingExpenseCategories
+// for the historical rows this already produced).
+function pickSeedBuckets(buckets: DistributionCategory[]): { primary?: UUID; secondary?: UUID; savings?: UUID } {
   const nonSavings = [...buckets].filter(b => !b.is_savings).sort((a, b) => b.percentage - a.percentage);
-  const primary = nonSavings[0]?.id ?? buckets[0]?.id ?? '';
+  const primary = nonSavings[0]?.id ?? buckets[0]?.id;
   const secondary = nonSavings[1]?.id ?? primary;
   const savingsBucket = buckets.find(b => b.is_savings)?.id ?? primary;
   return { primary, secondary, savings: savingsBucket };
@@ -156,11 +161,13 @@ function Step3Categories({
       if (cats.length === 0 && loadedBuckets.length > 0) {
         const seedBuckets = pickSeedBuckets(loadedBuckets);
         for (const def of DEFAULT_CATEGORIES) {
+          const bucketId = seedBuckets[def.bucket];
+          if (!bucketId) continue; // no valid bucket yet — skip rather than seed a dangling category
           const catId = uuidv7();
           await catRepo.saveExpenseCategory({
             id: catId,
             user_id: profileId,
-            distribution_category_id: seedBuckets[def.bucket],
+            distribution_category_id: bucketId,
             name: def.name,
           });
           for (const subName of def.subcategories) {
@@ -431,7 +438,7 @@ export default function OnboardingWizard({ profileId, startStep = 1, onComplete 
 
       <div key={currentStep} className="animate-fade-slide-up">
         {currentStep === 1 && (
-          <OnboardingStep1 onComplete={handleStep1Complete} />
+          <OnboardingStep1 profileId={wizardProfileId} onComplete={handleStep1Complete} />
         )}
 
         {currentStep === 2 && (

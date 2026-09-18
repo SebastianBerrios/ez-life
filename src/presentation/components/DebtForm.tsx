@@ -8,6 +8,7 @@ import { DebtDirection } from '../../core/domain/models/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 
 interface Props {
@@ -82,15 +83,15 @@ export default function DebtForm({ userId, onComplete, onCancel }: Props) {
 
         <div className="space-y-2">
           <Label htmlFor="direction">Dirección</Label>
-          <select
-            id="direction"
-            value={direction}
-            onChange={(e) => setDirection(e.target.value as DebtDirection)}
-            className="border-input bg-transparent flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none"
-          >
-            <option value="lent">Le presté yo</option>
-            <option value="borrowed">Me prestaron a mí</option>
-          </select>
+          <Select value={direction} onValueChange={(val) => setDirection((val ?? 'lent') as DebtDirection)}>
+            <SelectTrigger id="direction" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="lent">Le presté yo</SelectItem>
+              <SelectItem value="borrowed">Me prestaron a mí</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="space-y-2">

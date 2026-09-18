@@ -9,10 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 
 interface Props {
+  profileId: string;
   onComplete: (profileId: string) => void;
 }
 
-export default function OnboardingStep1({ onComplete }: Props) {
+export default function OnboardingStep1({ profileId, onComplete }: Props) {
   const [income, setIncome] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -24,11 +25,11 @@ export default function OnboardingStep1({ onComplete }: Props) {
       const profileRepo = new LocalProfileRepository();
       const incomeRepo = new LocalIncomeSourceRepository();
 
-      const userId = uuidv7();
-
-      // We save the profile
+      // Use the authenticated session's real id — never mint a fresh one here.
+      // A local-only id would orphan every row this wizard creates from RLS
+      // (which requires user_id === auth.uid()), so it would never sync.
       await profileRepo.save({
-        id: userId
+        id: profileId
       });
 
       // We save the base income in cents
@@ -36,12 +37,12 @@ export default function OnboardingStep1({ onComplete }: Props) {
 
       await incomeRepo.save({
         id: uuidv7(),
-        user_id: userId,
+        user_id: profileId,
         name: 'Sueldo Base',
         amount: incomeInCents,
       });
 
-      onComplete(userId);
+      onComplete(profileId);
     } catch (err) {
       console.error(err);
     } finally {

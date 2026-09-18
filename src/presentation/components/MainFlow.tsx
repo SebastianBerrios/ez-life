@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import LoginScreen from './LoginScreen';
 import OnboardingWizard from './OnboardingWizard';
 import Layout from './Layout';
+import MoreDrawer from './MoreDrawer';
+import { overflowNavItems } from './BottomNav';
 import Dashboard from './Dashboard';
 import MovementList from './MovementList';
 import MovementForm from './MovementForm';
@@ -11,17 +13,14 @@ import SavingsGoalList from './SavingsGoalList';
 import SavingsGoalForm from './SavingsGoalForm';
 import DebtList from './DebtList';
 import DebtForm from './DebtForm';
+import InstallmentLoanList from './InstallmentLoanList';
+import InstallmentLoanForm from './InstallmentLoanForm';
 import SharedSpaceScreen from './SharedSpaceScreen';
 import SharedSpaceCreate from './SharedSpaceCreate';
 import SharedSpaceJoin from './SharedSpaceJoin';
 import SharedMovementForm from './SharedMovementForm';
-import HabitList from './HabitList';
-import HabitForm from './HabitForm';
-import HabitsDashboard from './HabitsDashboard';
-import GoalList from './GoalList';
-import GoalForm from './GoalForm';
-import TaskList from './TaskList';
-import TaskForm from './TaskForm';
+import ControlPage from './ControlPage';
+import CreatePage from './CreatePage';
 import AnalysisScreen from './AnalysisScreen';
 import { Membership } from '../../core/domain/models/types';
 import SettingsScreen from './SettingsScreen';
@@ -34,6 +33,9 @@ import { useSyncManager } from '../hooks/useSyncManager';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useNotificationEvaluator } from '../hooks/useNotificationEvaluator';
 import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
+import { repairOrphanedLocalRows } from '../../infrastructure/sync/repairOrphanedRows';
+import { mergeDuplicateCategories } from '../../infrastructure/sync/mergeDuplicateCategories';
+import { repairDanglingExpenseCategories } from '../../infrastructure/sync/repairDanglingExpenseCategories';
 
 // Shared chrome for the app's dialogs (movement form, goal form,
 // notification history) — always centered on the viewport, never a
@@ -47,26 +49,24 @@ export default function MainFlow() {
   const [wizardStartStep, setWizardStartStep] = useState<1 | 2 | 3>(1);
   const [currentRoute, setCurrentRoute] = useState('dashboard');
   const [profileId, setProfileId] = useState<string | null>(null);
+  const [showMoreDrawer, setShowMoreDrawer] = useState(false);
   const [showMovementForm, setShowMovementForm] = useState(false);
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [goalsRefreshKey, setGoalsRefreshKey] = useState(0);
   const [showDebtForm, setShowDebtForm] = useState(false);
   const [debtsRefreshKey, setDebtsRefreshKey] = useState(0);
+  const [showInstallmentLoanForm, setShowInstallmentLoanForm] = useState(false);
+  const [installmentLoansRefreshKey, setInstallmentLoansRefreshKey] = useState(0);
   const [showSharedSpaceCreate, setShowSharedSpaceCreate] = useState(false);
   const [showSharedSpaceJoin, setShowSharedSpaceJoin] = useState(false);
   const [sharedSpacesRefreshKey, setSharedSpacesRefreshKey] = useState(0);
   const [addMovementTarget, setAddMovementTarget] = useState<{ spaceId: string; members: Membership[] } | null>(null);
-  const [showHabitForm, setShowHabitForm] = useState(false);
-  const [habitsRefreshKey, setHabitsRefreshKey] = useState(0);
-  const [showObjectiveGoalForm, setShowObjectiveGoalForm] = useState(false);
-  const [showTaskForm, setShowTaskForm] = useState(false);
-  const [objectivesRefreshKey, setObjectivesRefreshKey] = useState(0);
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
   const [showNotifications, setShowNotifications] = useState(false);
 
   // Background Jobs
   useRecurrenceEvaluator(profileId);
-  useSyncManager();
+  const { syncNow } = useSyncManager();
   useNotificationEvaluator(profileId);
   const isOnline = useOnlineStatus();
 
@@ -94,6 +94,30 @@ export default function MainFlow() {
           });
 
           try {
+            // Repair any local rows orphaned by the old onboarding bug (a
+            // stale random user_id instead of the real session id) BEFORE
+            // deciding whether this device needs the wizard — otherwise
+            // already-completed onboarding data stays invisible to this
+            // check forever. Then wait for the initial pull to actually
+            // finish before reading local state, so a genuinely new device
+            // gets a chance to receive existing data first instead of the
+            // wizard being triggered from a still-empty local DB.
+            await repairOrphanedLocalRows(userId);
+            await syncNow();
+
+            // Merge duplicate default categories left over from repeated
+            // onboarding runs across devices/sessions while sync was broken
+            // (see repairOrphanedLocalRows above) — after the pull above, so
+            // it sees whatever the server already has. Then, on the
+            // now-consolidated bucket set, repair any expense category whose
+            // distribution_category_id is missing/dangling (a separate
+            // historical seeding bug — same root cause: it never used to
+            // reach Supabase, so nothing caught it). Sync once more so both
+            // corrections push out right away.
+            await mergeDuplicateCategories(userId);
+            await repairDanglingExpenseCategories(userId);
+            await syncNow();
+
             const catRepo = new LocalCategoryRepository();
             const cats = await catRepo.getDistributionCategories(userId);
             const expCats = await catRepo.getExpenseCategories(userId);
@@ -134,7 +158,7 @@ export default function MainFlow() {
 
       return () => subscription.unsubscribe();
     });
-  }, []);
+  }, [syncNow]);
 
   if (step === 'loading') {
     return (
@@ -172,9 +196,6 @@ export default function MainFlow() {
         profileId={profileId ?? ''}
         startStep={wizardStartStep}
         onComplete={(finalProfileId) => {
-          // The wizard may have created/edited data under its own locally
-          // generated profileId (Step 1 skip-login path) — sync it back so
-          // Dashboard/MovementForm query the right user, not a stale one.
           setProfileId(finalProfileId);
           setStep('app');
         }}
@@ -187,11 +208,19 @@ export default function MainFlow() {
     <Layout
       currentRoute={currentRoute}
       onNavigate={setCurrentRoute}
+      onOpenMore={() => setShowMoreDrawer(true)}
       onNewMovement={() => setShowMovementForm(true)}
       avatarUrl={avatarUrl}
       onLogout={() => setStep('login')}
       onOpenNotifications={() => setShowNotifications(true)}
     >
+      <MoreDrawer
+        overflowNavItems={overflowNavItems}
+        currentRoute={currentRoute}
+        onNavigate={setCurrentRoute}
+        open={showMoreDrawer}
+        onOpenChange={setShowMoreDrawer}
+      />
       <div className="p-5 space-y-6">
         {/* Mobile header */}
         <header className="flex justify-between items-center py-2 md:hidden">
@@ -258,12 +287,18 @@ export default function MainFlow() {
 
         {currentRoute === 'debts' && profileId && (
           <div className="space-y-4">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center gap-2">
               <h2 className="text-xl font-bold text-foreground">Préstamos</h2>
-              <Button size="sm" onClick={() => setShowDebtForm(true)}>
-                + Nuevo préstamo
-              </Button>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => setShowInstallmentLoanForm(true)}>
+                  + Con cuotas
+                </Button>
+                <Button size="sm" onClick={() => setShowDebtForm(true)}>
+                  + Nuevo préstamo
+                </Button>
+              </div>
             </div>
+            <InstallmentLoanList key={installmentLoansRefreshKey} userId={profileId} />
             <DebtList key={debtsRefreshKey} userId={profileId} />
           </div>
         )}
@@ -283,43 +318,21 @@ export default function MainFlow() {
           </div>
         )}
 
-        {currentRoute === 'habits' && profileId && (
-          <div className="space-y-6">
-            <HabitsDashboard key={`dash-${habitsRefreshKey}`} userId={profileId} />
-
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-foreground">Hábitos</h2>
-                <Button size="sm" onClick={() => setShowHabitForm(true)}>
-                  + Nuevo hábito
-                </Button>
-              </div>
-              <HabitList key={habitsRefreshKey} userId={profileId} />
+        {currentRoute === 'control' && profileId && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-bold text-foreground">Control</h2>
             </div>
+            <ControlPage userId={profileId} />
           </div>
         )}
 
-        {currentRoute === 'objectives' && profileId && (
-          <div className="space-y-6">
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-foreground">Metas</h2>
-                <Button size="sm" onClick={() => setShowObjectiveGoalForm(true)}>
-                  + Nueva meta
-                </Button>
-              </div>
-              <GoalList key={`goals-${objectivesRefreshKey}`} userId={profileId} />
+        {currentRoute === 'create' && profileId && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-bold text-foreground">Crear</h2>
             </div>
-
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-foreground">Tareas</h2>
-                <Button size="sm" onClick={() => setShowTaskForm(true)}>
-                  + Nueva tarea
-                </Button>
-              </div>
-              <TaskList key={`tasks-${objectivesRefreshKey}`} userId={profileId} />
-            </div>
+            <CreatePage userId={profileId} />
           </div>
         )}
 
@@ -368,6 +381,21 @@ export default function MainFlow() {
                 setGoalsRefreshKey(k => k + 1);
               }}
               onCancel={() => setShowGoalForm(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {profileId && (
+        <Dialog open={showInstallmentLoanForm} onOpenChange={(open) => !open && setShowInstallmentLoanForm(false)}>
+          <DialogContent className={SHEET_DIALOG_CONTENT_CLASS}>
+            <InstallmentLoanForm
+              userId={profileId}
+              onComplete={() => {
+                setShowInstallmentLoanForm(false);
+                setInstallmentLoansRefreshKey(k => k + 1);
+              }}
+              onCancel={() => setShowInstallmentLoanForm(false)}
             />
           </DialogContent>
         </Dialog>
@@ -428,51 +456,6 @@ export default function MainFlow() {
                 setSharedSpacesRefreshKey(k => k + 1);
               }}
               onCancel={() => setAddMovementTarget(null)}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {profileId && (
-        <Dialog open={showHabitForm} onOpenChange={(open) => !open && setShowHabitForm(false)}>
-          <DialogContent className={SHEET_DIALOG_CONTENT_CLASS}>
-            <HabitForm
-              userId={profileId}
-              onComplete={() => {
-                setShowHabitForm(false);
-                setHabitsRefreshKey(k => k + 1);
-              }}
-              onCancel={() => setShowHabitForm(false)}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {profileId && (
-        <Dialog open={showObjectiveGoalForm} onOpenChange={(open) => !open && setShowObjectiveGoalForm(false)}>
-          <DialogContent className={SHEET_DIALOG_CONTENT_CLASS}>
-            <GoalForm
-              userId={profileId}
-              onComplete={() => {
-                setShowObjectiveGoalForm(false);
-                setObjectivesRefreshKey(k => k + 1);
-              }}
-              onCancel={() => setShowObjectiveGoalForm(false)}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {profileId && (
-        <Dialog open={showTaskForm} onOpenChange={(open) => !open && setShowTaskForm(false)}>
-          <DialogContent className={SHEET_DIALOG_CONTENT_CLASS}>
-            <TaskForm
-              userId={profileId}
-              onComplete={() => {
-                setShowTaskForm(false);
-                setObjectivesRefreshKey(k => k + 1);
-              }}
-              onCancel={() => setShowTaskForm(false)}
             />
           </DialogContent>
         </Dialog>

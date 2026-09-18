@@ -46,7 +46,8 @@ describe('DebtForm', () => {
     render(<DebtForm userId="fake-user-id" onComplete={vi.fn()} onCancel={vi.fn()} />);
 
     await user.type(screen.getByLabelText(/nombre/i), 'Ana');
-    await user.selectOptions(screen.getByLabelText(/dirección/i), 'borrowed');
+    await user.click(screen.getByLabelText(/dirección/i));
+    await user.click(await screen.findByRole('option', { name: /Me prestaron a mí/i }));
     await user.type(screen.getByLabelText(/monto/i), '50.00');
     fireEvent.change(screen.getByLabelText(/vencimiento/i), { target: { value: '2026-12-31' } });
     await user.type(screen.getByLabelText(/interés/i), '5');

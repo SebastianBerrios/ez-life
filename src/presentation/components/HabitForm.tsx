@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { LocalHabitRepository } from '../../infrastructure/repositories/local/LocalHabitRepository';
-import { DayOfWeek, HabitScheduleMode } from '../../core/domain/models/types';
+import { DayOfWeek, Habit, HabitScheduleMode } from '../../core/domain/models/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,6 +10,7 @@ import { Loader2 } from 'lucide-react';
 
 interface Props {
   userId: string;
+  existing?: Habit;
   onComplete: () => void;
   onCancel: () => void;
 }
@@ -24,11 +25,11 @@ const DAYS: { value: DayOfWeek; label: string }[] = [
   { value: 'sun', label: 'Domingo' },
 ];
 
-export default function HabitForm({ userId, onComplete, onCancel }: Props) {
-  const [name, setName] = useState('');
-  const [scheduleMode, setScheduleMode] = useState<HabitScheduleMode>('fixed_days');
-  const [fixedDays, setFixedDays] = useState<DayOfWeek[]>([]);
-  const [frequencyTarget, setFrequencyTarget] = useState('');
+export default function HabitForm({ userId, existing, onComplete, onCancel }: Props) {
+  const [name, setName] = useState(existing?.name ?? '');
+  const [scheduleMode, setScheduleMode] = useState<HabitScheduleMode>(existing?.schedule_mode ?? 'fixed_days');
+  const [fixedDays, setFixedDays] = useState<DayOfWeek[]>(existing?.fixed_days ?? []);
+  const [frequencyTarget, setFrequencyTarget] = useState(existing?.frequency_target?.toString() ?? '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,7 +54,7 @@ export default function HabitForm({ userId, onComplete, onCancel }: Props) {
     try {
       const repo = new LocalHabitRepository();
       await repo.save({
-        id: '',
+        id: existing?.id ?? '',
         user_id: userId,
         name,
         schedule_mode: scheduleMode,
@@ -71,7 +72,7 @@ export default function HabitForm({ userId, onComplete, onCancel }: Props) {
 
   return (
     <div className="w-full">
-      <h2 className="mb-4 font-heading text-base leading-none font-medium">Nuevo Hábito</h2>
+      <h2 className="mb-4 font-heading text-base leading-none font-medium">{existing ? 'Editar Hábito' : 'Nuevo Hábito'}</h2>
       <form onSubmit={handleSubmit} data-testid="habit-form" className="space-y-5">
         <div className="space-y-2">
           <Label htmlFor="habitName">Nombre</Label>
@@ -146,7 +147,7 @@ export default function HabitForm({ userId, onComplete, onCancel }: Props) {
           </Button>
           <Button type="submit" disabled={isSubmitting} className="flex-1">
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Crear
+            {existing ? 'Guardar cambios' : 'Crear'}
           </Button>
         </div>
       </form>

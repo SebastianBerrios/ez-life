@@ -1,4 +1,9 @@
-import { UUID, Profile, IncomeSource, DistributionCategory, ExpenseCategory, ExpenseSubcategory, SavingsGoal, Movement, Notification, Debt, SharedSpace, SharedSpacePermissionMode, SharedInvite, Membership, SharedMovement, SharedMovementSplit, SharedMovementType, SharedMovementSplitMode, Habit, HabitCompletion, Goal, Task } from '../models/types';
+import { UUID, Profile, IncomeSource, DistributionCategory, ExpenseCategory, ExpenseSubcategory, SavingsGoal, Movement, Notification, Debt, SharedSpace, SharedSpacePermissionMode, SharedInvite, Membership, SharedMovement, SharedMovementSplit, SharedMovementType, SharedMovementSplitMode, Habit, HabitCompletion, Goal, Task, InstallmentLoan, InstallmentPayment } from '../models/types';
+
+/** The user's own choice from FR-016 — the resulting value is always theirs, never computed (FR-017). */
+export type PrincipalPaymentAdjustment =
+  | { type: 'reduce_term'; newRemainingInstallments: number }
+  | { type: 'reduce_installment_amount'; newInstallmentAmountCents: number };
 
 export interface IProfileRepository {
   get(id: UUID): Promise<Profile | undefined>;
@@ -54,6 +59,27 @@ export interface IDebtRepository {
   getById(id: UUID): Promise<Debt | undefined>;
   save(debt: Omit<Debt, 'created_at' | 'updated_at'>): Promise<Debt>;
   recordSettlement(id: UUID, paymentAmount: number): Promise<Debt>;
+  delete(id: UUID): Promise<void>;
+}
+
+/**
+ * A separate entity from Debt on purpose (research.md #3) — bank/caja loans
+ * with a lender-defined installment schedule. `recordInstallmentPayment` and
+ * `recordPrincipalPayment` delegate all validation/derivation to the pure
+ * use-cases in `core/use-cases/` (Principio III); neither ever creates or
+ * touches a Movement (FR-027, Principio X).
+ */
+export interface IInstallmentLoanRepository {
+  getAll(userId: UUID): Promise<InstallmentLoan[]>;
+  getById(id: UUID): Promise<InstallmentLoan | undefined>;
+  /** `remaining_installments` is always initialized to `installment_count` (FR-011). */
+  create(loan: Omit<InstallmentLoan, 'created_at' | 'updated_at' | 'remaining_installments' | 'status'>): Promise<void>;
+  /** Corrects the original terms — independent of recording a payment, never changes status (FR-022). */
+  updateTerms(id: UUID, changes: { amount?: number; installmentCount?: number; installmentAmount?: number; interestRate?: number }): Promise<void>;
+  recordInstallmentPayment(loanId: UUID, installmentsPaid: number, date: Date): Promise<void>;
+  recordPrincipalPayment(loanId: UUID, amountCents: number, date: Date, adjustment: PrincipalPaymentAdjustment): Promise<void>;
+  /** Full history, ordered by date (FR-026). */
+  getPayments(loanId: UUID): Promise<InstallmentPayment[]>;
   delete(id: UUID): Promise<void>;
 }
 

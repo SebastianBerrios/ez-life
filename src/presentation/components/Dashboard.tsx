@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { LocalMovementRepository } from '../../infrastructure/repositories/local/LocalMovementRepository';
 import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
 import { LocalDebtRepository } from '../../infrastructure/repositories/local/LocalDebtRepository';
+import { onSyncCompleted } from '../../infrastructure/sync/syncEvents';
 import { Movement, DistributionCategory, Debt } from '../../core/domain/models/types';
 import { calculateMonthlyCycle } from '../../core/use-cases/calculateMonthlyCycle';
 import { calculateSpentByBucket } from '../../core/use-cases/calculateCategoryBreakdown';
@@ -24,33 +25,39 @@ export default function Dashboard({ userId }: Props) {
   const [loading, setLoading] = useState(true);
   const [refDate, setRefDate] = useState(() => new Date());
 
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      try {
-        const moveRepo = new LocalMovementRepository();
-        const catRepo = new LocalCategoryRepository();
-        const debtRepo = new LocalDebtRepository();
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const moveRepo = new LocalMovementRepository();
+      const catRepo = new LocalCategoryRepository();
+      const debtRepo = new LocalDebtRepository();
 
-        const [start, end] = calculateMonthlyCycle(refDate);
+      const [start, end] = calculateMonthlyCycle(refDate);
 
-        const [movesData, catsData, debtsData] = await Promise.all([
-          moveRepo.getAllByCycle(userId, start, end),
-          catRepo.getDistributionCategories(userId),
-          debtRepo.getAll(userId),
-        ]);
+      const [movesData, catsData, debtsData] = await Promise.all([
+        moveRepo.getAllByCycle(userId, start, end),
+        catRepo.getDistributionCategories(userId),
+        debtRepo.getAll(userId),
+      ]);
 
-        setMovements(movesData);
-        setDistCategories(catsData);
-        setDebts(debtsData.filter(d => d.settled_amount < d.amount));
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
+      setMovements(movesData);
+      setDistCategories(catsData);
+      setDebts(debtsData.filter(d => d.settled_amount < d.amount));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   }, [userId, refDate]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Re-read local data once a sync cycle pulls new rows in (e.g. a movement
+  // registered on another device) — a one-shot effect wouldn't otherwise
+  // notice data that arrives after this component already rendered.
+  useEffect(() => onSyncCompleted(loadData), [loadData]);
 
   const goToPreviousMonth = () => setRefDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1));
   const goToNextMonth = () => setRefDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1));

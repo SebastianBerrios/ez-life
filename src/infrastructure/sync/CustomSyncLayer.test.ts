@@ -182,6 +182,44 @@ describe('CustomSyncLayer', () => {
     expect(queue.length).toBe(0);
   });
 
+  it('lets a concurrent caller await the same in-flight cycle instead of resolving early', async () => {
+    let resolvePull: (value: { data: unknown[]; error: null }) => void;
+    const pullPromise = new Promise<{ data: unknown[]; error: null }>(resolve => {
+      resolvePull = resolve;
+    });
+    let pullCallCount = 0;
+
+    mockFrom.mockImplementation(() => ({
+      select: vi.fn().mockReturnValue({
+        gt: vi.fn().mockImplementation(() => {
+          pullCallCount += 1;
+          return pullPromise;
+        })
+      }),
+      upsert: vi.fn().mockResolvedValue({ error: null })
+    }));
+
+    const layer = new CustomSyncLayer();
+    const first = layer.sync();
+    const second = layer.sync();
+
+    let secondResolved = false;
+    second.then(() => { secondResolved = true; });
+
+    // Give microtasks a chance to run — the second call must NOT have
+    // resolved yet, because the first cycle's pull hasn't finished.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(secondResolved).toBe(false);
+
+    resolvePull!({ data: [], error: null });
+    await Promise.all([first, second]);
+
+    expect(secondResolved).toBe(true);
+    // Only one real sync cycle ran, even though sync() was called twice.
+    expect(pullCallCount).toBe(17); // one .gt() call per synced table, once
+  });
+
   it('does not advance last_sync when a push fails', async () => {
     await db.sync_queue.put({
       id: 'q1',
@@ -203,5 +241,131 @@ describe('CustomSyncLayer', () => {
     expect(localStorage.getItem('last_sync')).toBeFalsy();
     const queue = await db.sync_queue.toArray();
     expect(queue.length).toBe(1); // item stays queued for the next cycle
+  });
+
+  it('discards a superseded stale snapshot for the same row and only pushes the newest one', async () => {
+    const older = new Date(Date.now() - 60_000);
+    const newer = new Date();
+
+    // A bad snapshot queued before a later fix corrected the row (the
+    // real-world case: `distribution_category_id: null` queued, then the
+    // row got repaired and re-queued with a valid value).
+    await db.sync_queue.put({
+      id: 'q-old-bad',
+      table_name: 'expense_categories',
+      data: { id: 'ec1', distribution_category_id: null },
+      created_at: older,
+    });
+    await db.sync_queue.put({
+      id: 'q-new-good',
+      table_name: 'expense_categories',
+      data: { id: 'ec1', distribution_category_id: 'bucket-1' },
+      created_at: newer,
+    });
+
+    const mockUpsert = vi.fn().mockImplementation((payload: { distribution_category_id: string | null }) => {
+      if (payload.distribution_category_id === null) {
+        return Promise.resolve({ error: { code: '23502', message: 'null value in column "distribution_category_id"' } });
+      }
+      return Promise.resolve({ error: null });
+    });
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'expense_categories') {
+        return {
+          select: vi.fn().mockReturnValue({ gt: vi.fn().mockResolvedValue({ data: [], error: null }) }),
+          upsert: mockUpsert,
+        };
+      }
+      return emptyPullUpsertOk();
+    });
+
+    const layer = new CustomSyncLayer();
+    await layer.sync();
+
+    // The stale bad snapshot was never even sent — only the newest one was.
+    expect(mockUpsert).toHaveBeenCalledTimes(1);
+    expect(mockUpsert).toHaveBeenCalledWith({ id: 'ec1', distribution_category_id: 'bucket-1' });
+
+    const queue = await db.sync_queue.toArray();
+    expect(queue.length).toBe(0); // both the superseded stale entry and the successfully-pushed one are gone
+    expect(localStorage.getItem('last_sync')).toBeTruthy();
+  });
+
+  it('cleans up superseded entries even when the newest entry for that row also fails', async () => {
+    const older = new Date(Date.now() - 60_000);
+    const newer = new Date();
+
+    await db.sync_queue.put({
+      id: 'q-old',
+      table_name: 'expense_categories',
+      data: { id: 'ec2', name: 'stale' },
+      created_at: older,
+    });
+    await db.sync_queue.put({
+      id: 'q-new-fails',
+      table_name: 'expense_categories',
+      data: { id: 'ec2', name: 'still broken somehow' },
+      created_at: newer,
+    });
+
+    const mockUpsert = vi.fn().mockResolvedValue({ error: { message: 'still failing' } });
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'expense_categories') {
+        return {
+          select: vi.fn().mockReturnValue({ gt: vi.fn().mockResolvedValue({ data: [], error: null }) }),
+          upsert: mockUpsert,
+        };
+      }
+      return emptyPullUpsertOk();
+    });
+
+    const layer = new CustomSyncLayer();
+    await layer.sync();
+
+    // Only the newest snapshot was ever attempted.
+    expect(mockUpsert).toHaveBeenCalledTimes(1);
+    expect(mockUpsert).toHaveBeenCalledWith({ id: 'ec2', name: 'still broken somehow' });
+
+    const queue = await db.sync_queue.toArray();
+    expect(queue.length).toBe(1); // the failed newest entry stays queued for retry
+    expect(queue[0].id).toBe('q-new-fails'); // the superseded older one was still cleaned up
+    expect(localStorage.getItem('last_sync')).toBeFalsy(); // push failure still blocks advancing last_sync
+  });
+
+  it('still pushes both entries when they belong to different rows (no false-positive collapsing)', async () => {
+    await db.sync_queue.put({
+      id: 'q-row-a',
+      table_name: 'movements',
+      data: { id: 'm-a', amount: 100 },
+      created_at: new Date(Date.now() - 1000),
+    });
+    await db.sync_queue.put({
+      id: 'q-row-b',
+      table_name: 'movements',
+      data: { id: 'm-b', amount: 200 },
+      created_at: new Date(),
+    });
+
+    const mockUpsert = vi.fn().mockResolvedValue({ error: null });
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'movements') {
+        return {
+          select: vi.fn().mockReturnValue({ gt: vi.fn().mockResolvedValue({ data: [], error: null }) }),
+          upsert: mockUpsert,
+        };
+      }
+      return emptyPullUpsertOk();
+    });
+
+    const layer = new CustomSyncLayer();
+    await layer.sync();
+
+    expect(mockUpsert).toHaveBeenCalledTimes(2);
+    expect(mockUpsert).toHaveBeenCalledWith({ id: 'm-a', amount: 100 });
+    expect(mockUpsert).toHaveBeenCalledWith({ id: 'm-b', amount: 200 });
+
+    const queue = await db.sync_queue.toArray();
+    expect(queue.length).toBe(0);
   });
 });

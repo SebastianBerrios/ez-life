@@ -1,9 +1,10 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import Dashboard from './Dashboard';
 import { LocalMovementRepository } from '../../infrastructure/repositories/local/LocalMovementRepository';
 import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
 import { LocalDebtRepository } from '../../infrastructure/repositories/local/LocalDebtRepository';
+import { emitSyncCompleted } from '../../infrastructure/sync/syncEvents';
 
 vi.mock('../../infrastructure/repositories/local/LocalMovementRepository');
 vi.mock('../../infrastructure/repositories/local/LocalCategoryRepository');
@@ -52,5 +53,27 @@ describe('Dashboard', () => {
     render(<Dashboard userId="user-1" />);
 
     expect(await screen.findByText(/no ten[eé]s deudas activas/i)).toBeInTheDocument();
+  });
+
+  it('reloads local data when a sync cycle completes (e.g. a movement pulled from another device)', async () => {
+    const getAllByCycle = vi.fn().mockResolvedValue([]);
+    vi.mocked(LocalMovementRepository).mockImplementation(function () {
+      return { getAllByCycle } as unknown as InstanceType<typeof LocalMovementRepository>;
+    });
+    vi.mocked(LocalCategoryRepository).mockImplementation(function () {
+      return { getDistributionCategories: vi.fn().mockResolvedValue([]) } as unknown as InstanceType<typeof LocalCategoryRepository>;
+    });
+    vi.mocked(LocalDebtRepository).mockImplementation(function () {
+      return { getAll: vi.fn().mockResolvedValue([]) } as unknown as InstanceType<typeof LocalDebtRepository>;
+    });
+
+    render(<Dashboard userId="user-1" />);
+    await waitFor(() => expect(getAllByCycle).toHaveBeenCalledTimes(1));
+
+    act(() => {
+      emitSyncCompleted();
+    });
+
+    await waitFor(() => expect(getAllByCycle).toHaveBeenCalledTimes(2));
   });
 });

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { buildFixedDaysLog, evaluateFixedDaysStreak, evaluateFrequencyStreak, HabitDayResult, HabitWeekResult } from './evaluateHabitStreak';
-import type { HabitCompletion } from '../domain/models/types';
+import { buildFixedDaysLog, evaluateFixedDaysStreak, evaluateFrequencyStreak, isHabitScheduledToday, HabitDayResult, HabitWeekResult } from './evaluateHabitStreak';
+import type { Habit, HabitCompletion } from '../domain/models/types';
 
 describe('evaluateFixedDaysStreak', () => {
   function day(completed: boolean, tokenUsed = false): HabitDayResult {
@@ -101,5 +101,49 @@ describe('evaluateFrequencyStreak', () => {
   it('resets the streak when a week misses the target with no token available', () => {
     const result = evaluateFrequencyStreak([week(3, 3), week(1, 3)]);
     expect(result.streak).toBe(0);
+  });
+});
+
+describe('isHabitScheduledToday', () => {
+  const DAY_CODES = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
+  const today = new Date(Date.UTC(2026, 8, 18)); // fixed reference date — deterministic regardless of when the suite runs
+  const todayCode = DAY_CODES[today.getUTCDay()];
+  const otherCode = DAY_CODES[(today.getUTCDay() + 1) % 7];
+
+  function habit(overrides: Partial<Habit>): Habit {
+    return {
+      id: 'h1', user_id: 'u1', name: 'Test',
+      schedule_mode: 'fixed_days', fixed_days: [],
+      created_at: today, updated_at: today,
+      ...overrides,
+    } as Habit;
+  }
+
+  function completion(date: Date): HabitCompletion {
+    return { id: 'c1', habit_id: 'h1', date, token_used: false, created_at: date, updated_at: date };
+  }
+
+  it('a fixed-days habit is scheduled today when today\'s day code is in fixed_days (FR-008)', () => {
+    expect(isHabitScheduledToday(habit({ schedule_mode: 'fixed_days', fixed_days: [todayCode] }), [], today)).toBe(true);
+  });
+
+  it('a fixed-days habit is NOT scheduled today when today is not in fixed_days', () => {
+    expect(isHabitScheduledToday(habit({ schedule_mode: 'fixed_days', fixed_days: [otherCode] }), [], today)).toBe(false);
+  });
+
+  it('a frequency habit is scheduled today while this week\'s completions are below target', () => {
+    const h = habit({ schedule_mode: 'frequency', frequency_target: 3 });
+    expect(isHabitScheduledToday(h, [], today)).toBe(true);
+  });
+
+  it('a frequency habit is NOT scheduled today once this week\'s target is already met', () => {
+    const h = habit({ schedule_mode: 'frequency', frequency_target: 1 });
+    expect(isHabitScheduledToday(h, [completion(today)], today)).toBe(false);
+  });
+
+  it('a completion from a previous calendar week does not count toward the current week\'s target', () => {
+    const h = habit({ schedule_mode: 'frequency', frequency_target: 1 });
+    const eightDaysAgo = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - 8));
+    expect(isHabitScheduledToday(h, [completion(eightDaysAgo)], today)).toBe(true);
   });
 });

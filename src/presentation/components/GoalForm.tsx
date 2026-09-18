@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { LocalGoalRepository } from '../../infrastructure/repositories/local/LocalGoalRepository';
-import { GoalKind, GoalMilestone } from '../../core/domain/models/types';
+import { Goal, GoalKind, GoalMilestone } from '../../core/domain/models/types';
 import { uuidv7 } from 'uuidv7';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,15 +11,16 @@ import { Loader2, X } from 'lucide-react';
 
 interface Props {
   userId: string;
+  existing?: Goal;
   onComplete: () => void;
   onCancel: () => void;
 }
 
-export default function GoalForm({ userId, onComplete, onCancel }: Props) {
-  const [name, setName] = useState('');
-  const [kind, setKind] = useState<GoalKind>('numeric');
-  const [targetValue, setTargetValue] = useState('');
-  const [milestones, setMilestones] = useState<GoalMilestone[]>([]);
+export default function GoalForm({ userId, existing, onComplete, onCancel }: Props) {
+  const [name, setName] = useState(existing?.name ?? '');
+  const [kind, setKind] = useState<GoalKind>(existing?.kind ?? 'numeric');
+  const [targetValue, setTargetValue] = useState(existing?.target_value?.toString() ?? '');
+  const [milestones, setMilestones] = useState<GoalMilestone[]>(existing?.milestones ?? []);
   const [newMilestone, setNewMilestone] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,14 +48,15 @@ export default function GoalForm({ userId, onComplete, onCancel }: Props) {
     try {
       const repo = new LocalGoalRepository();
       await repo.save({
-        id: '',
+        id: existing?.id ?? '',
         user_id: userId,
         name,
         kind,
         target_value: kind === 'numeric' ? Number(targetValue) : undefined,
-        current_value: kind === 'numeric' ? 0 : undefined,
+        current_value: kind === 'numeric' ? (existing?.current_value ?? 0) : undefined,
         milestones: kind === 'checklist' ? milestones : undefined,
-        status: 'active',
+        status: existing?.status ?? 'active',
+        completed_at: existing?.completed_at,
       });
 
       onComplete();
@@ -67,7 +69,7 @@ export default function GoalForm({ userId, onComplete, onCancel }: Props) {
 
   return (
     <div className="w-full">
-      <h2 className="mb-4 font-heading text-base leading-none font-medium">Nueva Meta</h2>
+      <h2 className="mb-4 font-heading text-base leading-none font-medium">{existing ? 'Editar Meta' : 'Nueva Meta'}</h2>
       <form onSubmit={handleSubmit} data-testid="goal-form" className="space-y-5">
         <div className="space-y-2">
           <Label htmlFor="goalName">Nombre</Label>
@@ -133,7 +135,7 @@ export default function GoalForm({ userId, onComplete, onCancel }: Props) {
           </Button>
           <Button type="submit" disabled={isSubmitting} className="flex-1">
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Crear
+            {existing ? 'Guardar cambios' : 'Crear'}
           </Button>
         </div>
       </form>

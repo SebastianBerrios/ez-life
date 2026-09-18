@@ -9,6 +9,7 @@ import autoTable from 'jspdf-autotable';
 import { buildMovementsCsv, buildMovementsPdfTable } from '../../core/use-cases/exportMovements';
 import { ThemeToggle } from './ThemeToggle';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Edit2, Download, FileText, Bell, LogOut, Loader2 } from 'lucide-react';
 import { getSupabaseBrowserClient } from '../../infrastructure/supabase/client';
 
@@ -226,19 +227,22 @@ export default function SettingsScreen({ userId, onEditDistribution, onEditCateg
           <label htmlFor="notificationHour" className="text-sm font-medium text-foreground">
             Hora del recordatorio diario
           </label>
-          <select
-            id="notificationHour"
-            value={notificationHour}
-            onChange={(e) => handleNotificationHourChange(e.target.value)}
-            className="w-full h-11 px-3 border border-input rounded-xl bg-background text-foreground text-base focus:outline-none focus:ring-2 focus:ring-ring"
+          <Select
+            value={notificationHour === '' ? 'off' : notificationHour}
+            onValueChange={(val) => handleNotificationHourChange(val === 'off' ? '' : (val ?? ''))}
           >
-            <option value="">Desactivado</option>
-            {Array.from({ length: 24 }, (_, hour) => (
-              <option key={hour} value={hour}>
-                {String(hour).padStart(2, '0')}:00
-              </option>
-            ))}
-          </select>
+            <SelectTrigger id="notificationHour" className="w-full">
+              <SelectValue placeholder="Desactivado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="off">Desactivado</SelectItem>
+              {Array.from({ length: 24 }, (_, hour) => (
+                <SelectItem key={hour} value={String(hour)}>
+                  {String(hour).padStart(2, '0')}:00
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex items-center space-x-2">

@@ -145,7 +145,8 @@ describe('SharedMovementForm', () => {
       />
     );
 
-    await user.selectOptions(screen.getByLabelText(/^tipo$/i), 'income');
+    await user.click(screen.getByLabelText(/^tipo$/i));
+    await user.click(await screen.findByRole('option', { name: /Ingreso/i }));
     await user.type(screen.getByLabelText(/monto total/i), '100.00');
     fireEvent.submit(screen.getByTestId('shared-movement-form'));
 

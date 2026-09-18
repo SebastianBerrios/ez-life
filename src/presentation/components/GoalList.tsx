@@ -19,7 +19,9 @@ export default function GoalList({ userId }: Props) {
   const loadGoals = useCallback(async () => {
     try {
       const repo = new LocalGoalRepository();
-      setGoals(await repo.getAll(userId));
+      // ControlPage shows "Metas activas" (FR-009) — a completed goal has
+      // nothing left to track here.
+      setGoals((await repo.getAll(userId)).filter(g => g.status !== 'completed'));
     } catch (err) {
       console.error(err);
     } finally {
