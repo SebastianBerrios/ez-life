@@ -1,15 +1,17 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { LocalSharedMovementRepository } from '../../infrastructure/repositories/local/LocalSharedMovementRepository';
+import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
 import { createSharedMovement } from '../../core/use-cases/createSharedMovement';
 import { validateMovementAmount } from '../../core/use-cases/validateMovementAmount';
 import { DomainError } from '../../core/domain/errors/DomainError';
-import { Membership, SharedMovementSplitMode, SharedMovementType } from '../../core/domain/models/types';
+import { DistributionCategory, Membership, SharedMovementSplitMode, SharedMovementType } from '../../core/domain/models/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Props {
   spaceId: string;
@@ -28,6 +30,22 @@ export default function SharedMovementForm({ spaceId, currentUserId, members, on
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // The creator's own buckets, so their own share can count in their budget
+  // breakdown (FR-012) — a non-creator member's share stays uncategorized,
+  // the creator has no access to their private DistributionCategory rows.
+  const [distCategories, setDistCategories] = useState<DistributionCategory[]>([]);
+  const [distCategoryId, setDistCategoryId] = useState('');
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      const catRepo = new LocalCategoryRepository();
+      const cats = await catRepo.getDistributionCategories(currentUserId);
+      setDistCategories(cats);
+      if (cats[0]) setDistCategoryId(cats[0].id);
+    };
+    loadCategories();
+  }, [currentUserId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,6 +84,7 @@ export default function SharedMovementForm({ spaceId, currentUserId, members, on
         splitMode,
         splits,
         date: new Date(),
+        creatorDistributionCategoryId: type === 'expense' && distCategoryId ? distCategoryId : undefined,
       });
 
       onComplete();
@@ -110,6 +129,22 @@ export default function SharedMovementForm({ spaceId, currentUserId, members, on
             />
           </div>
         </div>
+
+        {type === 'expense' && distCategories.length > 0 && (
+          <div className="space-y-2">
+            <Label htmlFor="creatorDistCat">Tu categoría (50/30/20, opcional)</Label>
+            <Select value={distCategoryId} onValueChange={(val) => setDistCategoryId(val || '')}>
+              <SelectTrigger id="creatorDistCat">
+                <SelectValue placeholder="Sin categoría" />
+              </SelectTrigger>
+              <SelectContent>
+                {distCategories.map(c => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium">¿Cómo se divide?</legend>

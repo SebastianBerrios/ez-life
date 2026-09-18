@@ -19,6 +19,19 @@ export class LocalSharedSpaceRepository implements ISharedSpaceRepository {
     return await db.shared_spaces.where('id').anyOf(spaceIds).filter(s => !s.deleted_at).toArray();
   }
 
+  async getLeftForUser(userId: UUID): Promise<SharedSpace[]> {
+    const allMemberships = await db.memberships.where('user_id').equals(userId).toArray();
+    const activeSpaceIds = new Set(allMemberships.filter(m => !m.left_at).map(m => m.shared_space_id));
+    // A user can rejoin a space after leaving (a new Membership row, the old
+    // one is never reactivated) — only surface it here if there's no active
+    // membership for it, so it isn't shown twice.
+    const leftSpaceIds = Array.from(new Set(allMemberships.filter(m => !!m.left_at).map(m => m.shared_space_id)))
+      .filter(id => !activeSpaceIds.has(id));
+    if (leftSpaceIds.length === 0) return [];
+
+    return await db.shared_spaces.where('id').anyOf(leftSpaceIds).filter(s => !s.deleted_at).toArray();
+  }
+
   async create(name: string): Promise<SharedSpace> {
     const supabase = getSupabaseBrowserClient();
     const { data, error } = await supabase.rpc('create_shared_space', { p_name: name });

@@ -20,10 +20,12 @@ interface Props {
 
 /**
  * First-time-per-section onboarding for the shared space (FR-024) plus, once
- * a space exists, the balances/settings view (User Story 3).
+ * a space exists, the balances/settings view (User Story 3). Spaces the user
+ * left keep their frozen balance visible, read-only (FR-016).
  */
 export default function SharedSpaceScreen({ userId, onCreate, onJoin, onAddMovement, refreshKey }: Props) {
   const [spaces, setSpaces] = useState<SharedSpace[]>([]);
+  const [leftSpaces, setLeftSpaces] = useState<SharedSpace[]>([]);
   const [membersBySpace, setMembersBySpace] = useState<Record<string, Membership[]>>({});
   const [loading, setLoading] = useState(true);
 
@@ -32,8 +34,12 @@ export default function SharedSpaceScreen({ userId, onCreate, onJoin, onAddMovem
       const spaceRepo = new LocalSharedSpaceRepository();
       const membershipRepo = new LocalMembershipRepository();
 
-      const allSpaces = await spaceRepo.getAllForUser(userId);
+      const [allSpaces, allLeftSpaces] = await Promise.all([
+        spaceRepo.getAllForUser(userId),
+        spaceRepo.getLeftForUser(userId),
+      ]);
       setSpaces(allSpaces);
+      setLeftSpaces(allLeftSpaces);
 
       const memberLists = await Promise.all(allSpaces.map(s => membershipRepo.getMembers(s.id)));
       setMembersBySpace(Object.fromEntries(allSpaces.map((s, i) => [s.id, memberLists[i]])));
@@ -52,7 +58,7 @@ export default function SharedSpaceScreen({ userId, onCreate, onJoin, onAddMovem
     return <Skeleton className="h-28 w-full rounded-xl" />;
   }
 
-  if (spaces.length === 0) {
+  if (spaces.length === 0 && leftSpaces.length === 0) {
     return (
       <Card className="animate-fade-slide-up py-8 text-center shadow-warm-sm space-y-4">
         <p className="text-muted-foreground px-5">
@@ -82,6 +88,22 @@ export default function SharedSpaceScreen({ userId, onCreate, onJoin, onAddMovem
           <SharedSpaceSettings space={space} onChanged={loadSpaces} onLeft={loadSpaces} />
         </div>
       ))}
+
+      {leftSpaces.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="font-heading text-sm font-medium text-muted-foreground">Espacios que abandonaste</h3>
+          {leftSpaces.map(space => (
+            <div key={space.id} className="space-y-2">
+              <Card className="shadow-warm-sm px-5 py-4">
+                <h4 className="font-heading font-bold text-foreground">{space.name}</h4>
+                <p className="text-xs text-muted-foreground">Saldo congelado — ya no sos miembro de este espacio.</p>
+              </Card>
+              <SharedSpaceBalances spaceId={space.id} currentUserId={userId} refreshKey={refreshKey} />
+            </div>
+          ))}
+        </div>
+      )}
+
       <Button variant="outline" onClick={onJoin} className="w-full">Unirme a otro espacio</Button>
     </div>
   );

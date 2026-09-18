@@ -59,6 +59,52 @@ describe('Shared space repositories', () => {
       const repo = new LocalSharedSpaceRepository();
       await expect(repo.create('Casa')).rejects.toThrow();
     });
+
+    it('getLeftForUser returns a space the user left, but not one they are still active in (FR-016)', async () => {
+      const now = new Date();
+      await db.shared_spaces.put({
+        id: 'space-left', name: 'Ex casa', permission_mode: 'strict', status: 'active',
+        created_by: 'user-9', created_at: now, updated_at: now,
+      });
+      await db.shared_spaces.put({
+        id: 'space-active', name: 'Casa actual', permission_mode: 'strict', status: 'active',
+        created_by: 'user-9', created_at: now, updated_at: now,
+      });
+      await db.memberships.put({
+        id: 'm-left', shared_space_id: 'space-left', user_id: 'user-1',
+        joined_at: now, left_at: now, created_at: now, updated_at: now,
+      });
+      await db.memberships.put({
+        id: 'm-active', shared_space_id: 'space-active', user_id: 'user-1',
+        joined_at: now, created_at: now, updated_at: now,
+      });
+
+      const repo = new LocalSharedSpaceRepository();
+      const left = await repo.getLeftForUser('user-1');
+
+      expect(left.map(s => s.id)).toEqual(['space-left']);
+    });
+
+    it('getLeftForUser excludes a space the user rejoined after leaving', async () => {
+      const now = new Date();
+      await db.shared_spaces.put({
+        id: 'space-rejoined', name: 'Casa', permission_mode: 'strict', status: 'active',
+        created_by: 'user-9', created_at: now, updated_at: now,
+      });
+      await db.memberships.put({
+        id: 'm-old', shared_space_id: 'space-rejoined', user_id: 'user-1',
+        joined_at: now, left_at: now, created_at: now, updated_at: now,
+      });
+      await db.memberships.put({
+        id: 'm-new', shared_space_id: 'space-rejoined', user_id: 'user-1',
+        joined_at: now, created_at: now, updated_at: now,
+      });
+
+      const repo = new LocalSharedSpaceRepository();
+      const left = await repo.getLeftForUser('user-1');
+
+      expect(left).toHaveLength(0);
+    });
   });
 
   describe('LocalSharedInviteRepository', () => {

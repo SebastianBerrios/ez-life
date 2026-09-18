@@ -64,6 +64,8 @@ export interface IDebtRepository {
  */
 export interface ISharedSpaceRepository {
   getAllForUser(userId: UUID): Promise<SharedSpace[]>;
+  /** Spaces the user is no longer an active member of, but was — frozen balance stays visible (FR-016). */
+  getLeftForUser(userId: UUID): Promise<SharedSpace[]>;
   create(name: string): Promise<SharedSpace>;
   setPermissionMode(spaceId: UUID, mode: SharedSpacePermissionMode): Promise<void>;
 }
@@ -86,6 +88,8 @@ export interface CreateSharedMovementParams {
   splitMode: SharedMovementSplitMode;
   splits: SharedMovementSplit[]; // already computed client-side (core/use-cases/createSharedMovement)
   date: Date;
+  /** Creator's own bucket for their own share (FR-012) — never applied to another member's share (RLS, see contracts/rpc-functions.md). */
+  creatorDistributionCategoryId?: UUID;
 }
 
 /**

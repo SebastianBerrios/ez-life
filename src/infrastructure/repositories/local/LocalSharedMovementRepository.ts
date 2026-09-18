@@ -23,6 +23,7 @@ export class LocalSharedMovementRepository implements ISharedMovementRepository 
       p_split_mode: params.splitMode,
       p_splits: params.splits,
       p_date: params.date.toISOString(),
+      p_creator_distribution_category_id: params.creatorDistributionCategoryId ?? null,
     });
     if (error || !data) {
       throw new Error(error?.message ?? 'No se pudo registrar el gasto compartido.');
