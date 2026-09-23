@@ -182,6 +182,20 @@ describe('CustomSyncLayer', () => {
     expect(queue.length).toBe(0);
   });
 
+  it('includes installment_loans and installment_payments in the pull cycle (FR-015 — previously missing, no multi-device sync for loans)', async () => {
+    const pulledTables: string[] = [];
+    mockFrom.mockImplementation((table: string) => {
+      pulledTables.push(table);
+      return emptyPullUpsertOk();
+    });
+
+    const layer = new CustomSyncLayer();
+    await layer.sync();
+
+    expect(pulledTables).toContain('installment_loans');
+    expect(pulledTables).toContain('installment_payments');
+  });
+
   it('lets a concurrent caller await the same in-flight cycle instead of resolving early', async () => {
     let resolvePull: (value: { data: unknown[]; error: null }) => void;
     const pullPromise = new Promise<{ data: unknown[]; error: null }>(resolve => {
@@ -217,7 +231,7 @@ describe('CustomSyncLayer', () => {
 
     expect(secondResolved).toBe(true);
     // Only one real sync cycle ran, even though sync() was called twice.
-    expect(pullCallCount).toBe(17); // one .gt() call per synced table, once
+    expect(pullCallCount).toBe(19); // one .gt() call per synced table, once (17 + installment_loans + installment_payments, FR-015)
   });
 
   it('does not advance last_sync when a push fails', async () => {

@@ -49,4 +49,27 @@ describe('LocalTaskRepository', () => {
     expect(edited.status).toBe('done');
     expect(edited.done_at).toEqual(done.done_at);
   });
+
+  it('getAllIncludingDone() returns both pending and done tasks, but still excludes soft-deleted ones (FR-006)', async () => {
+    const repo = new LocalTaskRepository();
+    const userId = uuidv7();
+
+    await repo.save({
+      id: '', user_id: userId, title: 'Pendiente', due_date: new Date('2026-10-01'), status: 'pending',
+    } as Omit<Task, 'created_at' | 'updated_at'>);
+
+    const doneTask = await repo.save({
+      id: '', user_id: userId, title: 'Hecha', due_date: new Date('2026-10-02'), status: 'pending',
+    } as Omit<Task, 'created_at' | 'updated_at'>);
+    await repo.markDone(doneTask.id);
+
+    const toDelete = await repo.save({
+      id: '', user_id: userId, title: 'Borrada', due_date: new Date('2026-10-03'), status: 'pending',
+    } as Omit<Task, 'created_at' | 'updated_at'>);
+    await repo.delete(toDelete.id);
+
+    const all = await repo.getAllIncludingDone(userId);
+
+    expect(all.map(t => t.title).sort()).toEqual(['Hecha', 'Pendiente']);
+  });
 });

@@ -26,7 +26,7 @@ export const navItems: NavItem[] = [
   { id: 'dashboard', label: 'Resumen', Icon: LayoutDashboard },
   { id: 'movements', label: 'Movimientos', Icon: ArrowLeftRight },
   { id: 'analysis', label: 'Análisis', Icon: PieChart },
-  { id: 'goals', label: 'Metas', Icon: Target },
+  { id: 'goals', label: 'Metas de Ahorro', Icon: Target },
   { id: 'debts', label: 'Préstamos', Icon: HandCoins },
   { id: 'shared-space', label: 'Espacio', Icon: Users },
   { id: 'control', label: 'Control', Icon: ListChecks },

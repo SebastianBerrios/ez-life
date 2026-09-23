@@ -19,6 +19,7 @@ describe('LocalInstallmentLoanRepository', () => {
     installment_count: 12,
     installment_amount: 20000,
     interest_rate: 15,
+    distribution_category_id: 'bucket-1',
   });
 
   it('create() initializes remaining_installments = installment_count and status = active (FR-011)', async () => {
@@ -51,6 +52,28 @@ describe('LocalInstallmentLoanRepository', () => {
     await expect(repo.recordInstallmentPayment(loan.id, 999, new Date())).rejects.toThrow(DomainError);
   });
 
+  it('recordInstallmentPayment() also creates a Movement of type EXPENSE, linked via installment_payment_id, using the loan\'s distribution_category_id (FR-008, FR-010, constitution v2.0.0 Principio X)', async () => {
+    const repo = new LocalInstallmentLoanRepository();
+    const userId = uuidv7();
+    await repo.create(baseLoan(userId));
+    const [loan] = await repo.getAll(userId);
+
+    await repo.recordInstallmentPayment(loan.id, 2, new Date('2026-09-18'));
+
+    const payments = await repo.getPayments(loan.id);
+    expect(payments).toHaveLength(1);
+
+    const movements = (await db.movements.toArray()).filter(m => !m.deleted_at);
+    expect(movements).toHaveLength(1);
+    expect(movements[0]).toMatchObject({
+      type: 'EXPENSE',
+      amount: 40000,
+      user_id: userId,
+      installment_payment_id: payments[0].id,
+      distribution_category_id: 'bucket-1',
+    });
+  });
+
   it('recordPrincipalPayment() applies the adjustment and logs it, delegating validation to the use-case', async () => {
     const repo = new LocalInstallmentLoanRepository();
     const userId = uuidv7();
@@ -66,6 +89,54 @@ describe('LocalInstallmentLoanRepository', () => {
     const payments = await repo.getPayments(loan.id);
     expect(payments).toHaveLength(1);
     expect(payments[0]).toMatchObject({ kind: 'principal', adjustment_type: 'reduce_term', resulting_value: 7 });
+  });
+
+  it('recordPrincipalPayment() creates a linked Movement for adjustment.type = reduce_term (FR-009, FR-010)', async () => {
+    const repo = new LocalInstallmentLoanRepository();
+    const userId = uuidv7();
+    await repo.create(baseLoan(userId));
+    const [loan] = await repo.getAll(userId);
+
+    await repo.recordPrincipalPayment(loan.id, 100000, new Date('2026-09-18'), { type: 'reduce_term', newRemainingInstallments: 7 });
+
+    const [updated] = await repo.getAll(userId);
+    expect(updated.remaining_installments).toBe(7); // FR-009: reduce_term DOES change remaining_installments
+
+    const payments = await repo.getPayments(loan.id);
+    const movements = (await db.movements.toArray()).filter(m => !m.deleted_at);
+    expect(movements).toHaveLength(1);
+    expect(movements[0]).toMatchObject({
+      type: 'EXPENSE',
+      amount: 100000,
+      installment_payment_id: payments[0].id,
+      distribution_category_id: 'bucket-1',
+    });
+  });
+
+  it('recordPrincipalPayment() creates a linked Movement for adjustment.type = reduce_installment_amount, WITHOUT changing remaining_installments (FR-009 gap covered — research.md §4)', async () => {
+    const repo = new LocalInstallmentLoanRepository();
+    const userId = uuidv7();
+    await repo.create(baseLoan(userId));
+    const [loan] = await repo.getAll(userId);
+
+    await repo.recordPrincipalPayment(loan.id, 50000, new Date('2026-09-18'), { type: 'reduce_installment_amount', newInstallmentAmountCents: 15000 });
+
+    const [updated] = await repo.getAll(userId);
+    expect(updated.remaining_installments).toBe(12); // FR-009: unchanged for reduce_installment_amount
+    expect(updated.installment_amount).toBe(15000);
+
+    const payments = await repo.getPayments(loan.id);
+    expect(payments).toHaveLength(1);
+    expect(payments[0]).toMatchObject({ kind: 'principal', adjustment_type: 'reduce_installment_amount', resulting_value: 15000 });
+
+    const movements = (await db.movements.toArray()).filter(m => !m.deleted_at);
+    expect(movements).toHaveLength(1);
+    expect(movements[0]).toMatchObject({
+      type: 'EXPENSE',
+      amount: 50000,
+      installment_payment_id: payments[0].id,
+      distribution_category_id: 'bucket-1',
+    });
   });
 
   it('marks the loan settled once remaining_installments reaches 0, and keeps it visible (FR-025)', async () => {

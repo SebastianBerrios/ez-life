@@ -1,14 +1,17 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { LocalInstallmentLoanRepository } from '../../infrastructure/repositories/local/LocalInstallmentLoanRepository';
+import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
 import { validateMovementAmount } from '../../core/use-cases/validateMovementAmount';
 import { DomainError } from '../../core/domain/errors/DomainError';
-import { InstallmentLoan } from '../../core/domain/models/types';
+import { DistributionCategory, InstallmentLoan } from '../../core/domain/models/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Props {
   userId: string;
@@ -31,8 +34,24 @@ export default function InstallmentLoanForm({ userId, existing, onComplete, onCa
   const [installmentCount, setInstallmentCount] = useState(existing ? String(existing.installment_count) : '');
   const [installmentAmount, setInstallmentAmount] = useState(existing ? (existing.installment_amount / 100).toFixed(2) : '');
   const [interestRate, setInterestRate] = useState(existing?.interest_rate !== undefined ? String(existing.interest_rate) : '');
+  // FR-010/FR-011: every loan needs a real distribution bucket before it can
+  // accept a payment, since each payment now generates an expense Movement
+  // (constitution v2.0.0 Principio X) that must count in the 50/30/20 split.
+  const [distCategoryId, setDistCategoryId] = useState(existing?.distribution_category_id ?? '');
+  const [distCategories, setDistCategories] = useState<DistributionCategory[]>([]);
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      const catRepo = new LocalCategoryRepository();
+      const cats = await catRepo.getDistributionCategories(userId);
+      setDistCategories(cats);
+      setCategoriesLoaded(true);
+    };
+    loadCategories();
+  }, [userId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,6 +65,9 @@ export default function InstallmentLoanForm({ userId, existing, onComplete, onCa
       validateMovementAmount(installmentAmountInCents);
       if (!Number.isInteger(installmentCountValue) || installmentCountValue <= 0) {
         throw new DomainError('El número de cuotas debe ser un entero mayor a 0.');
+      }
+      if (!distCategoryId) {
+        throw new DomainError('Elegí una categoría de distribución (50/30/20) para este préstamo.');
       }
     } catch (err) {
       if (err instanceof DomainError) setError(err.message);
@@ -64,6 +86,7 @@ export default function InstallmentLoanForm({ userId, existing, onComplete, onCa
           installmentCount: installmentCountValue,
           installmentAmount: installmentAmountInCents,
           interestRate: interestRateValue,
+          distributionCategoryId: distCategoryId,
         });
       } else {
         await repo.create({
@@ -74,6 +97,7 @@ export default function InstallmentLoanForm({ userId, existing, onComplete, onCa
           installment_count: installmentCountValue,
           installment_amount: installmentAmountInCents,
           interest_rate: interestRateValue,
+          distribution_category_id: distCategoryId,
         });
       }
 
@@ -149,6 +173,24 @@ export default function InstallmentLoanForm({ userId, existing, onComplete, onCa
               onChange={(e) => setInstallmentAmount(e.target.value.replace(/[^0-9.]/g, ''))}
             />
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="distCategory">Categoría (50/30/20)</Label>
+          {categoriesLoaded ? (
+            <Select value={distCategoryId} onValueChange={(val) => { setDistCategoryId(val || ''); if (error) setError(null); }}>
+              <SelectTrigger id="distCategory">
+                <SelectValue placeholder="Seleccionar categoría" />
+              </SelectTrigger>
+              <SelectContent>
+                {distCategories.map(c => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Skeleton className="h-11 w-full rounded-xl" />
+          )}
         </div>
 
         <div className="space-y-2">

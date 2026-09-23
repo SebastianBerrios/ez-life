@@ -27,6 +27,7 @@ const DAYS: { value: DayOfWeek; label: string }[] = [
 
 export default function HabitForm({ userId, existing, onComplete, onCancel }: Props) {
   const [name, setName] = useState(existing?.name ?? '');
+  const [icon, setIcon] = useState(existing?.icon ?? '');
   const [scheduleMode, setScheduleMode] = useState<HabitScheduleMode>(existing?.schedule_mode ?? 'fixed_days');
   const [fixedDays, setFixedDays] = useState<DayOfWeek[]>(existing?.fixed_days ?? []);
   const [frequencyTarget, setFrequencyTarget] = useState(existing?.frequency_target?.toString() ?? '');
@@ -57,6 +58,7 @@ export default function HabitForm({ userId, existing, onComplete, onCancel }: Pr
         id: existing?.id ?? '',
         user_id: userId,
         name,
+        icon: icon || undefined,
         schedule_mode: scheduleMode,
         fixed_days: scheduleMode === 'fixed_days' ? fixedDays : undefined,
         frequency_target: scheduleMode === 'frequency' ? Number(frequencyTarget) : undefined,
@@ -83,6 +85,17 @@ export default function HabitForm({ userId, existing, onComplete, onCancel }: Pr
             placeholder="Ej. Correr"
             value={name}
             onChange={(e) => setName(e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="habitIcon">Ícono (opcional)</Label>
+          <Input
+            type="text"
+            id="habitIcon"
+            placeholder="Ej. 🏃"
+            value={icon}
+            onChange={(e) => setIcon(e.target.value)}
           />
         </div>
 

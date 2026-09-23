@@ -105,4 +105,44 @@ describe('HabitForm', () => {
       }));
     });
   });
+
+  it('saves the optional icon/emoji when the user fills it in (FR-006)', async () => {
+    const user = userEvent.setup();
+    const mockSave = vi.fn().mockResolvedValue({ id: 'h3' });
+    vi.mocked(LocalHabitRepository).mockImplementation(function () {
+      return { save: mockSave } as unknown as InstanceType<typeof LocalHabitRepository>;
+    });
+
+    render(<HabitForm userId="user-1" onComplete={vi.fn()} onCancel={vi.fn()} />);
+
+    await user.type(screen.getByLabelText(/nombre/i), 'Correr');
+    await user.type(screen.getByLabelText(/ícono/i), '🏃');
+    await user.click(screen.getByLabelText(/lunes/i));
+
+    fireEvent.submit(screen.getByTestId('habit-form'));
+
+    await waitFor(() => {
+      expect(mockSave).toHaveBeenCalledWith(expect.objectContaining({ icon: '🏃' }));
+    });
+  });
+
+  it('omits icon when left empty', async () => {
+    const user = userEvent.setup();
+    const mockSave = vi.fn().mockResolvedValue({ id: 'h4' });
+    vi.mocked(LocalHabitRepository).mockImplementation(function () {
+      return { save: mockSave } as unknown as InstanceType<typeof LocalHabitRepository>;
+    });
+
+    render(<HabitForm userId="user-1" onComplete={vi.fn()} onCancel={vi.fn()} />);
+
+    await user.type(screen.getByLabelText(/nombre/i), 'Correr');
+    await user.click(screen.getByLabelText(/lunes/i));
+
+    fireEvent.submit(screen.getByTestId('habit-form'));
+
+    await waitFor(() => {
+      expect(mockSave).toHaveBeenCalled();
+    });
+    expect(mockSave.mock.calls[0][0].icon).toBeUndefined();
+  });
 });

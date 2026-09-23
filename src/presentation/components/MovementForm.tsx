@@ -5,6 +5,7 @@ import { LocalMovementRepository } from '../../infrastructure/repositories/local
 import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
 import { LocalSavingsGoalRepository } from '../../infrastructure/repositories/local/LocalSavingsGoalRepository';
 import { validateMovementAmount } from '../../core/use-cases/validateMovementAmount';
+import { validateBalanceAdjustment } from '../../core/use-cases/validateBalanceAdjustment';
 import { DomainError } from '../../core/domain/errors/DomainError';
 import { DistributionCategory, ExpenseCategory, ExpenseSubcategory, SavingsGoal } from '../../core/domain/models/types';
 import { Button } from '@/components/ui/button';
@@ -40,9 +41,11 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
 
   const [isRecurring, setIsRecurring] = useState(false);
+  const [isAdjustment, setIsAdjustment] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [amountError, setAmountError] = useState<string | null>(null);
+  const [adjustmentError, setAdjustmentError] = useState<string | null>(null);
 
   // Load all static data on mount.
   // IMPORTANT: distCategoryId/expenseCategoryId must be set BEFORE dataLoaded=true
@@ -117,6 +120,29 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
     }
     setAmountError(null);
 
+    // A balance adjustment never carries a distribution/expense category
+    // (FR-004, data-model.md) — computed once so validation and the saved
+    // payload agree on the exact same values.
+    const distributionCategoryId = !isAdjustment && type === 'EXPENSE' ? distCategoryId : undefined;
+    const expenseCategoryIdToSave = !isAdjustment && type === 'EXPENSE' && expenseCategoryId ? expenseCategoryId : undefined;
+    const expenseSubcategoryIdToSave = !isAdjustment && type === 'EXPENSE' && expenseSubcategoryId ? expenseSubcategoryId : undefined;
+
+    try {
+      validateBalanceAdjustment({
+        is_adjustment: isAdjustment,
+        description,
+        distribution_category_id: distributionCategoryId,
+        expense_category_id: expenseCategoryIdToSave,
+        expense_subcategory_id: expenseSubcategoryIdToSave,
+      });
+    } catch (err) {
+      if (err instanceof DomainError) {
+        setAdjustmentError(err.message);
+      }
+      return;
+    }
+    setAdjustmentError(null);
+
     setIsSubmitting(true);
 
     try {
@@ -129,11 +155,12 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
         amount: amountInCents,
         date: new Date(),
         description,
-        distribution_category_id: type === 'EXPENSE' ? distCategoryId : undefined,
-        expense_category_id: type === 'EXPENSE' && expenseCategoryId ? expenseCategoryId : undefined,
-        expense_subcategory_id: type === 'EXPENSE' && expenseSubcategoryId ? expenseSubcategoryId : undefined,
-        savings_goal_id: type === 'EXPENSE' && savingsGoalId ? savingsGoalId : undefined,
+        distribution_category_id: distributionCategoryId,
+        expense_category_id: expenseCategoryIdToSave,
+        expense_subcategory_id: expenseSubcategoryIdToSave,
+        savings_goal_id: !isAdjustment && type === 'EXPENSE' && savingsGoalId ? savingsGoalId : undefined,
         is_recurring: isRecurring,
+        is_adjustment: isAdjustment,
       });
 
       onComplete();
@@ -146,6 +173,7 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
 
   const selectedBucket = distCategories.find(c => c.id === distCategoryId);
   const showSavingsGoal =
+    !isAdjustment &&
     type === 'EXPENSE' &&
     savingsGoals.length > 0 &&
     selectedBucket?.is_savings === true;
@@ -183,8 +211,27 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
             </div>
           </div>
 
+          {/* Balance adjustment toggle — when active, hides category/subcategory
+              selectors (they never apply to an adjustment, FR-004) and makes
+              the description mandatory (FR-002, validateBalanceAdjustment). */}
+          <div className="flex items-center space-x-2">
+            <input
+              id="isAdjustment"
+              type="checkbox"
+              className="h-4 w-4 rounded border-input accent-primary"
+              checked={isAdjustment}
+              onChange={(e) => {
+                setIsAdjustment(e.target.checked);
+                setAdjustmentError(null);
+              }}
+            />
+            <Label htmlFor="isAdjustment" className="cursor-pointer">
+              Es un ajuste de balance
+            </Label>
+          </div>
+
           {/* Distribution category — first level of the cascade, filters the category list below */}
-          {type === 'EXPENSE' && (
+          {type === 'EXPENSE' && !isAdjustment && (
             <div className="space-y-2">
               <Label htmlFor="distCat">Categoría (50/30/20)</Label>
               {dataLoaded ? (
@@ -205,7 +252,7 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
           )}
 
           {/* Expense category — cascaded, filtered by the selected bucket */}
-          {type === 'EXPENSE' && (
+          {type === 'EXPENSE' && !isAdjustment && (
             <div className="space-y-2">
               <Label htmlFor="expenseCat">Categoría de gasto</Label>
               {dataLoaded ? (
@@ -234,7 +281,7 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
           )}
 
           {/* Expense subcategory — enabled only when a category is selected */}
-          {type === 'EXPENSE' && expenseCategoryId && (
+          {type === 'EXPENSE' && !isAdjustment && expenseCategoryId && (
             <div className="space-y-2">
               <Label htmlFor="expenseSubcat">Subcategoría</Label>
               {dataLoaded ? (
@@ -314,16 +361,24 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
             )}
           </div>
 
-          {/* Description */}
+          {/* Description — mandatory motive when isAdjustment is active (FR-002) */}
           <div className="space-y-2">
-            <Label htmlFor="description">Descripción</Label>
+            <Label htmlFor="description">
+              {isAdjustment ? 'Motivo del ajuste' : 'Descripción'}
+            </Label>
             <Input
               type="text"
               id="description"
-              placeholder="Ej. Cena familiar"
+              placeholder={isAdjustment ? 'Ej. Reembolso extraordinario' : 'Ej. Cena familiar'}
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) => {
+                setDescription(e.target.value);
+                if (adjustmentError) setAdjustmentError(null);
+              }}
             />
+            {adjustmentError && (
+              <p className="text-sm text-destructive">{adjustmentError}</p>
+            )}
           </div>
 
           {/* Recurring */}

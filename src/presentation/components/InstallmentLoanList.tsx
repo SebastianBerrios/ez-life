@@ -31,6 +31,9 @@ export default function InstallmentLoanList({ userId }: Props) {
   const [adjustmentTypeDrafts, setAdjustmentTypeDrafts] = useState<Record<string, InstallmentAdjustmentType | ''>>({});
   const [resultingValueDrafts, setResultingValueDrafts] = useState<Record<string, string>>({});
   const [principalErrors, setPrincipalErrors] = useState<Record<string, string>>({});
+  // FR-014: disables "Confirmar abono" while the payment is in flight, to
+  // prevent an accidental double-submit from creating two payments/Movements.
+  const [principalSubmitting, setPrincipalSubmitting] = useState<Record<string, boolean>>({});
 
   const [paymentHistory, setPaymentHistory] = useState<Record<string, InstallmentPayment[]>>({});
   const [historyOpenFor, setHistoryOpenFor] = useState<string | null>(null);
@@ -83,6 +86,7 @@ export default function InstallmentLoanList({ userId }: Props) {
       ? { type: 'reduce_term' as const, newRemainingInstallments: parseInt(resultingDraft, 10) }
       : { type: 'reduce_installment_amount' as const, newInstallmentAmountCents: Math.round(parseFloat(resultingDraft.replace(/,/g, '')) * 100) };
 
+    setPrincipalSubmitting(prev => ({ ...prev, [loan.id]: true }));
     try {
       const repo = new LocalInstallmentLoanRepository();
       await repo.recordPrincipalPayment(loan.id, amountInCents, new Date(), adjustment);
@@ -95,6 +99,8 @@ export default function InstallmentLoanList({ userId }: Props) {
     } catch (err) {
       const message = err instanceof DomainError ? err.message : 'No se pudo registrar el abono a capital.';
       setPrincipalErrors(prev => ({ ...prev, [loan.id]: message }));
+    } finally {
+      setPrincipalSubmitting(prev => ({ ...prev, [loan.id]: false }));
     }
   };
 
@@ -186,30 +192,44 @@ export default function InstallmentLoanList({ userId }: Props) {
               </div>
             )}
 
-            {!isSettled && (
-              <div className="mt-4 px-5 space-y-3">
-                <div className="flex gap-2 items-end">
-                  <div className="flex-1 space-y-1">
-                    <Label htmlFor={`installments-${loan.id}`}>Cuotas a pagar</Label>
-                    <Input
-                      id={`installments-${loan.id}`}
-                      type="text"
-                      placeholder="1"
-                      value={installmentDrafts[loan.id] ?? ''}
-                      onChange={(e) => setInstallmentDrafts(prev => ({ ...prev, [loan.id]: e.target.value.replace(/[^0-9]/g, '') }))}
-                    />
-                  </div>
-                  <Button size="sm" onClick={() => handlePayInstallments(loan)}>
-                    Pagar cuota(s)
-                  </Button>
-                </div>
-                {installmentErrors[loan.id] && <p className="text-sm text-destructive">{installmentErrors[loan.id]}</p>}
+            {!isSettled && !loan.distribution_category_id && (
+              <div className="mt-4 px-5">
+                <p className="text-sm text-muted-foreground">
+                  Asigná una categoría de distribución (50/30/20) desde &quot;Corregir términos&quot; antes de registrar un pago — la necesita para poder generar el movimiento de gasto correspondiente.
+                </p>
+              </div>
+            )}
 
-                {!showPrincipalFlow[loan.id] && (
-                  <Button variant="outline" size="sm" className="w-full" onClick={() => setShowPrincipalFlow(prev => ({ ...prev, [loan.id]: true }))}>
-                    Registrar abono a capital
-                  </Button>
-                )}
+            {!isSettled && loan.distribution_category_id && (
+              <div className="mt-4 px-5 space-y-4">
+                <div className="space-y-2">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pagar cuota(s)</h4>
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1 space-y-1">
+                      <Label htmlFor={`installments-${loan.id}`}>Cuotas a pagar</Label>
+                      <Input
+                        id={`installments-${loan.id}`}
+                        type="text"
+                        placeholder="1"
+                        value={installmentDrafts[loan.id] ?? ''}
+                        onChange={(e) => setInstallmentDrafts(prev => ({ ...prev, [loan.id]: e.target.value.replace(/[^0-9]/g, '') }))}
+                      />
+                    </div>
+                    <Button size="sm" onClick={() => handlePayInstallments(loan)}>
+                      Pagar cuota(s)
+                    </Button>
+                  </div>
+                  {installmentErrors[loan.id] && <p className="text-sm text-destructive">{installmentErrors[loan.id]}</p>}
+                </div>
+
+                <div className="border-t pt-3 space-y-2">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Registrar abono a capital</h4>
+
+                  {!showPrincipalFlow[loan.id] && (
+                    <Button variant="outline" size="sm" className="w-full" onClick={() => setShowPrincipalFlow(prev => ({ ...prev, [loan.id]: true }))}>
+                      Registrar abono a capital
+                    </Button>
+                  )}
 
                 {showPrincipalFlow[loan.id] && (
                   <div className="space-y-2 rounded-md border p-3">
@@ -265,11 +285,17 @@ export default function InstallmentLoanList({ userId }: Props) {
 
                     {principalErrors[loan.id] && <p className="text-sm text-destructive">{principalErrors[loan.id]}</p>}
 
-                    <Button size="sm" className="w-full" onClick={() => handleConfirmPrincipalPayment(loan)}>
+                    <Button
+                      size="sm"
+                      className="w-full"
+                      disabled={Boolean(principalSubmitting[loan.id])}
+                      onClick={() => handleConfirmPrincipalPayment(loan)}
+                    >
                       Confirmar abono
                     </Button>
                   </div>
                 )}
+                </div>
               </div>
             )}
 

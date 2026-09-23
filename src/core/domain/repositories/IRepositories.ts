@@ -74,8 +74,8 @@ export interface IInstallmentLoanRepository {
   getById(id: UUID): Promise<InstallmentLoan | undefined>;
   /** `remaining_installments` is always initialized to `installment_count` (FR-011). */
   create(loan: Omit<InstallmentLoan, 'created_at' | 'updated_at' | 'remaining_installments' | 'status'>): Promise<void>;
-  /** Corrects the original terms — independent of recording a payment, never changes status (FR-022). */
-  updateTerms(id: UUID, changes: { amount?: number; installmentCount?: number; installmentAmount?: number; interestRate?: number }): Promise<void>;
+  /** Corrects the original terms — independent of recording a payment, never changes status (FR-022). `distributionCategoryId` lets a pre-existing loan (created before spec 003) gain the bucket its future payments' Movements need. */
+  updateTerms(id: UUID, changes: { amount?: number; installmentCount?: number; installmentAmount?: number; interestRate?: number; distributionCategoryId?: UUID }): Promise<void>;
   recordInstallmentPayment(loanId: UUID, installmentsPaid: number, date: Date): Promise<void>;
   recordPrincipalPayment(loanId: UUID, amountCents: number, date: Date, adjustment: PrincipalPaymentAdjustment): Promise<void>;
   /** Full history, ordered by date (FR-026). */
@@ -150,6 +150,8 @@ export interface IGoalRepository {
 export interface ITaskRepository {
   /** Only pending (non-done, non-deleted) tasks — a done task is archived (FR-021). */
   getAll(userId: UUID): Promise<Task[]>;
+  /** Every non-deleted task regardless of status — for a full overview (e.g. TaskDashboard, spec 003 FR-006), unlike `getAll`'s pending-only view. */
+  getAllIncludingDone(userId: UUID): Promise<Task[]>;
   save(task: Omit<Task, 'created_at' | 'updated_at'>): Promise<Task>;
   markDone(id: UUID): Promise<Task>;
   delete(id: UUID): Promise<void>;

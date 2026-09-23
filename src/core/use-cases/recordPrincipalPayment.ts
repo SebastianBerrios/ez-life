@@ -1,5 +1,5 @@
 import { DomainError } from '../domain/errors/DomainError';
-import { InstallmentAdjustmentType, InstallmentLoanStatus } from '../domain/models/types';
+import { InstallmentAdjustmentType, InstallmentLoanStatus, UUID } from '../domain/models/types';
 import { evaluateInstallmentLoanStatus } from './evaluateInstallmentLoanStatus';
 import { PrincipalPaymentAdjustment } from '../domain/repositories/IRepositories';
 
@@ -14,18 +14,25 @@ export interface PrincipalPaymentRecordResult {
     adjustment_type: InstallmentAdjustmentType;
     resulting_value: number;
   };
+  /**
+   * Description of the expense Movement this payment must generate
+   * (constitution v2.0.0 Principio X, spec 003 FR-010) — for BOTH
+   * adjustment types (`reduce_term` and `reduce_installment_amount`).
+   * `distribution_category_id` is copied verbatim from the loan.
+   */
+  movement: { amount: number; date: Date; distribution_category_id?: UUID };
 }
 
 /**
  * Applies a principal/advance payment against a loan. The resulting new
  * value (fewer remaining installments, or a lower installment amount) is
  * always the value the user typed in themselves — this function only
- * validates and applies it, it never derives it (FR-017). Deliberately
- * returns nothing resembling a Movement (Principio X / FR-027), same
- * guarantee applyDebtSettlement already gives for Debt.
+ * validates and applies it, it never derives it (FR-017). Also describes the
+ * expense Movement this payment must generate (constitution v2.0.0 Principio
+ * X, spec 003 FR-010) — still a pure function, it never touches a repository.
  */
 export function recordPrincipalPayment(
-  loan: { installment_amount: number; remaining_installments: number },
+  loan: { installment_amount: number; remaining_installments: number; distribution_category_id?: UUID },
   amountCents: number,
   date: Date,
   adjustment: PrincipalPaymentAdjustment
@@ -69,6 +76,11 @@ export function recordPrincipalPayment(
       date,
       adjustment_type: adjustment.type,
       resulting_value,
+    },
+    movement: {
+      amount: amountCents,
+      date,
+      distribution_category_id: loan.distribution_category_id,
     },
   };
 }

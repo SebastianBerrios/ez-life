@@ -18,6 +18,7 @@ interface Props {
 
 export default function GoalForm({ userId, existing, onComplete, onCancel }: Props) {
   const [name, setName] = useState(existing?.name ?? '');
+  const [description, setDescription] = useState(existing?.description ?? '');
   const [kind, setKind] = useState<GoalKind>(existing?.kind ?? 'numeric');
   const [targetValue, setTargetValue] = useState(existing?.target_value?.toString() ?? '');
   const [milestones, setMilestones] = useState<GoalMilestone[]>(existing?.milestones ?? []);
@@ -51,6 +52,7 @@ export default function GoalForm({ userId, existing, onComplete, onCancel }: Pro
         id: existing?.id ?? '',
         user_id: userId,
         name,
+        description: description || undefined,
         kind,
         target_value: kind === 'numeric' ? Number(targetValue) : undefined,
         current_value: kind === 'numeric' ? (existing?.current_value ?? 0) : undefined,
@@ -74,6 +76,17 @@ export default function GoalForm({ userId, existing, onComplete, onCancel }: Pro
         <div className="space-y-2">
           <Label htmlFor="goalName">Nombre</Label>
           <Input type="text" id="goalName" required value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="goalDescription">Descripción (opcional)</Label>
+          <Input
+            type="text"
+            id="goalDescription"
+            placeholder="Notas adicionales"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
         </div>
 
         <fieldset className="space-y-2">

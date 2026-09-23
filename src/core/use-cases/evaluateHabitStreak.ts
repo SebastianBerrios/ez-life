@@ -121,6 +121,47 @@ export interface HabitWeekResult {
  * chronological order. Streak unit is weeks, not days; tokens are earned per
  * 7 accumulated individual completions (not per week of racha).
  */
+export interface HabitStreakHistoryPoint {
+  date: Date;
+  completed: boolean; // true if there was a real HabitCompletion or a token_used that day
+}
+
+/**
+ * Day-by-day completion history for the streak evolution chart (FR-004) —
+ * same input data as the current-streak calculators above, just reshaped
+ * into a time series instead of a single number (research.md §4). For a
+ * fixed-days habit, non-scheduled weekdays are excluded entirely (mirrors
+ * buildFixedDaysLog); a frequency habit has no fixed schedule, so every
+ * calendar day in the range gets a point.
+ */
+export function calculateHabitStreakHistory(
+  habit: Habit,
+  completions: HabitCompletion[],
+  range: { from: Date; to: Date }
+): HabitStreakHistoryPoint[] {
+  const completionByDate = new Map(completions.map(c => [dateOnlyKey(c.date), c]));
+  const points: HabitStreakHistoryPoint[] = [];
+
+  const cursor = new Date(Date.UTC(range.from.getUTCFullYear(), range.from.getUTCMonth(), range.from.getUTCDate()));
+  const end = new Date(Date.UTC(range.to.getUTCFullYear(), range.to.getUTCMonth(), range.to.getUTCDate()));
+
+  while (cursor <= end) {
+    const isScheduled =
+      habit.schedule_mode !== 'fixed_days' ||
+      !habit.fixed_days ||
+      habit.fixed_days.includes(DAY_CODES[cursor.getUTCDay()]);
+
+    if (isScheduled) {
+      const completion = completionByDate.get(dateOnlyKey(cursor));
+      points.push({ date: new Date(cursor), completed: Boolean(completion) });
+    }
+
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  return points;
+}
+
 export function evaluateFrequencyStreak(weeks: HabitWeekResult[]): StreakResult {
   let streak = 0;
   let tokensAvailable = 0;

@@ -18,6 +18,7 @@ interface HabitWithStreak extends Habit {
   tokensAvailable: number;
   completedToday: boolean;
   completionRate: number;
+  scheduledToday: boolean;
 }
 
 export default function HabitList({ userId }: Props) {
@@ -30,20 +31,20 @@ export default function HabitList({ userId }: Props) {
       const allHabits = await repo.getAll(userId);
       const today = new Date();
 
-      const withStreak = await Promise.all(allHabits.map(async (habit): Promise<HabitWithStreak | null> => {
+      const withStreak = await Promise.all(allHabits.map(async (habit): Promise<HabitWithStreak> => {
         const completions = await repo.getCompletions(habit.id);
 
-        // ControlPage's "hoy" agenda (FR-008) — a habit not scheduled today
-        // (wrong fixed day, or this week's frequency target already met)
-        // doesn't belong here.
-        if (!isHabitScheduledToday(habit, completions, today)) return null;
+        // FR-004: a habit not scheduled today (wrong fixed day, or this
+        // week's frequency target already met) stays visible — it's marked
+        // instead of disappearing, so the user can still see/manage it.
+        const scheduledToday = isHabitScheduledToday(habit, completions, today);
 
         const completionRate = calculateHabitCompletionRate(habit, completions, today);
 
         if (habit.schedule_mode === 'fixed_days' && habit.fixed_days) {
           const log = buildFixedDaysLog(habit.fixed_days, completions, habit.created_at, today);
           const { streak, tokensAvailable } = evaluateFixedDaysStreak(log);
-          return { ...habit, streak, tokensAvailable, completedToday: Boolean(log[log.length - 1]?.completed), completionRate };
+          return { ...habit, streak, tokensAvailable, completedToday: Boolean(log[log.length - 1]?.completed), completionRate, scheduledToday };
         }
 
         // Frequency mode: only the current week's completion state matters
@@ -51,10 +52,10 @@ export default function HabitList({ userId }: Props) {
         const target = habit.frequency_target ?? 1;
         const weekCompletions = completions.length; // simplified: lifetime count, good enough for a streak display
         const { streak, tokensAvailable } = evaluateFrequencyStreak([{ completions: weekCompletions, target, tokenUsed: false }]);
-        return { ...habit, streak, tokensAvailable, completedToday: false, completionRate };
+        return { ...habit, streak, tokensAvailable, completedToday: false, completionRate, scheduledToday };
       }));
 
-      setHabits(withStreak.filter((h): h is HabitWithStreak => h !== null));
+      setHabits(withStreak);
     } catch (err) {
       console.error(err);
     } finally {
@@ -105,7 +106,14 @@ export default function HabitList({ userId }: Props) {
         <Card key={habit.id} className="relative shadow-warm-sm px-5 py-4">
           <div className="flex items-start justify-between">
             <div>
-              <h3 className="font-heading font-bold text-foreground">{habit.name}</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="font-heading font-bold text-foreground">{habit.name}</h3>
+                {!habit.scheduledToday && (
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                    No corresponde hoy
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-muted-foreground mt-1">
                 Racha: {habit.streak} · Comodines: {'🛡️'.repeat(habit.tokensAvailable) || '0'}
               </p>

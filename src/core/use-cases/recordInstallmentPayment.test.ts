@@ -40,10 +40,28 @@ describe('recordInstallmentPayment', () => {
     expect(() => recordInstallmentPayment(loan, 1.5, new Date())).toThrow(DomainError);
   });
 
-  it('never returns anything resembling a Movement (FR-027, Principio X)', () => {
+  it('never touches any DB — it is a pure function returning only descriptions (Principio III)', () => {
     const result = recordInstallmentPayment({ installment_amount: 10000, remaining_installments: 12 }, 2, new Date());
 
-    expect(Object.keys(result).sort()).toEqual(['payment', 'remaining_installments', 'status']);
+    expect(Object.keys(result).sort()).toEqual(['movement', 'payment', 'remaining_installments', 'status']);
     expect(Object.keys(result.payment).sort()).toEqual(['amount', 'date', 'kind']);
+  });
+
+  it('includes a Movement description (amount in cents, date, distribution_category_id from the loan) — FR-010, constitution v2.0.0 Principio X', () => {
+    const date = new Date('2026-09-18');
+    const result = recordInstallmentPayment(
+      { installment_amount: 10000, remaining_installments: 12, distribution_category_id: 'bucket-1' },
+      2,
+      date
+    );
+
+    expect(result.movement).toEqual({ amount: 20000, date, distribution_category_id: 'bucket-1' });
+  });
+
+  it('leaves the Movement description\'s distribution_category_id undefined when the loan has none yet', () => {
+    const date = new Date('2026-09-18');
+    const result = recordInstallmentPayment({ installment_amount: 10000, remaining_installments: 12 }, 1, date);
+
+    expect(result.movement).toEqual({ amount: 10000, date, distribution_category_id: undefined });
   });
 });

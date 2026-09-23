@@ -76,4 +76,91 @@ describe('MovementForm', () => {
 
     expect(mockOnComplete).toHaveBeenCalled();
   });
+
+  describe('balance adjustment mode (006-ajuste-de-balance-mensual)', () => {
+    function mockRepositories(mockSave = vi.fn()) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (LocalMovementRepository as any).mockImplementation(function() { return { save: mockSave }; });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (LocalCategoryRepository as any).mockImplementation(function() {
+        return {
+          getDistributionCategories: vi.fn().mockResolvedValue([{ id: 'cat-id', name: 'Ahorro e Inversión', percentage: 20, is_default: true, is_savings: true }]),
+          getExpenseCategories: vi.fn().mockResolvedValue([{ id: 'exp-cat-id', distribution_category_id: 'cat-id', name: 'Alimentación' }]),
+          getSubcategories: vi.fn().mockResolvedValue([{ id: 'sub-id', category_id: 'exp-cat-id', name: 'Desayuno' }])
+        };
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (LocalSavingsGoalRepository as any).mockImplementation(function() {
+        return { getAll: vi.fn().mockResolvedValue([]) };
+      });
+      return mockSave;
+    }
+
+    it('hides category/subcategory selectors once adjustment mode is activated', async () => {
+      const user = userEvent.setup();
+      mockRepositories();
+
+      render(<MovementForm userId="fake-user-id" onComplete={vi.fn()} onCancel={vi.fn()} />);
+
+      expect(await screen.findByLabelText(/Categoría \(50\/30\/20\)/i)).toBeInTheDocument();
+
+      const adjustmentToggle = screen.getByLabelText(/es un ajuste de balance/i);
+      await user.click(adjustmentToggle);
+
+      expect(screen.queryByLabelText(/Categoría \(50\/30\/20\)/i)).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/Categoría de gasto/i)).not.toBeInTheDocument();
+    });
+
+    it('blocks saving an adjustment without a description', async () => {
+      const user = userEvent.setup();
+      const mockSave = mockRepositories();
+
+      render(<MovementForm userId="fake-user-id" onComplete={vi.fn()} onCancel={vi.fn()} />);
+
+      await screen.findByLabelText(/Categoría \(50\/30\/20\)/i);
+      const adjustmentToggle = screen.getByLabelText(/es un ajuste de balance/i);
+      await user.click(adjustmentToggle);
+
+      const amountInput = screen.getByLabelText(/monto/i);
+      await user.type(amountInput, '100');
+
+      const form = screen.getByTestId('movement-form');
+      fireEvent.submit(form);
+
+      await waitFor(() => {
+        expect(screen.getByText(/requiere un motivo/i)).toBeInTheDocument();
+      });
+      expect(mockSave).not.toHaveBeenCalled();
+    });
+
+    it('saves an adjustment with a description and no category fields', async () => {
+      const user = userEvent.setup();
+      const mockSave = mockRepositories();
+
+      render(<MovementForm userId="fake-user-id" onComplete={vi.fn()} onCancel={vi.fn()} />);
+
+      await screen.findByLabelText(/Categoría \(50\/30\/20\)/i);
+      const adjustmentToggle = screen.getByLabelText(/es un ajuste de balance/i);
+      await user.click(adjustmentToggle);
+
+      const amountInput = screen.getByLabelText(/monto/i);
+      await user.type(amountInput, '100');
+
+      const descInput = screen.getByLabelText(/motivo del ajuste/i);
+      await user.type(descInput, 'Regalo inesperado');
+
+      const form = screen.getByTestId('movement-form');
+      fireEvent.submit(form);
+
+      await waitFor(() => {
+        expect(mockSave).toHaveBeenCalledWith(expect.objectContaining({
+          is_adjustment: true,
+          description: 'Regalo inesperado',
+          distribution_category_id: undefined,
+          expense_category_id: undefined,
+          expense_subcategory_id: undefined,
+        }));
+      });
+    });
+  });
 });

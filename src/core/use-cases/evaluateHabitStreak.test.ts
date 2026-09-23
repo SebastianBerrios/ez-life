@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildFixedDaysLog, evaluateFixedDaysStreak, evaluateFrequencyStreak, isHabitScheduledToday, HabitDayResult, HabitWeekResult } from './evaluateHabitStreak';
+import { buildFixedDaysLog, evaluateFixedDaysStreak, evaluateFrequencyStreak, isHabitScheduledToday, calculateHabitStreakHistory, HabitDayResult, HabitWeekResult } from './evaluateHabitStreak';
 import type { Habit, HabitCompletion } from '../domain/models/types';
 
 describe('evaluateFixedDaysStreak', () => {
@@ -145,5 +145,61 @@ describe('isHabitScheduledToday', () => {
     const h = habit({ schedule_mode: 'frequency', frequency_target: 1 });
     const eightDaysAgo = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - 8));
     expect(isHabitScheduledToday(h, [completion(eightDaysAgo)], today)).toBe(true);
+  });
+});
+
+describe('calculateHabitStreakHistory', () => {
+  function habit(overrides: Partial<Habit>): Habit {
+    return {
+      id: 'h1', user_id: 'u1', name: 'Test',
+      schedule_mode: 'fixed_days', fixed_days: [],
+      created_at: new Date('2026-09-01'), updated_at: new Date('2026-09-01'),
+      ...overrides,
+    } as Habit;
+  }
+
+  function completion(date: string, tokenUsed = false): HabitCompletion {
+    return { id: date, habit_id: 'h1', date: new Date(date), token_used: tokenUsed, created_at: new Date(), updated_at: new Date() };
+  }
+
+  it('returns one point per scheduled day for a fixed-days habit, excluding non-scheduled weekdays', () => {
+    // 2026-09-14 Monday, 2026-09-15 Tuesday, 2026-09-16 Wednesday
+    const h = habit({ schedule_mode: 'fixed_days', fixed_days: ['mon', 'wed'] });
+    const history = calculateHabitStreakHistory(
+      h,
+      [completion('2026-09-14')],
+      { from: new Date('2026-09-14'), to: new Date('2026-09-16') }
+    );
+
+    expect(history).toEqual([
+      { date: new Date(Date.UTC(2026, 8, 14)), completed: true },
+      { date: new Date(Date.UTC(2026, 8, 16)), completed: false },
+    ]);
+  });
+
+  it('returns one point per calendar day for a frequency habit, marking completed days correctly', () => {
+    const h = habit({ schedule_mode: 'frequency', frequency_target: 3 });
+    const history = calculateHabitStreakHistory(
+      h,
+      [completion('2026-09-14'), completion('2026-09-16')],
+      { from: new Date('2026-09-14'), to: new Date('2026-09-16') }
+    );
+
+    expect(history).toEqual([
+      { date: new Date(Date.UTC(2026, 8, 14)), completed: true },
+      { date: new Date(Date.UTC(2026, 8, 15)), completed: false },
+      { date: new Date(Date.UTC(2026, 8, 16)), completed: true },
+    ]);
+  });
+
+  it('marks a token-covered day as completed too', () => {
+    const h = habit({ schedule_mode: 'fixed_days', fixed_days: ['mon'] });
+    const history = calculateHabitStreakHistory(
+      h,
+      [completion('2026-09-14', true)],
+      { from: new Date('2026-09-14'), to: new Date('2026-09-14') }
+    );
+
+    expect(history).toEqual([{ date: new Date(Date.UTC(2026, 8, 14)), completed: true }]);
   });
 });

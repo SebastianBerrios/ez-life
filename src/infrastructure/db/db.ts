@@ -220,6 +220,124 @@ export class EzLifeDB extends Dexie {
       // Automatic upgrade handled by Dexie
     });
 
+    // spec 003-fixes-criticos: InstallmentLoan.distribution_category_id and
+    // Movement.installment_payment_id are both optional fields, not indexes
+    // — no new store definition needed, but the version bump documents the
+    // schema change explicitly (data-model.md), consistent with every prior
+    // field addition in this file.
+    this.version(12).stores({
+      profiles: 'id',
+      income_sources: 'id, user_id',
+      distribution_categories: 'id, user_id',
+      expense_categories: 'id, user_id, distribution_category_id',
+      expense_subcategories: 'id, category_id',
+      savings_goals: 'id, user_id',
+      movements: 'id, user_id, date',
+      notifications: 'id, user_id, created_at',
+      debts: 'id, user_id, due_date',
+      shared_spaces: 'id, status',
+      memberships: 'id, shared_space_id, user_id',
+      shared_invites: 'id, shared_space_id, code',
+      shared_movements: 'id, shared_space_id, date',
+      habits: 'id, user_id',
+      habit_completions: 'id, habit_id, date',
+      goals: 'id, user_id, status',
+      tasks: 'id, user_id, status, due_date',
+      installment_loans: 'id, user_id, status',
+      installment_payments: 'id, installment_loan_id, date',
+      sync_queue: 'id, created_at'
+    }).upgrade(() => {
+      // Automatic upgrade handled by Dexie
+    });
+
+    // 005-habitos-tareas-metas-ux: Task.schedule_mode/fixed_days/
+    // frequency_target/recurrence_series_id/recurrence_active (data-model.md)
+    // are optional fields, not indexes — no new store definition needed, but
+    // the version bump documents the schema change explicitly, consistent
+    // with every prior field addition in this file (e.g. version 12).
+    this.version(13).stores({
+      profiles: 'id',
+      income_sources: 'id, user_id',
+      distribution_categories: 'id, user_id',
+      expense_categories: 'id, user_id, distribution_category_id',
+      expense_subcategories: 'id, category_id',
+      savings_goals: 'id, user_id',
+      movements: 'id, user_id, date',
+      notifications: 'id, user_id, created_at',
+      debts: 'id, user_id, due_date',
+      shared_spaces: 'id, status',
+      memberships: 'id, shared_space_id, user_id',
+      shared_invites: 'id, shared_space_id, code',
+      shared_movements: 'id, shared_space_id, date',
+      habits: 'id, user_id',
+      habit_completions: 'id, habit_id, date',
+      goals: 'id, user_id, status',
+      tasks: 'id, user_id, status, due_date',
+      installment_loans: 'id, user_id, status',
+      installment_payments: 'id, installment_loan_id, date',
+      sync_queue: 'id, created_at'
+    }).upgrade(() => {
+      // Automatic upgrade handled by Dexie
+    });
+
+    // 005-habitos-tareas-metas-ux: Task.description, Habit.icon,
+    // Goal.description (data-model.md) — again optional fields, not indexes,
+    // version bump only documents the schema change.
+    this.version(14).stores({
+      profiles: 'id',
+      income_sources: 'id, user_id',
+      distribution_categories: 'id, user_id',
+      expense_categories: 'id, user_id, distribution_category_id',
+      expense_subcategories: 'id, category_id',
+      savings_goals: 'id, user_id',
+      movements: 'id, user_id, date',
+      notifications: 'id, user_id, created_at',
+      debts: 'id, user_id, due_date',
+      shared_spaces: 'id, status',
+      memberships: 'id, shared_space_id, user_id',
+      shared_invites: 'id, shared_space_id, code',
+      shared_movements: 'id, shared_space_id, date',
+      habits: 'id, user_id',
+      habit_completions: 'id, habit_id, date',
+      goals: 'id, user_id, status',
+      tasks: 'id, user_id, status, due_date',
+      installment_loans: 'id, user_id, status',
+      installment_payments: 'id, installment_loan_id, date',
+      sync_queue: 'id, created_at'
+    }).upgrade(() => {
+      // Automatic upgrade handled by Dexie
+    });
+
+    // 006-ajuste-de-balance-mensual: Movement.is_adjustment (data-model.md) —
+    // an optional field, not an index, no backfill needed — every existing
+    // Movement is interpreted as is_adjustment: false by absence of the
+    // field. Version bump only documents the schema change, consistent with
+    // every prior field addition in this file (e.g. version 12, 13, 14).
+    this.version(15).stores({
+      profiles: 'id',
+      income_sources: 'id, user_id',
+      distribution_categories: 'id, user_id',
+      expense_categories: 'id, user_id, distribution_category_id',
+      expense_subcategories: 'id, category_id',
+      savings_goals: 'id, user_id',
+      movements: 'id, user_id, date',
+      notifications: 'id, user_id, created_at',
+      debts: 'id, user_id, due_date',
+      shared_spaces: 'id, status',
+      memberships: 'id, shared_space_id, user_id',
+      shared_invites: 'id, shared_space_id, code',
+      shared_movements: 'id, shared_space_id, date',
+      habits: 'id, user_id',
+      habit_completions: 'id, habit_id, date',
+      goals: 'id, user_id, status',
+      tasks: 'id, user_id, status, due_date',
+      installment_loans: 'id, user_id, status',
+      installment_payments: 'id, installment_loan_id, date',
+      sync_queue: 'id, created_at'
+    }).upgrade(() => {
+      // Automatic upgrade handled by Dexie
+    });
+
     this.setupSyncQueueTransactionScope();
     this.setupHooks();
   }

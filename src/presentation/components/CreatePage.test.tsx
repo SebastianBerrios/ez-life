@@ -67,4 +67,49 @@ describe('CreatePage', () => {
     expect(await screen.findByRole('button', { name: /\+ nueva tarea/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /\+ nuevo h[aá]bito/i })).toBeInTheDocument();
   });
+
+  it('calls onHabitSaved after creating a habit — MainFlow uses this to bump ControlPage\'s shared refresh key (FR-003)', async () => {
+    const user = userEvent.setup();
+    mockRepos();
+    const onHabitSaved = vi.fn();
+
+    render(<CreatePage userId="u1" onHabitSaved={onHabitSaved} />);
+
+    await user.click(await screen.findByRole('button', { name: /\+ nuevo h[aá]bito/i }));
+    await user.type(screen.getByLabelText(/nombre/i), 'Meditar');
+    await user.click(screen.getByLabelText('Lunes'));
+    fireEvent.submit(screen.getByTestId('habit-form'));
+
+    await waitFor(() => expect(onHabitSaved).toHaveBeenCalled());
+  });
+
+  it('calls onTaskSaved after creating a task — MainFlow uses this to bump ControlPage\'s shared refresh key (FR-003)', async () => {
+    const user = userEvent.setup();
+    mockRepos();
+    const onTaskSaved = vi.fn();
+
+    render(<CreatePage userId="u1" onTaskSaved={onTaskSaved} />);
+
+    await user.click(await screen.findByRole('button', { name: /\+ nueva tarea/i }));
+    await user.type(screen.getByLabelText(/t[ií]tulo/i), 'Pagar alquiler');
+    fireEvent.change(screen.getByLabelText(/fecha l[ií]mite/i), { target: { value: '2026-10-01' } });
+    fireEvent.submit(screen.getByTestId('task-form'));
+
+    await waitFor(() => expect(onTaskSaved).toHaveBeenCalled());
+  });
+
+  it('calls onGoalSaved after creating a goal — MainFlow uses this to bump ControlPage\'s dedicated Goal refresh key (FR-003)', async () => {
+    const user = userEvent.setup();
+    mockRepos();
+    const onGoalSaved = vi.fn();
+
+    render(<CreatePage userId="u1" onGoalSaved={onGoalSaved} />);
+
+    await user.click(await screen.findByRole('button', { name: /\+ nueva meta/i }));
+    await user.type(screen.getByLabelText(/nombre/i), 'Leer 12 libros');
+    await user.type(screen.getByLabelText(/valor objetivo/i), '12');
+    fireEvent.submit(screen.getByTestId('goal-form'));
+
+    await waitFor(() => expect(onGoalSaved).toHaveBeenCalled());
+  });
 });

@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { LocalGoalRepository } from '../../infrastructure/repositories/local/LocalGoalRepository';
 import { Goal } from '../../core/domain/models/types';
+import { calculateGoalProgress } from '../../core/use-cases/calculateGoalProgress';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -89,7 +90,7 @@ export default function GoalList({ userId }: Props) {
 
           {goal.kind === 'numeric' && (
             <div className="mt-3 space-y-2">
-              <Progress value={Math.min(((goal.current_value ?? 0) / (goal.target_value ?? 1)) * 100, 100)} />
+              <Progress value={calculateGoalProgress(goal) * 100} />
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">
                   {goal.current_value ?? 0} / {goal.target_value}

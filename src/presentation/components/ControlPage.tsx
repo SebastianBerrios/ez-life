@@ -7,12 +7,20 @@ import { LocalHabitRepository } from '../../infrastructure/repositories/local/Lo
 import TaskList from './TaskList';
 import HabitList from './HabitList';
 import GoalList from './GoalList';
+import HabitDashboard from './HabitDashboard';
+import TaskDashboard from './TaskDashboard';
+import GoalDashboard from './GoalDashboard';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface Props {
   userId: string;
   refreshKey?: number;
+  /** FR-003: bumped by MainFlow when a habit/task is saved from the 'create' route — remounts the matching list here to refetch immediately. */
+  habitsRefreshKey?: number;
+  tasksRefreshKey?: number;
+  /** FR-003: bumped by MainFlow when a Goal is saved from the 'create' route — remounts GoalList/GoalDashboard here. Not the same as `goalsRefreshKey` in MainFlow.tsx, which belongs to the unrelated SavingsGoal route. */
+  goalsControlRefreshKey?: number;
 }
 
 /**
@@ -23,7 +31,7 @@ interface Props {
  * component only decides the single unified empty state across all three,
  * since each of those already renders its own empty message individually.
  */
-export default function ControlPage({ userId, refreshKey }: Props) {
+export default function ControlPage({ userId, refreshKey, habitsRefreshKey, tasksRefreshKey, goalsControlRefreshKey }: Props) {
   const [loading, setLoading] = useState(true);
   const [isEmpty, setIsEmpty] = useState(false);
 
@@ -68,15 +76,33 @@ export default function ControlPage({ userId, refreshKey }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-4">
+      <div className="space-y-4" data-testid="today-section">
         <h2 className="text-xl font-bold text-foreground">Hoy</h2>
-        <TaskList userId={userId} />
-        <HabitList userId={userId} />
+        <TaskList key={`tasks-${tasksRefreshKey}`} userId={userId} />
+        <HabitList key={`habits-${habitsRefreshKey}`} userId={userId} />
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-4" data-testid="active-goals-section">
         <h2 className="text-xl font-bold text-foreground">Metas activas</h2>
-        <GoalList userId={userId} />
+        <GoalList key={`goals-${goalsControlRefreshKey}`} userId={userId} />
+      </div>
+
+      {/* FR-005/FR-006/FR-007: minimal dashboard overview — full lists (including
+          not-scheduled-today habits, any-due-date tasks, and completed goals),
+          independent of the "hoy"/"activas" sections above. */}
+      <div className="space-y-4" data-testid="habits-dashboard-section">
+        <h2 className="text-xl font-bold text-foreground">Dashboard de hábitos</h2>
+        <HabitDashboard key={`habits-dashboard-${habitsRefreshKey}`} userId={userId} />
+      </div>
+
+      <div className="space-y-4" data-testid="tasks-dashboard-section">
+        <h2 className="text-xl font-bold text-foreground">Dashboard de tareas</h2>
+        <TaskDashboard key={`tasks-dashboard-${tasksRefreshKey}`} userId={userId} />
+      </div>
+
+      <div className="space-y-4" data-testid="goals-dashboard-section">
+        <h2 className="text-xl font-bold text-foreground">Dashboard de metas</h2>
+        <GoalDashboard key={`goals-dashboard-${goalsControlRefreshKey}`} userId={userId} />
       </div>
     </div>
   );

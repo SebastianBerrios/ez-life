@@ -29,7 +29,10 @@ export class CustomSyncLayer {
         'profiles', 'income_sources', 'distribution_categories',
         'expense_categories', 'expense_subcategories', 'savings_goals', 'movements',
         'notifications', 'debts', 'shared_spaces', 'memberships', 'shared_invites',
-        'shared_movements', 'habits', 'habit_completions', 'goals', 'tasks'
+        'shared_movements', 'habits', 'habit_completions', 'goals', 'tasks',
+        // FR-015: previously push-only (SYNCED_TABLES in db.ts) — never pulled,
+        // which broke multi-device sync for loans/payments.
+        'installment_loans', 'installment_payments'
       ];
 
       for (const tableName of tablesToSync) {

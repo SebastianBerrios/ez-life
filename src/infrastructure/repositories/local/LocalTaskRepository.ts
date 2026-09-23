@@ -11,6 +11,13 @@ export class LocalTaskRepository implements ITaskRepository {
       .toArray();
   }
 
+  async getAllIncludingDone(userId: UUID): Promise<Task[]> {
+    return await db.tasks
+      .where('user_id').equals(userId)
+      .filter(t => !t.deleted_at)
+      .toArray();
+  }
+
   async save(data: Omit<Task, 'created_at' | 'updated_at'>): Promise<Task> {
     const now = new Date();
     const id = data.id || uuidv7();

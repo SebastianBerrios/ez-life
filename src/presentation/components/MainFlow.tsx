@@ -32,6 +32,7 @@ import { useRecurrenceEvaluator } from '../hooks/useRecurrenceEvaluator';
 import { useSyncManager } from '../hooks/useSyncManager';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useNotificationEvaluator } from '../hooks/useNotificationEvaluator';
+import { useTaskRecurrenceEvaluator } from '../hooks/useTaskRecurrenceEvaluator';
 import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
 import { repairOrphanedLocalRows } from '../../infrastructure/sync/repairOrphanedRows';
 import { mergeDuplicateCategories } from '../../infrastructure/sync/mergeDuplicateCategories';
@@ -44,6 +45,23 @@ import { repairDanglingExpenseCategories } from '../../infrastructure/sync/repai
 const SHEET_DIALOG_CONTENT_CLASS =
   'bg-card max-w-md rounded-2xl border border-border p-5 shadow-xl max-h-[85vh] overflow-y-auto sm:p-6';
 
+// FR-004: per-page browser tab titles. The app has a single real Next.js
+// route (`src/app/page.tsx`) — every "page" below is client-side routing
+// inside this component's `currentRoute` state, so Next.js's file-based
+// `generateMetadata` can't produce a per-page title (research.md §1). This
+// mutates `document.title` directly instead, keyed off `currentRoute`.
+const routeTitles: Record<string, string> = {
+  dashboard: 'Resumen',
+  movements: 'Historial',
+  analysis: 'Análisis',
+  goals: 'Mis Metas',
+  debts: 'Préstamos',
+  'shared-space': 'Espacio Compartido',
+  control: 'Control',
+  create: 'Crear',
+  settings: 'Ajustes',
+};
+
 export default function MainFlow() {
   const [step, setStep] = useState<'loading' | 'login' | 'onboarding-wizard' | 'app'>('loading');
   const [wizardStartStep, setWizardStartStep] = useState<1 | 2 | 3>(1);
@@ -51,8 +69,19 @@ export default function MainFlow() {
   const [profileId, setProfileId] = useState<string | null>(null);
   const [showMoreDrawer, setShowMoreDrawer] = useState(false);
   const [showMovementForm, setShowMovementForm] = useState(false);
+  const [movementsRefreshKey, setMovementsRefreshKey] = useState(0);
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [goalsRefreshKey, setGoalsRefreshKey] = useState(0);
+  // FR-003: shared between the 'create' and 'control' routes — a habit/task
+  // saved from CreatePage bumps the counter ControlPage forwards as `key` to
+  // its own HabitList/TaskList, same refresh-by-key pattern as goalsRefreshKey.
+  const [habitsRefreshKey, setHabitsRefreshKey] = useState(0);
+  const [tasksRefreshKey, setTasksRefreshKey] = useState(0);
+  // FR-003: same pattern, dedicated to the generic Goal checklist/numeric
+  // entity shown in Control's GoalList/GoalDashboard — distinct from
+  // `goalsRefreshKey` above, which belongs to the unrelated SavingsGoal
+  // ("Metas de Ahorro") route.
+  const [goalsControlRefreshKey, setGoalsControlRefreshKey] = useState(0);
   const [showDebtForm, setShowDebtForm] = useState(false);
   const [debtsRefreshKey, setDebtsRefreshKey] = useState(0);
   const [showInstallmentLoanForm, setShowInstallmentLoanForm] = useState(false);
@@ -68,7 +97,14 @@ export default function MainFlow() {
   useRecurrenceEvaluator(profileId);
   const { syncNow } = useSyncManager();
   useNotificationEvaluator(profileId);
+  useTaskRecurrenceEvaluator(profileId);
   const isOnline = useOnlineStatus();
+
+  React.useEffect(() => {
+    document.title = routeTitles[currentRoute]
+      ? `${routeTitles[currentRoute]} · ez-life`
+      : 'ez-life';
+  }, [currentRoute]);
 
   React.useEffect(() => {
     import('../../infrastructure/supabase/client').then(({ getSupabaseBrowserClient }) => {
@@ -260,7 +296,7 @@ export default function MainFlow() {
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-bold text-foreground">Historial</h2>
             </div>
-            <MovementList userId={profileId} />
+            <MovementList key={movementsRefreshKey} userId={profileId} />
           </div>
         )}
 
@@ -323,7 +359,12 @@ export default function MainFlow() {
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-bold text-foreground">Control</h2>
             </div>
-            <ControlPage userId={profileId} />
+            <ControlPage
+              userId={profileId}
+              habitsRefreshKey={habitsRefreshKey}
+              tasksRefreshKey={tasksRefreshKey}
+              goalsControlRefreshKey={goalsControlRefreshKey}
+            />
           </div>
         )}
 
@@ -332,7 +373,12 @@ export default function MainFlow() {
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-bold text-foreground">Crear</h2>
             </div>
-            <CreatePage userId={profileId} />
+            <CreatePage
+              userId={profileId}
+              onHabitSaved={() => setHabitsRefreshKey(k => k + 1)}
+              onTaskSaved={() => setTasksRefreshKey(k => k + 1)}
+              onGoalSaved={() => setGoalsControlRefreshKey(k => k + 1)}
+            />
           </div>
         )}
 
@@ -363,7 +409,10 @@ export default function MainFlow() {
             <DialogContent className={SHEET_DIALOG_CONTENT_CLASS}>
               <MovementForm
                 userId={profileId}
-                onComplete={() => setShowMovementForm(false)}
+                onComplete={() => {
+                  setShowMovementForm(false);
+                  setMovementsRefreshKey(k => k + 1);
+                }}
                 onCancel={() => setShowMovementForm(false)}
               />
             </DialogContent>

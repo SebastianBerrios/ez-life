@@ -1,24 +1,25 @@
 <!--
 Sync Impact Report
 ===================
-Version change: (unversioned baseline, carried over from docs/constitution.md) → 1.1.0
-Modified principles: none (all 8 pre-existing rules carried over verbatim in meaning, renumbered as
-  Roman-numeral principles I–VIII to fit this template's structure)
-Added principles:
-  - IX. Membership Requiere Consentimiento Explícito, Nunca Implícito Por Autenticación
+Version change: 1.1.0 → 2.0.0
+Modified principles:
   - X. Deudas y Liquidaciones Son Contables, Nunca Transacciones Simuladas
-  - XI. Un Solo Sistema de Recordatorios
-  - XII. Offline-First No Es Negociable; Sync en Tiempo Real Es una Mejora Best-Effort
-  - XIII. Los Conceptos de Dominio Distintos Permanecen Distintos
+    → X. Liquidaciones Informales Son Contables; Pagos de Préstamo Son Gasto Real
+    Incompatible redefinition: the "never generate a Movement" rule no longer covers
+    InstallmentLoan/InstallmentPayment (bank/caja loans, spec 002 US3) — only Debt (informal
+    lent/borrowed between people) keeps the bookkeeping-only guarantee. InstallmentPayment
+    recording (any kind) now MUST generate a corresponding expense Movement. Existing
+    InstallmentPayment code that relies on the old blanket rule
+    (src/core/domain/models/types.ts:226-229, spec 002 FR-027) is now non-compliant and must
+    be updated — tracked as part of feature spec 003-fixes-criticos.
+Added principles: none
 Removed sections: none
-Omitted template sections: [SECTION_2_NAME] and [SECTION_3_NAME] were dropped rather than filled
-  with filler content — every rule the project currently enforces fits as a Core Principle; adding
-  empty/generic sections would violate Principle VII (Simplicidad).
-Templates requiring follow-up: none checked automatically in this run — `.specify/templates/*`
-  (plan/spec/tasks) should be skimmed next time they're touched to confirm they don't reference a
-  stale principle count or the pre-spec-kit `specs/` legacy layout.
-Deferred items: none. RATIFICATION_DATE recovered from `git log --follow -- docs/constitution.md`
-  (first commit "version 01", 2026-09-14) instead of a TODO.
+Omitted template sections: [SECTION_2_NAME] and [SECTION_3_NAME] remain omitted, same
+  justification as the 1.1.0 report (Principle VII, Simplicidad).
+Templates requiring follow-up:
+  - specs/003-fixes-criticos/spec.md (to be written) must reflect the narrowed Principle X
+    when specifying InstallmentPayment → Movement behavior.
+Deferred items: none.
 -->
 
 # Ez-life Constitution
@@ -74,12 +75,23 @@ políticas RLS de auto-inserción ni triggers sobre un evento de auth que otorgu
 Rationale: este es el error de seguridad más caro posible en una app financiera compartida — un
 usuario autenticado viendo o editando datos de un espacio del que no es miembro.
 
-### X. Deudas y Liquidaciones Son Contables, Nunca Transacciones Simuladas
-Marcar una deuda o préstamo como saldado registra únicamente que una obligación quedó resuelta
-(monto + fecha). NO DEBE generar un `Movement` de ingreso/egreso — la app no mueve plata real, y
-hacerlo corrompería la distribución real de ingresos/egresos del usuario.
-Rationale: sin esta regla, un refactor futuro bien intencionado podría "simplificar" convirtiendo
-una liquidación en un movimiento, ensuciando silenciosamente el 50/30/20 del usuario.
+### X. Liquidaciones Informales Son Contables; Pagos de Préstamo Son Gasto Real
+Saldar un `Debt` (deuda informal prestada/pedida entre personas, `applyDebtSettlement`) registra
+únicamente que una obligación quedó resuelta (monto + fecha). NO DEBE generar un `Movement` de
+ingreso/egreso — ese dinero no circula por la app en este momento, y crear un Movement corrompería
+la distribución real de ingresos/egresos del usuario.
+
+En cambio, registrar un `InstallmentPayment` sobre un `InstallmentLoan` (cuota de banco/caja,
+cualquier `kind`: `installment` o `principal`) DEBE generar un `Movement` de egreso equivalente al
+monto pagado, además de su registro de bookkeeping existente (fecha, tipo, cuotas restantes) — ese
+pago es plata real que sale del bolsillo del usuario hacia el prestamista cada vez que ocurre, no
+una liquidación simbólica.
+
+Rationale: la simetría original entre `Debt` y `InstallmentLoan` fue una sobregeneralización — los
+dos son "deudas" en el lenguaje cotidiano, pero solo saldar un `Debt` es contable-puro. Un pago de
+cuota de préstamo es un gasto real y recurrente que el usuario necesita ver reflejado en su balance
+y en el Historial de Movimientos como cualquier otro egreso — omitirlo le esconde plata que
+realmente perdió, y rompe su distribución 50/30/20 tanto como omitir cualquier otro gasto real.
 
 ### XI. Un Solo Sistema de Recordatorios
 Toda funcionalidad de recordatorio, alerta o impulso motivacional (hábitos, tareas, préstamos,
@@ -125,4 +137,4 @@ consistentes con este documento y nunca contradecirlo).
 - **Resolución de conflictos**: si esta constitución y una spec existente entran en conflicto, esta
   constitución gana; la spec se corrige.
 
-**Version**: 1.1.0 | **Ratified**: 2026-09-14 | **Last Amended**: 2026-09-17
+**Version**: 2.0.0 | **Ratified**: 2026-09-14 | **Last Amended**: 2026-09-22

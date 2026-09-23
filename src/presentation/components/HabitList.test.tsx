@@ -58,7 +58,7 @@ describe('HabitList', () => {
     expect(await screen.findByText('Meditar')).toBeInTheDocument();
   });
 
-  it('does NOT show a fixed-days habit not scheduled for today (FR-008)', async () => {
+  it('still shows a fixed-days habit not scheduled for today, marked "No corresponde hoy" instead of hiding it (FR-004)', async () => {
     mockHabits([
       { id: 'h1', user_id: 'u1', name: 'Yoga', schedule_mode: 'fixed_days', fixed_days: [otherCode], created_at: new Date(), updated_at: new Date() },
     ]);
@@ -66,11 +66,11 @@ describe('HabitList', () => {
 
     render(<HabitList userId="u1" />);
 
-    expect(await screen.findByText(/no ten[eé]s h[aá]bitos registrados/i)).toBeInTheDocument();
-    expect(screen.queryByText('Yoga')).not.toBeInTheDocument();
+    expect(await screen.findByText('Yoga')).toBeInTheDocument();
+    expect(screen.getByText(/no corresponde hoy/i)).toBeInTheDocument();
   });
 
-  it('does NOT show a frequency habit that already met this week\'s target (FR-008)', async () => {
+  it('still shows a frequency habit that already met this week\'s target, marked "No corresponde hoy" (FR-004)', async () => {
     const today = new Date();
     mockHabits(
       [{ id: 'h1', user_id: 'u1', name: 'Leer', schedule_mode: 'frequency', frequency_target: 1, created_at: new Date(), updated_at: new Date() }],
@@ -80,7 +80,19 @@ describe('HabitList', () => {
 
     render(<HabitList userId="u1" />);
 
-    expect(await screen.findByText(/no ten[eé]s h[aá]bitos registrados/i)).toBeInTheDocument();
-    expect(screen.queryByText('Leer')).not.toBeInTheDocument();
+    expect(await screen.findByText('Leer')).toBeInTheDocument();
+    expect(screen.getByText(/no corresponde hoy/i)).toBeInTheDocument();
+  });
+
+  it('does NOT mark a fixed-days habit scheduled for today as "No corresponde hoy" (FR-004)', async () => {
+    mockHabits([
+      { id: 'h1', user_id: 'u1', name: 'Meditar', schedule_mode: 'fixed_days', fixed_days: [todayCode], created_at: new Date(), updated_at: new Date() },
+    ]);
+    vi.mocked(calculateHabitCompletionRate).mockReturnValue(0);
+
+    render(<HabitList userId="u1" />);
+
+    expect(await screen.findByText('Meditar')).toBeInTheDocument();
+    expect(screen.queryByText(/no corresponde hoy/i)).not.toBeInTheDocument();
   });
 });

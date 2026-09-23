@@ -84,4 +84,44 @@ describe('GoalForm', () => {
       }));
     });
   });
+
+  it('saves the optional description when the user fills it in (FR-008)', async () => {
+    const user = userEvent.setup();
+    const mockSave = vi.fn().mockResolvedValue({ id: 'g3' });
+    vi.mocked(LocalGoalRepository).mockImplementation(function () {
+      return { save: mockSave } as unknown as InstanceType<typeof LocalGoalRepository>;
+    });
+
+    render(<GoalForm userId="user-1" onComplete={vi.fn()} onCancel={vi.fn()} />);
+
+    await user.type(screen.getByLabelText(/nombre/i), 'Correr 100km');
+    await user.type(screen.getByLabelText(/valor objetivo/i), '100');
+    await user.type(screen.getByLabelText(/descripción/i), 'Prepararme para la maratón');
+
+    fireEvent.submit(screen.getByTestId('goal-form'));
+
+    await waitFor(() => {
+      expect(mockSave).toHaveBeenCalledWith(expect.objectContaining({ description: 'Prepararme para la maratón' }));
+    });
+  });
+
+  it('omits description when left empty', async () => {
+    const user = userEvent.setup();
+    const mockSave = vi.fn().mockResolvedValue({ id: 'g4' });
+    vi.mocked(LocalGoalRepository).mockImplementation(function () {
+      return { save: mockSave } as unknown as InstanceType<typeof LocalGoalRepository>;
+    });
+
+    render(<GoalForm userId="user-1" onComplete={vi.fn()} onCancel={vi.fn()} />);
+
+    await user.type(screen.getByLabelText(/nombre/i), 'Correr 100km');
+    await user.type(screen.getByLabelText(/valor objetivo/i), '100');
+
+    fireEvent.submit(screen.getByTestId('goal-form'));
+
+    await waitFor(() => {
+      expect(mockSave).toHaveBeenCalled();
+    });
+    expect(mockSave.mock.calls[0][0].description).toBeUndefined();
+  });
 });

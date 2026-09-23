@@ -16,9 +16,25 @@ const fraunces = Fraunces({
   style: ["normal", "italic"],
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
+  ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "ez-life",
   description: "Control financiero personal",
+  openGraph: {
+    title: "ez-life",
+    description: "Control financiero personal",
+    siteName: "ez-life",
+    locale: "es",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ez-life",
+    description: "Control financiero personal",
+  },
 };
 
 export default function RootLayout({

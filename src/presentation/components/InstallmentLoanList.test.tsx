@@ -17,6 +17,7 @@ const activeLoan = {
   installment_amount: 20000,
   interest_rate: 15,
   status: 'active' as const,
+  distribution_category_id: 'bucket-1',
   created_at: new Date('2026-09-01'),
   updated_at: new Date('2026-09-01'),
 };
@@ -51,6 +52,24 @@ describe('InstallmentLoanList', () => {
     expect(screen.getByText(/pagado.*saldado/i)).toBeInTheDocument();
   });
 
+  it('gates payment actions behind setting a distribution category first, for a loan that has none yet (FR-010/FR-011)', async () => {
+    mockRepo({ getAll: vi.fn().mockResolvedValue([{ ...activeLoan, distribution_category_id: undefined }]) } as never);
+    render(<InstallmentLoanList userId="fake-user-id" />);
+
+    expect(await screen.findByText(/BCP/i)).toBeInTheDocument();
+    expect(screen.getByText(/asigná una categoría/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /pagar cuota/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /abono a capital/i })).not.toBeInTheDocument();
+  });
+
+  it('allows payment actions once the loan already has a distribution category (FR-010/FR-011)', async () => {
+    mockRepo({ getAll: vi.fn().mockResolvedValue([{ ...activeLoan, distribution_category_id: 'bucket-1' }]) } as never);
+    render(<InstallmentLoanList userId="fake-user-id" />);
+
+    expect(await screen.findByText(/BCP/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /pagar cuota/i })).toBeInTheDocument();
+  });
+
   it('asks reduce plazo vs. reduce cuota when registering a principal payment, and lets the user type the resulting value (FR-016, FR-017)', async () => {
     const user = userEvent.setup();
     const mockRecordPrincipalPayment = vi.fn();
@@ -77,6 +96,34 @@ describe('InstallmentLoanList', () => {
         { type: 'reduce_term', newRemainingInstallments: 7 }
       );
     });
+  });
+
+  it('disables the "Confirmar abono" button while recordPrincipalPayment is in flight, to prevent an accidental double-submit (FR-014)', async () => {
+    const user = userEvent.setup();
+    let resolvePayment: () => void = () => {};
+    const pending = new Promise<void>((resolve) => { resolvePayment = resolve; });
+    const mockRecordPrincipalPayment = vi.fn().mockReturnValue(pending);
+    mockRepo({ recordPrincipalPayment: mockRecordPrincipalPayment } as never);
+
+    render(<InstallmentLoanList userId="fake-user-id" />);
+    await screen.findByText(/BCP/i);
+
+    await user.click(screen.getByRole('button', { name: /abono a capital/i }));
+    await user.type(screen.getByLabelText(/monto del abono/i), '1000.00');
+
+    const adjustmentSelect = screen.getByLabelText(/reduce/i);
+    await user.click(adjustmentSelect);
+    await user.click(await screen.findByRole('option', { name: /plazo/i }));
+    await user.type(screen.getByLabelText(/nuevo número de cuotas/i), '7');
+
+    const confirmButton = screen.getByRole('button', { name: /confirmar abono/i });
+    await user.click(confirmButton);
+
+    await waitFor(() => {
+      expect(confirmButton).toBeDisabled();
+    });
+
+    resolvePayment();
   });
 
   it('shows an error and does not apply the change when paying more installments than remain (FR-021)', async () => {

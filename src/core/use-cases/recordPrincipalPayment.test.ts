@@ -59,11 +59,30 @@ describe('recordPrincipalPayment', () => {
     ).toThrow(DomainError);
   });
 
-  it('never returns anything resembling a Movement (FR-027, Principio X)', () => {
+  it('never touches any DB — it is a pure function returning only descriptions (Principio III)', () => {
     const loan = { installment_amount: 10000, remaining_installments: 12 };
     const result = recordPrincipalPayment(loan, 50000, new Date(), { type: 'reduce_term', newRemainingInstallments: 7 });
 
-    expect(Object.keys(result).sort()).toEqual(['installment_amount', 'payment', 'remaining_installments', 'status']);
+    expect(Object.keys(result).sort()).toEqual(['installment_amount', 'movement', 'payment', 'remaining_installments', 'status']);
     expect(Object.keys(result.payment).sort()).toEqual(['adjustment_type', 'amount', 'date', 'kind', 'resulting_value']);
+  });
+
+  it('includes a Movement description (amount in cents, date, distribution_category_id from the loan) for BOTH adjustment types — FR-010, constitution v2.0.0 Principio X', () => {
+    const date = new Date('2026-09-18');
+    const loan = { installment_amount: 10000, remaining_installments: 12, distribution_category_id: 'bucket-1' };
+
+    const reduceTermResult = recordPrincipalPayment(loan, 50000, date, { type: 'reduce_term', newRemainingInstallments: 7 });
+    expect(reduceTermResult.movement).toEqual({ amount: 50000, date, distribution_category_id: 'bucket-1' });
+
+    const reduceAmountResult = recordPrincipalPayment(loan, 50000, date, { type: 'reduce_installment_amount', newInstallmentAmountCents: 7500 });
+    expect(reduceAmountResult.movement).toEqual({ amount: 50000, date, distribution_category_id: 'bucket-1' });
+  });
+
+  it('leaves the Movement description\'s distribution_category_id undefined when the loan has none yet', () => {
+    const date = new Date('2026-09-18');
+    const loan = { installment_amount: 10000, remaining_installments: 12 };
+    const result = recordPrincipalPayment(loan, 50000, date, { type: 'reduce_term', newRemainingInstallments: 7 });
+
+    expect(result.movement).toEqual({ amount: 50000, date, distribution_category_id: undefined });
   });
 });

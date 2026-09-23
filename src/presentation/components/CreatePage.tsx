@@ -15,6 +15,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface Props {
   userId: string;
+  /** FR-003: notifies MainFlow so it can bump the shared refresh key ControlPage forwards to HabitList/TaskList. */
+  onHabitSaved?: () => void;
+  onTaskSaved?: () => void;
+  /** FR-003: notifies MainFlow so it can bump the dedicated Goal refresh key ControlPage forwards to GoalList/GoalDashboard — separate from `goalsRefreshKey` in MainFlow.tsx, which belongs to the unrelated SavingsGoal ("Metas de Ahorro") route. */
+  onGoalSaved?: () => void;
 }
 
 // Same chrome as the app's other centered dialogs (MainFlow.tsx) — a create
@@ -28,7 +33,7 @@ const DIALOG_CONTENT_CLASS =
  * lists existing items with an "Editar" action (no tracking actions like
  * mark-done/complete here, that belongs to ControlPage/TaskList/HabitList).
  */
-export default function CreatePage({ userId }: Props) {
+export default function CreatePage({ userId, onHabitSaved, onTaskSaved, onGoalSaved }: Props) {
   const [loading, setLoading] = useState(true);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -134,7 +139,7 @@ export default function CreatePage({ userId }: Props) {
           <GoalForm
             userId={userId}
             existing={goalDialog.existing}
-            onComplete={() => { setGoalDialog({ open: false }); setRefreshKey(k => k + 1); }}
+            onComplete={() => { setGoalDialog({ open: false }); setRefreshKey(k => k + 1); onGoalSaved?.(); }}
             onCancel={() => setGoalDialog({ open: false })}
           />
         </DialogContent>
@@ -145,7 +150,7 @@ export default function CreatePage({ userId }: Props) {
           <TaskForm
             userId={userId}
             existing={taskDialog.existing}
-            onComplete={() => { setTaskDialog({ open: false }); setRefreshKey(k => k + 1); }}
+            onComplete={() => { setTaskDialog({ open: false }); setRefreshKey(k => k + 1); onTaskSaved?.(); }}
             onCancel={() => setTaskDialog({ open: false })}
           />
         </DialogContent>
@@ -156,7 +161,7 @@ export default function CreatePage({ userId }: Props) {
           <HabitForm
             userId={userId}
             existing={habitDialog.existing}
-            onComplete={() => { setHabitDialog({ open: false }); setRefreshKey(k => k + 1); }}
+            onComplete={() => { setHabitDialog({ open: false }); setRefreshKey(k => k + 1); onHabitSaved?.(); }}
             onCancel={() => setHabitDialog({ open: false })}
           />
         </DialogContent>

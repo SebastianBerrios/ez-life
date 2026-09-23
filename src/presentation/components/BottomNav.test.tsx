@@ -63,3 +63,10 @@ describe('BottomNav (rendered)', () => {
     }
   });
 });
+
+describe('BottomNav labels (005-habitos-tareas-metas-ux, FR-009)', () => {
+  it('labels the SavingsGoal nav item "Metas de Ahorro", distinct from "Metas" in Control', () => {
+    const goalsItem = navItems.find((item) => item.id === 'goals');
+    expect(goalsItem?.label).toBe('Metas de Ahorro');
+  });
+});

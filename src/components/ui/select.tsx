@@ -118,7 +118,13 @@ function SelectContent({
   sideOffset = 4,
   align = "center",
   alignOffset = 0,
-  alignItemWithTrigger = true,
+  // US4/FR-001: `true` (the primitive's own default) reproduces native
+  // `<select>` behavior by placing the selected item exactly over the
+  // trigger — which is precisely the overlap bug reported (it can hide the
+  // selected value or the first option). Anchoring below the trigger instead
+  // fixes it for all ~9 existing `<Select>` call sites at once, since this is
+  // the one shared component every one of them renders through.
+  alignItemWithTrigger = false,
   ...props
 }: SelectPrimitive.Popup.Props &
   Pick<

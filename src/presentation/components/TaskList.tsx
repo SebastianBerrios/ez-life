@@ -61,6 +61,20 @@ export default function TaskList({ userId }: Props) {
     }
   };
 
+  // FR-004: stops generating future occurrences from this series — the
+  // occurrence itself, and every one already generated, stays unchanged.
+  // Never touches streak/token state — a recurring Task never has any
+  // (Principio XIII).
+  const handleCancelRecurrence = async (task: Task) => {
+    try {
+      const repo = new LocalTaskRepository();
+      await repo.save({ ...task, recurrence_active: false });
+      await loadTasks();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   if (loading) {
     return <Skeleton className="h-20 w-full rounded-xl" />;
   }
@@ -86,6 +100,11 @@ export default function TaskList({ userId }: Props) {
             </div>
             <div className="flex gap-2">
               <Button size="sm" onClick={() => handleMarkDone(task.id)}>Hecha</Button>
+              {task.schedule_mode && task.recurrence_active !== false && (
+                <Button variant="outline" size="sm" onClick={() => handleCancelRecurrence(task)}>
+                  Cancelar recurrencia
+                </Button>
+              )}
               <Button variant="ghost" size="sm" onClick={() => handleDelete(task.id)} className="text-destructive hover:bg-destructive/10">
                 Borrar
               </Button>
