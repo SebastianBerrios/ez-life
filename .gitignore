@@ -76,3 +76,8 @@ next-env.d.ts
 
 # supabase CLI local link state (machine-specific, never shared/committed)
 /supabase/.temp/
+# Generated from the production build; never reuse a stale cache manifest.
+/public/sw.js
+
+# Playwright CLI scratch output (screenshots/page snapshots from manual verification)
+/.playwright-cli/
