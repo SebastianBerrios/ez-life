@@ -1,0 +1,20 @@
+import { beforeEach, it, expect } from 'vitest';
+import { render, screen, waitFor, act } from '@testing-library/react';
+import AnalysisScreen from './AnalysisScreen';
+import { db } from '../../infrastructure/db/db';
+import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
+import { LocalMovementRepository } from '../../infrastructure/repositories/local/LocalMovementRepository';
+beforeEach(async () => { await db.delete(); await db.open(); });
+it('updates analysis after local commits and remote application without remounting', async () => {
+  const categoryRepo = new LocalCategoryRepository();
+  await categoryRepo.saveDistributionSet('A', [{ id: 'bucket', user_id: 'A', name: 'Ahorro', percentage: 100, is_default: true, is_savings: true }]);
+  await categoryRepo.saveExpenseCategory({ id: 'category', user_id: 'A', name: 'Comida', distribution_category_id: 'bucket' }, ['General']);
+  const movementRepo = new LocalMovementRepository();
+  const row = await movementRepo.save({ id: '', user_id: 'A', type: 'EXPENSE', amount: 100, date: new Date(), distribution_category_id: 'bucket', expense_category_id: 'category', is_recurring: false });
+  render(<AnalysisScreen userId="A" />);
+  await waitFor(() => expect(screen.getAllByText('S/ 1.00').length).toBeGreaterThan(0));
+  await act(async () => { await movementRepo.save({ ...row, amount: 250 }); });
+  await waitFor(() => expect(screen.getAllByText('S/ 2.50').length).toBeGreaterThan(0));
+  await act(async () => { await db.applyRemoteRecords('movements', [{ ...row, amount: 350, updated_at: new Date(Date.now() + 1000) }]); });
+  await waitFor(() => expect(screen.getAllByText('S/ 3.50').length).toBeGreaterThan(0));
+});
