@@ -2,6 +2,8 @@ import { db } from '../../db/db';
 import { IIncomeSourceRepository } from '../../../core/domain/repositories/IRepositories';
 import { IncomeSource, UUID } from '../../../core/domain/models/types';
 import { uuidv7 } from 'uuidv7';
+import { validateMovementAmount } from '../../../core/use-cases/validateMovementAmount';
+import { DomainError } from '../../../core/domain/errors/DomainError';
 
 export class LocalIncomeSourceRepository implements IIncomeSourceRepository {
   async getAll(userId: UUID): Promise<IncomeSource[]> {
@@ -9,9 +11,12 @@ export class LocalIncomeSourceRepository implements IIncomeSourceRepository {
   }
 
   async save(sourceData: Omit<IncomeSource, 'created_at' | 'updated_at'>): Promise<IncomeSource> {
+    validateMovementAmount(sourceData.amount);
+    if (!sourceData.name.trim()) throw new DomainError('Ingresá el nombre de la fuente.');
     const now = new Date();
     const id = sourceData.id || uuidv7();
     const existing = await db.income_sources.get(id);
+    if (existing && existing.user_id !== sourceData.user_id) throw new DomainError('La fuente pertenece a otra cuenta.');
     
     let source: IncomeSource;
     if (existing) {
@@ -25,9 +30,12 @@ export class LocalIncomeSourceRepository implements IIncomeSourceRepository {
   }
 
   async delete(id: UUID): Promise<void> {
+    return db.transaction('rw', [db.income_sources, db.movements, db.sync_queue], async () => {
+    if (await db.movements.filter(m => !m.deleted_at && m.income_source_id === id).count()) throw new DomainError('La fuente tiene movimientos asociados.');
     const existing = await db.income_sources.get(id);
     if (existing) {
       await db.income_sources.put({ ...existing, deleted_at: new Date(), updated_at: new Date() });
     }
+    });
   }
 }

@@ -71,7 +71,7 @@ export default function GoalList({ userId }: Props) {
 
   if (goals.length === 0) {
     return (
-      <Card className="animate-fade-slide-up py-8 text-center shadow-warm-sm">
+      <Card className="animate-fade-slide-up py-8 text-center shadow-none">
         <p className="text-muted-foreground">No tenés metas registradas.</p>
       </Card>
     );
@@ -80,7 +80,7 @@ export default function GoalList({ userId }: Props) {
   return (
     <div className="animate-fade-slide-up space-y-4">
       {goals.map(goal => (
-        <Card key={goal.id} className="shadow-warm-sm px-5 py-4">
+        <Card key={goal.id} className="shadow-none px-5 py-4">
           <div className="flex items-start justify-between">
             <h3 className="font-heading font-bold text-foreground">{goal.name}</h3>
             <Button variant="ghost" size="sm" onClick={() => handleDelete(goal.id)} className="text-destructive hover:bg-destructive/10">
@@ -105,20 +105,22 @@ export default function GoalList({ userId }: Props) {
           {goal.kind === 'checklist' && (
             <ul className="mt-3 space-y-1">
               {(goal.milestones ?? []).map(m => (
-                <li key={m.id} className="flex items-center gap-2 text-sm">
+                <li key={m.id} className="text-sm">
+                  <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={m.done}
                     onChange={(e) => handleToggleMilestone(goal, m.id, e.target.checked)}
                   />
                   <span className={m.done ? 'line-through text-muted-foreground' : ''}>{m.label}</span>
+                  </label>
                 </li>
               ))}
             </ul>
           )}
 
           {goal.status === 'completed' && (
-            <p className="mt-3 text-sm text-primary font-medium">¡Completada! 🎉</p>
+            <p className="mt-3 text-sm text-primary font-medium">¡Completada!</p>
           )}
         </Card>
       ))}

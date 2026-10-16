@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import MainFlow from './MainFlow';
 
-const { movementListMounts } = vi.hoisted(() => ({ movementListMounts: vi.fn() }));
+const { movementListMounts, syncNow } = vi.hoisted(() => ({ movementListMounts: vi.fn(), syncNow: vi.fn().mockResolvedValue(undefined) }));
 
 vi.mock('../../infrastructure/supabase/client', () => ({
   getSupabaseBrowserClient: () => ({
@@ -26,11 +26,12 @@ vi.mock('../../infrastructure/repositories/local/LocalCategoryRepository', () =>
 }));
 
 vi.mock('../../infrastructure/sync/repairOrphanedRows', () => ({ repairOrphanedLocalRows: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('../../infrastructure/repositories/local/LocalOnboardingRepository', () => ({ LocalOnboardingRepository: vi.fn(function () { return { progress: async () => 3 }; }) }));
 vi.mock('../../infrastructure/sync/mergeDuplicateCategories', () => ({ mergeDuplicateCategories: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('../../infrastructure/sync/repairDanglingExpenseCategories', () => ({ repairDanglingExpenseCategories: vi.fn().mockResolvedValue(undefined) }));
 
 vi.mock('../hooks/useRecurrenceEvaluator', () => ({ useRecurrenceEvaluator: vi.fn() }));
-vi.mock('../hooks/useSyncManager', () => ({ useSyncManager: () => ({ syncNow: vi.fn().mockResolvedValue(undefined) }) }));
+vi.mock('../hooks/useSyncManager', () => ({ useSyncManager: () => ({ syncNow }) }));
 vi.mock('../hooks/useOnlineStatus', () => ({ useOnlineStatus: () => true }));
 vi.mock('../hooks/useNotificationEvaluator', () => ({ useNotificationEvaluator: vi.fn() }));
 vi.mock('../hooks/useTaskRecurrenceEvaluator', () => ({ useTaskRecurrenceEvaluator: vi.fn() }));

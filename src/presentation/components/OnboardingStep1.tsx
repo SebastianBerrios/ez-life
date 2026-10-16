@@ -1,9 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { LocalProfileRepository } from '../../infrastructure/repositories/local/LocalProfileRepository';
-import { LocalIncomeSourceRepository } from '../../infrastructure/repositories/local/LocalIncomeSourceRepository';
-import { uuidv7 } from 'uuidv7';
+import { LocalOnboardingRepository } from '../../infrastructure/repositories/local/LocalOnboardingRepository';
+import { parseMoney } from '../../core/use-cases/parseMoney';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -16,42 +15,25 @@ interface Props {
 export default function OnboardingStep1({ profileId, onComplete }: Props) {
   const [income, setIncome] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     try {
-      const profileRepo = new LocalProfileRepository();
-      const incomeRepo = new LocalIncomeSourceRepository();
-
-      // Use the authenticated session's real id — never mint a fresh one here.
-      // A local-only id would orphan every row this wizard creates from RLS
-      // (which requires user_id === auth.uid()), so it would never sync.
-      await profileRepo.save({
-        id: profileId
-      });
-
-      // We save the base income in cents
-      const incomeInCents = Math.round(parseFloat(income) * 100);
-
-      await incomeRepo.save({
-        id: uuidv7(),
-        user_id: profileId,
-        name: 'Sueldo Base',
-        amount: incomeInCents,
-      });
+      await new LocalOnboardingRepository().saveIncome(profileId, parseMoney(income));
 
       onComplete(profileId);
     } catch (err) {
-      console.error(err);
+      setError(err instanceof Error ? err.message : 'No se pudo guardar el ingreso.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="max-w-md mx-auto bg-card border border-border p-6 rounded-2xl shadow-warm-sm">
+    <div className="max-w-md mx-auto bg-card border border-border p-6 rounded-xl shadow-none">
       <h2 className="text-2xl font-bold text-foreground mb-6 font-heading">Paso 1: Configuración Básica</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
 
@@ -78,6 +60,7 @@ export default function OnboardingStep1({ profileId, onComplete }: Props) {
           </div>
         </div>
 
+        {error && <p role="alert" className="text-destructive">{error}</p>}
         <Button type="submit" disabled={isSubmitting} className="w-full">
           {isSubmitting ? 'Guardando...' : 'Continuar'}
         </Button>

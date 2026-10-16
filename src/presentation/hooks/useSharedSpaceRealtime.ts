@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { subscribeSharedSpaceChanges } from '../../infrastructure/supabase/realtime';
-import { CustomSyncLayer } from '../../infrastructure/sync/CustomSyncLayer';
+import { sessionSync } from '../../infrastructure/sync/CustomSyncLayer';
 
 /**
  * Triggers an immediate incremental sync when a Realtime event arrives for
@@ -11,9 +11,8 @@ export function useSharedSpaceRealtime(spaceId: string | null) {
   useEffect(() => {
     if (!spaceId) return;
 
-    const syncLayer = new CustomSyncLayer();
     const unsubscribe = subscribeSharedSpaceChanges(spaceId, () => {
-      syncLayer.sync();
+      sessionSync.sync();
     });
 
     return unsubscribe;

@@ -1,9 +1,12 @@
 'use client';
 
+import PersonalProgress from './PersonalProgress';
 import React, { useCallback, useEffect, useState } from 'react';
 import { LocalMovementRepository } from '../../infrastructure/repositories/local/LocalMovementRepository';
 import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
 import { LocalDebtRepository } from '../../infrastructure/repositories/local/LocalDebtRepository';
+import { LocalIncomeSourceRepository } from '../../infrastructure/repositories/local/LocalIncomeSourceRepository';
+import { onLocalChanges } from '../../infrastructure/db/localChanges';
 import { onSyncCompleted } from '../../infrastructure/sync/syncEvents';
 import { Movement, DistributionCategory, ExpenseCategory, ExpenseSubcategory, Debt } from '../../core/domain/models/types';
 import { calculateMonthlyCycle } from '../../core/use-cases/calculateMonthlyCycle';
@@ -19,6 +22,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 
 interface Props {
   userId: string;
+  onOpenProgress?: () => void;
 }
 
 // Budget-proximity thresholds for the semaphore indicator (T008) — a
@@ -41,15 +45,15 @@ const STATUS_LABEL: Record<BudgetStatus, string> = {
 };
 
 const STATUS_DOT_CLASS: Record<BudgetStatus, string> = {
-  ok: 'bg-emerald-500',
+  ok: 'bg-primary',
   warning: 'bg-amber-500',
   over: 'bg-destructive',
 };
 
 const STATUS_PROGRESS_CLASS: Record<BudgetStatus, string> = {
-  ok: '[&>div]:bg-emerald-500',
-  warning: '[&>div]:bg-amber-500',
-  over: '[&>div]:bg-destructive',
+  ok: '[&_[data-slot=progress-indicator]]:bg-primary',
+  warning: '[&_[data-slot=progress-indicator]]:bg-amber-500',
+  over: '[&_[data-slot=progress-indicator]]:bg-destructive',
 };
 
 function formatDelta(cents: number): string {
@@ -57,7 +61,7 @@ function formatDelta(cents: number): string {
   return `${sign} S/ ${(Math.abs(cents) / 100).toFixed(2)}`;
 }
 
-export default function Dashboard({ userId }: Props) {
+export default function Dashboard({ userId, onOpenProgress }: Props) {
   const [movements, setMovements] = useState<Movement[]>([]);
   const [previousMovements, setPreviousMovements] = useState<Movement[]>([]);
   const [distCategories, setDistCategories] = useState<DistributionCategory[]>([]);
@@ -65,6 +69,7 @@ export default function Dashboard({ userId }: Props) {
   const [expenseSubcategories, setExpenseSubcategories] = useState<ExpenseSubcategory[]>([]);
   const [debts, setDebts] = useState<Debt[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expectedIncome, setExpectedIncome] = useState(0);
   const [refDate, setRefDate] = useState(() => new Date());
 
   const loadData = useCallback(async () => {
@@ -78,12 +83,13 @@ export default function Dashboard({ userId }: Props) {
       const previousRefDate = new Date(refDate.getFullYear(), refDate.getMonth() - 1, 1);
       const [prevStart, prevEnd] = calculateMonthlyCycle(previousRefDate);
 
-      const [movesData, prevMovesData, catsData, expenseCatsData, debtsData] = await Promise.all([
+      const [movesData, prevMovesData, catsData, expenseCatsData, debtsData, sources] = await Promise.all([
         moveRepo.getAllByCycle(userId, start, end),
         moveRepo.getAllByCycle(userId, prevStart, prevEnd),
         catRepo.getDistributionCategories(userId),
         catRepo.getExpenseCategories(userId),
         debtRepo.getAll(userId),
+        new LocalIncomeSourceRepository().getAll(userId),
       ]);
 
       const subcategoriesByCategory = await Promise.all(
@@ -91,6 +97,7 @@ export default function Dashboard({ userId }: Props) {
       );
 
       setMovements(movesData);
+      setExpectedIncome(sources.reduce((total, source) => total + source.amount, 0));
       setPreviousMovements(prevMovesData);
       setDistCategories(catsData);
       setExpenseCategories(expenseCatsData);
@@ -111,6 +118,7 @@ export default function Dashboard({ userId }: Props) {
   // registered on another device) — a one-shot effect wouldn't otherwise
   // notice data that arrives after this component already rendered.
   useEffect(() => onSyncCompleted(loadData), [loadData]);
+  useEffect(() => onLocalChanges(['movements', 'income_sources', 'distribution_categories', 'expense_categories', 'expense_subcategories', 'debts'], loadData), [loadData]);
 
   const goToPreviousMonth = () => setRefDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1));
   const goToNextMonth = () => setRefDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1));
@@ -119,7 +127,7 @@ export default function Dashboard({ userId }: Props) {
   if (loading) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-40 w-full rounded-2xl" />
+        <Skeleton className="h-40 w-full rounded-xl" />
         <Skeleton className="h-48 w-full rounded-xl" />
       </div>
     );
@@ -129,7 +137,7 @@ export default function Dashboard({ userId }: Props) {
   const totalExpense = movements.filter(m => m.type === 'EXPENSE').reduce((acc, m) => acc + m.amount, 0);
   const balance = totalIncome - totalExpense;
 
-  const budgets = calculateBudgets(totalIncome, distCategories);
+  const budgets = calculateBudgets(expectedIncome, distCategories);
 
   const breakdown = calculateCategoryBreakdown(movements, distCategories, expenseCategories, expenseSubcategories);
   const chartData = breakdown
@@ -156,11 +164,11 @@ export default function Dashboard({ userId }: Props) {
         </button>
       </div>
 
-      <div className="bg-primary rounded-2xl p-6 text-primary-foreground shadow-warm-md">
-        <h2 className="font-heading text-sm font-medium opacity-80 mb-1">Balance del Mes</h2>
-        <p className="text-4xl font-bold mb-6">S/ {(balance / 100).toFixed(2)}</p>
+      <div className="bg-card border border-border rounded-xl p-6 text-foreground">
+        <h2 className="text-sm font-medium text-muted-foreground mb-1">Balance del Mes</h2>
+        <p className="font-heading text-4xl md:text-5xl font-medium tracking-tight tabular-nums mb-6">S/ {(balance / 100).toFixed(2)}</p>
 
-        <div className="flex justify-between border-t border-primary-foreground/20 pt-4">
+        <div className="flex justify-between border-t border-border pt-4">
           <div>
             <p className="text-sm opacity-80">Ingresos</p>
             <p className="text-base font-semibold">S/ {(totalIncome / 100).toFixed(2)}</p>
@@ -172,56 +180,7 @@ export default function Dashboard({ userId }: Props) {
         </div>
       </div>
 
-      <Card className="shadow-warm-sm">
-        <CardHeader>
-          <CardTitle className="text-lg">Comparación con el mes anterior</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!comparison.previous || !comparison.delta ? (
-            <p className="text-sm text-muted-foreground">No hay datos del mes anterior para comparar todavía.</p>
-          ) : (
-            <div className="space-y-2" data-testid="period-comparison">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Ingresos</span>
-                <span className="font-medium text-foreground">{formatDelta(comparison.delta.income)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Egresos</span>
-                <span className="font-medium text-foreground">{formatDelta(comparison.delta.expense)}</span>
-              </div>
-              <div className="flex justify-between text-sm font-semibold">
-                <span className="text-foreground">Balance</span>
-                <span className="text-foreground">{formatDelta(comparison.delta.balance)}</span>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card className="shadow-warm-sm">
-        <CardHeader>
-          <CardTitle className="text-lg">Distribución de gastos por categoría</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {chartData.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No hay gastos categorizados este mes todavía.</p>
-          ) : (
-            <div data-testid="category-breakdown-chart" className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip formatter={(value) => `S/ ${Number(Array.isArray(value) ? value[0] : (value ?? 0)).toFixed(2)}`} />
-                  <Bar dataKey="spent" fill="var(--color-primary, #6366f1)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card className="shadow-warm-sm">
+      <Card className="shadow-none">
         <CardHeader>
           <CardTitle className="text-lg">Presupuestos (50/30/20)</CardTitle>
         </CardHeader>
@@ -263,7 +222,58 @@ export default function Dashboard({ userId }: Props) {
         </CardContent>
       </Card>
 
-      <Card className="shadow-warm-sm">
+      <PersonalProgress userId={userId} compact onOpen={onOpenProgress} />
+
+      <Card className="shadow-none">
+        <CardHeader>
+          <CardTitle className="text-lg">Comparación con el mes anterior</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!comparison.previous || !comparison.delta ? (
+            <p className="text-sm text-muted-foreground">No hay datos del mes anterior para comparar todavía.</p>
+          ) : (
+            <div className="space-y-2" data-testid="period-comparison">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Ingresos</span>
+                <span className="font-medium text-foreground">{formatDelta(comparison.delta.income)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Egresos</span>
+                <span className="font-medium text-foreground">{formatDelta(comparison.delta.expense)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-semibold">
+                <span className="text-foreground">Balance</span>
+                <span className="text-foreground">{formatDelta(comparison.delta.balance)}</span>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-none">
+        <CardHeader>
+          <CardTitle className="text-lg">Distribución de gastos por categoría</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {chartData.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No hay gastos categorizados este mes todavía.</p>
+          ) : (
+            <div data-testid="category-breakdown-chart" className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip formatter={(value) => `S/ ${Number(Array.isArray(value) ? value[0] : (value ?? 0)).toFixed(2)}`} />
+                  <Bar dataKey="spent" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-none">
         <CardHeader>
           <CardTitle className="text-lg">Deudas activas</CardTitle>
         </CardHeader>

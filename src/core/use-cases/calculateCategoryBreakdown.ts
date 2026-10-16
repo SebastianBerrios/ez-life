@@ -31,14 +31,11 @@ export function calculateSpentByBucket(
   movements: Movement[],
   distributionCategories: DistributionCategory[]
 ): Record<UUID, number> {
-  const expenses = movements.filter(m => m.type === 'EXPENSE');
-
-  return distributionCategories.reduce<Record<UUID, number>>((acc, bucket) => {
-    acc[bucket.id] = expenses
-      .filter(m => m.distribution_category_id === bucket.id)
-      .reduce((sum, m) => sum + m.amount, 0);
-    return acc;
-  }, {});
+  const totals: Record<UUID, number> = Object.fromEntries(distributionCategories.map(bucket => [bucket.id, 0]));
+  for (const movement of movements) {
+    if (movement.type === 'EXPENSE' && !movement.is_adjustment && !movement.deleted_at && movement.distribution_category_id && Object.hasOwn(totals, movement.distribution_category_id)) totals[movement.distribution_category_id] += movement.amount;
+  }
+  return totals;
 }
 
 export function calculateCategoryBreakdown(
@@ -47,32 +44,37 @@ export function calculateCategoryBreakdown(
   expenseCategories: ExpenseCategory[],
   expenseSubcategories: ExpenseSubcategory[]
 ): DistributionBreakdown[] {
-  const expenses = movements.filter(m => m.type === 'EXPENSE');
-  const sumFor = (predicate: (m: Movement) => boolean) =>
-    expenses.filter(predicate).reduce((acc, m) => acc + m.amount, 0);
-
-  return distributionCategories.map(bucket => {
-    const categories: CategoryBreakdown[] = expenseCategories
-      .filter(cat => cat.distribution_category_id === bucket.id)
-      .map(cat => ({
+  const buckets = new Map<UUID, number>();
+  const categoriesSpent = new Map<UUID, number>();
+  const subcategoriesSpent = new Map<UUID, number>();
+  for (const movement of movements) {
+    if (movement.type !== 'EXPENSE' || movement.is_adjustment || movement.deleted_at) continue;
+    for (const [id, totals] of [[movement.distribution_category_id, buckets], [movement.expense_category_id, categoriesSpent], [movement.expense_subcategory_id, subcategoriesSpent]] as const) {
+      if (id) totals.set(id, (totals.get(id) ?? 0) + movement.amount);
+    }
+  }
+  const categoriesByBucket = new Map<UUID, CategoryBreakdown[]>();
+  const subcategoriesByCategory = new Map<UUID, SubcategoryBreakdown[]>();
+  for (const sub of expenseSubcategories) {
+    const list = subcategoriesByCategory.get(sub.category_id) ?? [];
+    list.push({ id: sub.id, name: sub.name, spent: subcategoriesSpent.get(sub.id) ?? 0 });
+    subcategoriesByCategory.set(sub.category_id, list);
+  }
+  for (const cat of expenseCategories) {
+    const list = categoriesByBucket.get(cat.distribution_category_id) ?? [];
+    list.push({
         id: cat.id,
         name: cat.name,
-        spent: sumFor(m => m.expense_category_id === cat.id),
-        subcategories: expenseSubcategories
-          .filter(sub => sub.category_id === cat.id)
-          .map(sub => ({
-            id: sub.id,
-            name: sub.name,
-            spent: sumFor(m => m.expense_subcategory_id === sub.id),
-          })),
-      }));
-
-    return {
+        spent: categoriesSpent.get(cat.id) ?? 0,
+        subcategories: subcategoriesByCategory.get(cat.id) ?? [],
+    });
+    categoriesByBucket.set(cat.distribution_category_id, list);
+  }
+  return distributionCategories.map(bucket => ({
       id: bucket.id,
       name: bucket.name,
       percentage: bucket.percentage,
-      spent: sumFor(m => m.distribution_category_id === bucket.id),
-      categories,
-    };
-  });
+      spent: buckets.get(bucket.id) ?? 0,
+      categories: categoriesByBucket.get(bucket.id) ?? [],
+  }));
 }

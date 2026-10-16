@@ -94,7 +94,7 @@ export default function HabitList({ userId }: Props) {
 
   if (habits.length === 0) {
     return (
-      <Card className="animate-fade-slide-up py-8 text-center shadow-warm-sm">
+      <Card className="animate-fade-slide-up py-8 text-center shadow-none">
         <p className="text-muted-foreground">No tenés hábitos registrados.</p>
       </Card>
     );
@@ -103,7 +103,7 @@ export default function HabitList({ userId }: Props) {
   return (
     <div className="animate-fade-slide-up space-y-4">
       {habits.map(habit => (
-        <Card key={habit.id} className="relative shadow-warm-sm px-5 py-4">
+        <Card key={habit.id} className="relative shadow-none px-5 py-4">
           <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-2">

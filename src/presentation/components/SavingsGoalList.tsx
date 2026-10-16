@@ -73,7 +73,7 @@ export default function SavingsGoalList({ userId }: Props) {
 
   if (goals.length === 0) {
     return (
-      <Card className="animate-fade-slide-up py-8 text-center shadow-warm-sm">
+      <Card className="animate-fade-slide-up py-8 text-center shadow-none">
         <p className="text-muted-foreground">No tenés metas de ahorro registradas.</p>
       </Card>
     );
@@ -86,7 +86,7 @@ export default function SavingsGoalList({ userId }: Props) {
         const isExpired = goal.deadline && new Date(goal.deadline) < new Date() && progress < 100;
 
         return (
-          <Card key={goal.id} className="relative shadow-warm-sm">
+          <Card key={goal.id} className="relative shadow-none">
             <div className="flex items-start justify-between px-5">
               <div>
                 <h3 className="font-heading font-bold text-foreground">{goal.name}</h3>
@@ -114,7 +114,7 @@ export default function SavingsGoalList({ userId }: Props) {
               </div>
               <Progress
                 value={progress}
-                className={isExpired ? '[&>div]:bg-destructive' : '[&>div]:bg-primary'}
+                className={isExpired ? '[&_[data-slot=progress-indicator]]:bg-destructive' : '[&_[data-slot=progress-indicator]]:bg-primary'}
               />
             </div>
           </Card>

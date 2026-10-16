@@ -71,7 +71,7 @@ describe('Local Repositories', () => {
 
       const category = await catRepo.saveExpenseCategory({
         id: uuidv7(), user_id: userId, distribution_category_id: bucket.id, name: 'Alimentación',
-      });
+      }, ['General']);
 
       expect(category.distribution_category_id).toBe(bucket.id);
       expect(await catRepo.countExpenseCategoriesByDistribution(bucket.id)).toBe(1);

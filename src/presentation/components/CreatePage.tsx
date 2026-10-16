@@ -25,7 +25,7 @@ interface Props {
 // Same chrome as the app's other centered dialogs (MainFlow.tsx) — a create
 // or edit form is a focused, modal action, never a bottom sheet.
 const DIALOG_CONTENT_CLASS =
-  'bg-card max-w-md rounded-2xl border border-border p-5 shadow-xl max-h-[85vh] overflow-y-auto sm:p-6';
+  'bg-card max-w-md rounded-xl border border-border p-5 shadow-xl max-h-[85vh] overflow-y-auto sm:p-6';
 
 /**
  * Create-and-edit surface (FR-005, FR-006) for Goal/Task/Habit — the
@@ -68,9 +68,9 @@ export default function CreatePage({ userId, onHabitSaved, onTaskSaved, onGoalSa
   if (loading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-24 w-full rounded-2xl" />
-        <Skeleton className="h-24 w-full rounded-2xl" />
-        <Skeleton className="h-24 w-full rounded-2xl" />
+        <Skeleton className="h-24 w-full rounded-xl" />
+        <Skeleton className="h-24 w-full rounded-xl" />
+        <Skeleton className="h-24 w-full rounded-xl" />
       </div>
     );
   }
@@ -83,14 +83,14 @@ export default function CreatePage({ userId, onHabitSaved, onTaskSaved, onGoalSa
           <Button size="sm" onClick={() => setGoalDialog({ open: true })}>+ Nueva meta</Button>
         </div>
         {goals.length === 0 ? (
-          <Card className="py-6 text-center text-sm text-muted-foreground shadow-warm-sm">No tenés metas todavía.</Card>
+          <Card className="py-6 text-center text-sm text-muted-foreground shadow-none">No tenés metas todavía.</Card>
         ) : (
           <div className="space-y-2">
             {goals.map(goal => (
-              <Card key={goal.id} className="shadow-warm-sm px-4 py-3 flex items-center justify-between">
+              <div key={goal.id} className="border-b border-border py-3 flex items-center justify-between gap-3">
                 <span className="text-sm font-medium text-foreground">{goal.name}</span>
                 <Button variant="outline" size="sm" onClick={() => setGoalDialog({ open: true, existing: goal })}>Editar</Button>
-              </Card>
+              </div>
             ))}
           </div>
         )}
@@ -102,14 +102,14 @@ export default function CreatePage({ userId, onHabitSaved, onTaskSaved, onGoalSa
           <Button size="sm" onClick={() => setTaskDialog({ open: true })}>+ Nueva tarea</Button>
         </div>
         {tasks.length === 0 ? (
-          <Card className="py-6 text-center text-sm text-muted-foreground shadow-warm-sm">No tenés tareas todavía.</Card>
+          <Card className="py-6 text-center text-sm text-muted-foreground shadow-none">No tenés tareas todavía.</Card>
         ) : (
           <div className="space-y-2">
             {tasks.map(task => (
-              <Card key={task.id} className="shadow-warm-sm px-4 py-3 flex items-center justify-between">
+              <div key={task.id} className="border-b border-border py-3 flex items-center justify-between gap-3">
                 <span className="text-sm font-medium text-foreground">{task.title}</span>
                 <Button variant="outline" size="sm" onClick={() => setTaskDialog({ open: true, existing: task })}>Editar</Button>
-              </Card>
+              </div>
             ))}
           </div>
         )}
@@ -121,14 +121,14 @@ export default function CreatePage({ userId, onHabitSaved, onTaskSaved, onGoalSa
           <Button size="sm" onClick={() => setHabitDialog({ open: true })}>+ Nuevo hábito</Button>
         </div>
         {habits.length === 0 ? (
-          <Card className="py-6 text-center text-sm text-muted-foreground shadow-warm-sm">No tenés hábitos todavía.</Card>
+          <Card className="py-6 text-center text-sm text-muted-foreground shadow-none">No tenés hábitos todavía.</Card>
         ) : (
           <div className="space-y-2">
             {habits.map(habit => (
-              <Card key={habit.id} className="shadow-warm-sm px-4 py-3 flex items-center justify-between">
+              <div key={habit.id} className="border-b border-border py-3 flex items-center justify-between gap-3">
                 <span className="text-sm font-medium text-foreground">{habit.name}</span>
                 <Button variant="outline" size="sm" onClick={() => setHabitDialog({ open: true, existing: habit })}>Editar</Button>
-              </Card>
+              </div>
             ))}
           </div>
         )}

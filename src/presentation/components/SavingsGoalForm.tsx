@@ -113,6 +113,7 @@ export default function SavingsGoalForm({ userId, onComplete, onCancel }: Props)
             )}
           </div>
 
+          <details className="border-t border-border pt-2"><summary className="text-sm font-medium">Opciones adicionales</summary>
           <div className="space-y-2">
             <Label htmlFor="deadline">Fecha límite (Opcional)</Label>
             <Input
@@ -122,6 +123,8 @@ export default function SavingsGoalForm({ userId, onComplete, onCancel }: Props)
               onChange={(e) => setDeadline(e.target.value)}
             />
           </div>
+
+          </details>
 
           <div className="flex gap-3 pt-2">
             <Button

@@ -7,6 +7,9 @@ export interface BaseEntity {
 }
 
 export interface Profile extends BaseEntity {
+  gamification_enabled?: boolean;
+  onboarding_step?: 0 | 1 | 2 | 3;
+  onboarding_income_source_id?: UUID;
   id: UUID;
   last_recurrence_eval_month?: string; // YYYY-MM
   notification_hour?: number; // 0-23, local hour for the daily reminder (RF-16)
@@ -52,6 +55,8 @@ export interface SavingsGoal extends BaseEntity {
 }
 
 export interface Movement extends BaseEntity {
+  recurrence_rule_id?: UUID;
+  recurrence_month?: string;
   id: UUID;
   user_id: UUID;
   type: 'INCOME' | 'EXPENSE';
@@ -70,7 +75,13 @@ export interface Movement extends BaseEntity {
   is_adjustment?: boolean; // spec 006 FR-001/FR-004 — true for a manual balance adjustment; never carries a distribution/expense category (validateBalanceAdjustment)
 }
 
-export type NotificationType = 'budget_over_80' | 'goal_completed' | 'daily_reminder' | 'loan_due_soon' | 'shared_movement_added' | 'habit_reminder' | 'streak_at_risk' | 'task_due';
+export interface MovementRecurrence extends Movement {
+  active: boolean;
+  day_of_month: number;
+  activated_month: string;
+}
+
+export type NotificationType = 'achievement_unlocked' | 'budget_over_80' | 'goal_completed' | 'daily_reminder' | 'loan_due_soon' | 'shared_movement_added' | 'habit_reminder' | 'streak_at_risk' | 'task_due';
 
 export interface Notification extends BaseEntity {
   id: UUID;

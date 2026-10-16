@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Edit2, Download, FileText, Bell, LogOut, Loader2 } from 'lucide-react';
 import { getSupabaseBrowserClient } from '../../infrastructure/supabase/client';
+import IncomeSourceSettings from './IncomeSourceSettings';
+import { forgetLocalAccount } from '../../infrastructure/auth/localAccount';
 
 interface Props {
   userId: string;
@@ -26,6 +28,9 @@ export default function SettingsScreen({ userId, onEditDistribution, onEditCateg
   const [notificationHour, setNotificationHour] = useState<string>('');
   const [inappEnabled, setInappEnabled] = useState(true);
   const [pushEnabled, setPushEnabled] = useState(false);
+  const [gamificationEnabled, setGamificationEnabled] = useState(true);
+  const [savingGamification, setSavingGamification] = useState(false);
+  const [preferenceError, setPreferenceError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -37,6 +42,7 @@ export default function SettingsScreen({ userId, onEditDistribution, onEditCateg
           setNotificationHour(data.notification_hour !== undefined ? String(data.notification_hour) : '');
           setInappEnabled(data.inapp_enabled !== false);
           setPushEnabled(data.push_enabled === true);
+          setGamificationEnabled(data.gamification_enabled !== false);
         }
       } catch (err) {
         console.error(err);
@@ -53,6 +59,22 @@ export default function SettingsScreen({ userId, onEditDistribution, onEditCateg
       setProfile(updated);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleGamificationChange = async (enabled: boolean) => {
+    const previous = gamificationEnabled;
+    setGamificationEnabled(enabled);
+    setSavingGamification(true);
+    setPreferenceError(null);
+    try {
+      const updated = await new LocalProfileRepository().save({ id: userId, gamification_enabled: enabled });
+      setProfile(updated);
+    } catch {
+      setGamificationEnabled(previous);
+      setPreferenceError('No pudimos guardar esta preferencia. Intenta de nuevo.');
+    } finally {
+      setSavingGamification(false);
     }
   };
 
@@ -146,8 +168,9 @@ export default function SettingsScreen({ userId, onEditDistribution, onEditCateg
 
   const handleLogout = async () => {
     const supabase = getSupabaseBrowserClient();
-    await supabase.auth.signOut();
+    forgetLocalAccount();
     onLogout?.();
+    await supabase.auth.signOut({ scope: 'local' });
   };
 
   return (
@@ -163,6 +186,7 @@ export default function SettingsScreen({ userId, onEditDistribution, onEditCateg
       </Section>
 
       {/* Categories */}
+      <Section title="Fuentes de ingreso"><IncomeSourceSettings userId={userId} /></Section>
       <Section title="Categorías y Distribución">
         <p className="text-sm text-muted-foreground">
           Ajustá tus categorías de distribución (%) y gestioná las categorías y subcategorías de gasto.
@@ -214,6 +238,17 @@ export default function SettingsScreen({ userId, onEditDistribution, onEditCateg
             PDF
           </Button>
         </div>
+      </Section>
+
+      <Section title="Mi progreso">
+        <label className="flex items-center gap-3 min-h-11 cursor-pointer">
+          <input type="checkbox" className="h-4 w-4 accent-primary" checked={gamificationEnabled}
+            disabled={savingGamification || !profile}
+            onChange={event => void handleGamificationChange(event.target.checked)} />
+          <span className="text-sm">Mostrar logros personales y celebraciones</span>
+        </label>
+        <p className="text-sm text-muted-foreground">Puedes ocultarlos cuando quieras. Tu historial se conserva.</p>
+        {preferenceError && <p role="alert" className="text-sm text-destructive">{preferenceError}</p>}
       </Section>
 
       {/* Notifications */}
@@ -294,7 +329,7 @@ export default function SettingsScreen({ userId, onEditDistribution, onEditCateg
 // Shared section wrapper
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-card border border-border rounded-2xl p-5 space-y-3 shadow-sm">
+    <div className="bg-card border border-border rounded-xl p-5 space-y-3 shadow-none">
       <h3 className="text-base font-semibold text-foreground">{title}</h3>
       {children}
     </div>

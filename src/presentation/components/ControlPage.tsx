@@ -57,15 +57,15 @@ export default function ControlPage({ userId, refreshKey, habitsRefreshKey, task
   if (loading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-24 w-full rounded-2xl" />
-        <Skeleton className="h-24 w-full rounded-2xl" />
+        <Skeleton className="h-24 w-full rounded-xl" />
+        <Skeleton className="h-24 w-full rounded-xl" />
       </div>
     );
   }
 
   if (isEmpty) {
     return (
-      <Card className="animate-fade-slide-up py-10 text-center shadow-warm-sm">
+      <Card className="animate-fade-slide-up py-10 text-center shadow-none">
         <CardContent className="space-y-2">
           <p className="text-muted-foreground">Todavía no tenés metas, tareas ni hábitos.</p>
           <p className="text-sm text-muted-foreground">Andá a &quot;Crear&quot; para agregar el primero.</p>

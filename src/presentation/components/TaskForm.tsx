@@ -99,6 +99,7 @@ export default function TaskForm({ userId, existing, onComplete, onCancel }: Pro
           <Input type="date" id="dueDate" required value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
         </div>
 
+        <details open={Boolean(existing?.description || existing?.schedule_mode)} className="border-t border-border pt-2"><summary className="text-sm font-medium">Opciones adicionales</summary><div className="space-y-4 pt-3">
         <div className="space-y-2">
           <Label htmlFor="taskDescription">Descripción (opcional)</Label>
           <Input
@@ -178,6 +179,8 @@ export default function TaskForm({ userId, existing, onComplete, onCancel }: Pro
             )}
           </>
         )}
+
+        </div></details>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 

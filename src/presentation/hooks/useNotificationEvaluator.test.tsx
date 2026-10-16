@@ -9,6 +9,8 @@ describe('useNotificationEvaluator', () => {
 
   beforeEach(async () => {
     await db.profiles.clear();
+    await db.achievement_receipts.clear();
+    await db.income_sources.clear();
     await db.movements.clear();
     await db.distribution_categories.clear();
     await db.savings_goals.clear();
@@ -28,7 +30,25 @@ describe('useNotificationEvaluator', () => {
     vi.restoreAllMocks();
   });
 
+  it('celebrates a new local unlock through the existing pipeline and does not repeat it on remount', async () => {
+    await db.profiles.put({ id: userId, push_enabled: false, created_at: now, updated_at: now });
+    const hook = renderHook(() => useNotificationEvaluator(userId));
+    await waitFor(async () => expect(await db.achievement_receipts.where('user_id').equals(userId).count()).toBe(6));
+    const changed = new Date();
+    await db.tasks.bulkPut(Array.from({ length: 10 }, (_, i) => ({
+      id: `achievement-task-${i}`, user_id: userId, title: 'Tarea', status: 'done',
+      due_date: changed, created_at: changed, updated_at: changed,
+    })));
+    await waitFor(() => expect(hook.result.current).toMatchObject({ userId, count: 1 }));
+    expect(await db.notifications.filter(row => row.type === 'achievement_unlocked').count()).toBe(1);
+    hook.unmount();
+    const reopened = renderHook(() => useNotificationEvaluator(userId));
+    expect(reopened.result.current).toBeNull();
+    reopened.unmount();
+  });
+
   it('creates a budget_over_80 notification when a bucket crosses 80% of its budget, and a second run does not duplicate it', async () => {
+    await db.income_sources.put({ id: 'source', user_id: userId, name: 'Sueldo', amount: 10000, created_at: now, updated_at: now });
     await db.profiles.put({
       id: userId,
       push_enabled: false, // avoid touching the real browser Notification API in tests

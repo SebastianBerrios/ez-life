@@ -116,6 +116,7 @@ export default function DebtForm({ userId, onComplete, onCancel }: Props) {
           {amountError && <p className="text-sm text-destructive">{amountError}</p>}
         </div>
 
+        <details open={false} className="border-t border-border pt-2"><summary className="text-sm font-medium">Opciones adicionales</summary><div className="space-y-4 pt-3">
         <div className="space-y-2">
           <Label htmlFor="dueDate">Fecha de vencimiento (Opcional)</Label>
           <Input
@@ -136,6 +137,8 @@ export default function DebtForm({ userId, onComplete, onCancel }: Props) {
             onChange={(e) => setInterestRate(e.target.value.replace(/[^0-9.]/g, ''))}
           />
         </div>
+
+        </div></details>
 
         <div className="flex gap-3 pt-2">
           <Button

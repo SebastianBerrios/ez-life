@@ -6,6 +6,7 @@ import { LocalMovementRepository } from '../../infrastructure/repositories/local
 import { validateDeletion } from '../../core/use-cases/validateDeletion';
 import { DomainError } from '../../core/domain/errors/DomainError';
 import { uuidv7 } from 'uuidv7';
+import { stableId } from '../../core/use-cases/stableId';
 import { Info, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -54,17 +55,15 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
       if (existing.length > 0) {
         setBuckets(existing.map(c => ({ id: c.id, name: c.name, percentage: c.percentage, is_default: c.is_default, is_savings: c.is_savings })));
       } else {
-        const seeded = await Promise.all(
-          DEFAULT_BUCKETS.map(b =>
-            catRepo.saveDistributionCategory({
-              id: uuidv7(),
+        const seeded = await catRepo.saveDistributionSet(profileId,
+          DEFAULT_BUCKETS.map((b, index) => ({
+              id: stableId(`seed-bucket:${profileId}:${index}`),
               user_id: profileId,
               name: b.name,
               percentage: b.percentage,
               is_default: b.is_default,
               is_savings: b.is_savings,
-            })
-          )
+            }))
         );
         setBuckets(seeded.map(c => ({ id: c.id, name: c.name, percentage: c.percentage, is_default: c.is_default, is_savings: c.is_savings })));
       }
@@ -125,7 +124,6 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
     }
 
     setDeleteErrors(prev => { const next = { ...prev }; delete next[id]; return next; });
-    await catRepo.deleteDistributionCategory(id);
     setBuckets(prev => prev.filter(b => b.id !== id));
   };
 
@@ -135,17 +133,15 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
     setIsSubmitting(true);
 
     try {
-      await Promise.all(
-        buckets.map(b =>
-          catRepo.saveDistributionCategory({
+      await catRepo.saveDistributionSet(profileId,
+        buckets.map(b => ({
             id: b.id,
             user_id: profileId,
             name: b.name.trim() || 'Sin nombre',
             percentage: b.percentage,
             is_default: b.is_default,
             is_savings: b.is_savings,
-          })
-        )
+          }))
       );
       onComplete();
     } catch (err) {
@@ -161,7 +157,7 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
 
   return (
     <div className="max-w-md mx-auto px-4">
-      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-card border border-border rounded-xl shadow-none overflow-hidden">
         {/* Header */}
         <div className="px-6 pt-6 pb-4">
           <h2 className="text-2xl font-bold text-foreground font-heading">Tu distribución de ingresos</h2>
@@ -171,7 +167,7 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
         </div>
 
         {/* Tutorial collapsible */}
-        <div className="mx-6 mb-4 bg-primary/8 border border-primary/20 rounded-xl overflow-hidden">
+        <div className="mx-6 mb-4 border-y border-border overflow-hidden">
           <button
             type="button"
             onClick={() => setTutorialOpen(v => !v)}
@@ -193,9 +189,9 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
                 Una regla simple para organizar tus ingresos en categorías:
               </p>
               <div className="space-y-2">
-                <TutorialItem emoji="🏠" label="50% — Necesidades" description="Alquiler, comida, transporte, servicios." color="text-primary" />
-                <TutorialItem emoji="🎉" label="30% — Gustos" description="Salidas, streaming, ropa, hobbies." color="text-warning" />
-                <TutorialItem emoji="💰" label="20% — Ahorro" description="Fondo de emergencia, inversiones, metas." color="text-foreground" />
+                <TutorialItem label="50% — Necesidades" description="Alquiler, comida, transporte, servicios." color="text-foreground" />
+                <TutorialItem label="30% — Gustos" description="Salidas, streaming, ropa, hobbies." color="text-foreground" />
+                <TutorialItem label="20% — Ahorro" description="Fondo de emergencia, inversiones, metas." color="text-foreground" />
               </div>
               <p className="text-sm text-muted-foreground">
                 Es solo un punto de partida — agregá, renombrá o eliminá categorías según tu realidad. Solo asegurate de que sumen 100%.
@@ -279,10 +275,9 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
   );
 }
 
-function TutorialItem({ emoji, label, description, color }: { emoji: string; label: string; description: string; color: string }) {
+function TutorialItem({ label, description, color }: { label: string; description: string; color: string }) {
   return (
     <div className="flex gap-3">
-      <span className="text-base shrink-0 mt-0.5">{emoji}</span>
       <div>
         <p className={`text-sm font-semibold ${color}`}>{label}</p>
         <p className="text-sm text-muted-foreground">{description}</p>

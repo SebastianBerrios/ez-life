@@ -48,7 +48,7 @@ export default function SharedSpaceSettings({ space, onChanged, onLeft }: Props)
   };
 
   return (
-    <Card className="shadow-warm-sm px-5 py-4 space-y-3">
+    <Card className="shadow-none px-5 py-4 space-y-3">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium">Modo de permisos</p>

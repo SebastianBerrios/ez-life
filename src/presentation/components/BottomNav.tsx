@@ -1,12 +1,14 @@
 'use client';
 
 import React from 'react';
+import { forgetLocalAccount } from '../../infrastructure/auth/localAccount';
 import type { LucideIcon } from 'lucide-react';
-import { Plus, LogOut, LayoutDashboard, ArrowLeftRight, PieChart, Target, Settings, Bell, HandCoins, Users, ListChecks, MoreHorizontal } from 'lucide-react';
+import { Plus, LogOut, LayoutDashboard, ArrowLeftRight, PieChart, Target, Settings, Bell, HandCoins, Users, ListChecks, MoreHorizontal, Award } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { getSupabaseBrowserClient } from '../../infrastructure/supabase/client';
 
 interface Props {
+  gamificationEnabled?: boolean;
   currentRoute: string;
   onNavigate: (route: string) => void;
   onOpenMore?: () => void;
@@ -31,6 +33,7 @@ export const navItems: NavItem[] = [
   { id: 'shared-space', label: 'Espacio', Icon: Users },
   { id: 'control', label: 'Control', Icon: ListChecks },
   { id: 'create', label: 'Crear', Icon: Plus },
+  { id: 'progress', label: 'Mi progreso', Icon: Award },
   { id: 'settings', label: 'Ajustes', Icon: Settings },
 ];
 
@@ -42,18 +45,19 @@ const PRIMARY_ROUTE_IDS = ['dashboard', 'movements', 'debts', 'control'];
 export const primaryNavItems: NavItem[] = navItems.filter((item) => PRIMARY_ROUTE_IDS.includes(item.id));
 export const overflowNavItems: NavItem[] = navItems.filter((item) => !PRIMARY_ROUTE_IDS.includes(item.id));
 
-export default function Navigation({ currentRoute, onNavigate, onOpenMore, onNewMovement, avatarUrl, onLogout, onOpenNotifications }: Props) {
+export default function Navigation({ gamificationEnabled = true, currentRoute, onNavigate, onOpenMore, onNewMovement, avatarUrl, onLogout, onOpenNotifications }: Props) {
   const handleLogout = async () => {
     const supabase = getSupabaseBrowserClient();
-    await supabase.auth.signOut();
+    forgetLocalAccount();
     onLogout?.();
+    await supabase.auth.signOut({ scope: 'local' });
   };
 
   return (
     <>
       {/* ── Mobile Bottom Nav ─────────────────────────────────── */}
       <nav
-        className="md:hidden fixed bottom-0 w-full bg-card border-t border-border pb-safe shadow-warm-md z-40"
+        className="md:hidden fixed bottom-0 w-full bg-card border-t border-border pb-safe shadow-none z-40"
         aria-label="Navegación principal"
       >
         <div className="flex justify-around items-center h-16">
@@ -94,7 +98,7 @@ export default function Navigation({ currentRoute, onNavigate, onOpenMore, onNew
         {/* Logo + theme */}
         <div className="flex items-center justify-between px-5 py-5 shrink-0">
           <div className="flex items-center gap-2">
-            <span className="text-xl">🌿</span>
+
             <h1 className="text-xl font-extrabold text-foreground tracking-tight font-heading">ez-life</h1>
           </div>
           <div className="flex items-center gap-1">
@@ -102,7 +106,7 @@ export default function Navigation({ currentRoute, onNavigate, onOpenMore, onNew
               <button
                 onClick={onOpenNotifications}
                 aria-label="Ver notificaciones"
-                className="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-muted text-muted-foreground transition-colors"
+                className="h-11 w-11 flex items-center justify-center rounded-lg hover:bg-muted text-muted-foreground transition-colors"
               >
                 <Bell className="w-4 h-4" />
               </button>
@@ -116,7 +120,7 @@ export default function Navigation({ currentRoute, onNavigate, onOpenMore, onNew
           <div className="px-4 mb-4 shrink-0">
             <button
               onClick={onNewMovement}
-              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl py-2.5 px-4 flex items-center justify-center gap-2 shadow-sm transition-colors font-semibold text-sm"
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl py-2.5 px-4 flex items-center justify-center gap-2 shadow-none transition-colors font-semibold text-sm"
             >
               <Plus className="w-4 h-4" />
               Nuevo
@@ -126,7 +130,7 @@ export default function Navigation({ currentRoute, onNavigate, onOpenMore, onNew
 
         {/* Nav items */}
         <nav className="flex-1 px-3 space-y-1">
-          {navItems.map(({ id, label, Icon }) => {
+          {navItems.filter(item => item.id !== 'progress' || gamificationEnabled).map(({ id, label, Icon }) => {
             const active = currentRoute === id;
             return (
               <button

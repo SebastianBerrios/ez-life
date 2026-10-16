@@ -145,7 +145,7 @@ export default function InstallmentLoanList({ userId }: Props) {
         const isSettled = loan.status === 'settled';
 
         return (
-          <Card key={loan.id} className="relative shadow-warm-sm">
+          <Card key={loan.id} className="relative shadow-none">
             <div className="flex items-start justify-between px-5">
               <div>
                 <h3 className="font-heading font-bold text-foreground">{loan.lender_name}</h3>

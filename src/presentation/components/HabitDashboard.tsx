@@ -71,7 +71,7 @@ export default function HabitDashboard({ userId }: Props) {
 
   if (habits.length === 0) {
     return (
-      <Card className="animate-fade-slide-up py-8 text-center shadow-warm-sm">
+      <Card className="animate-fade-slide-up py-8 text-center shadow-none">
         <p className="text-muted-foreground">No tenés hábitos registrados.</p>
       </Card>
     );
@@ -106,7 +106,7 @@ export default function HabitDashboard({ userId }: Props) {
         }));
 
         return (
-          <Card key={habit.id} className="shadow-warm-sm px-4 py-3 space-y-3">
+          <Card key={habit.id} className="shadow-none px-4 py-3 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-foreground">{habit.name}</span>
               <span className="text-sm text-muted-foreground">Racha: {habit.streak}</span>

@@ -47,7 +47,7 @@ export default function TaskDashboard({ userId }: Props) {
 
   if (tasks.length === 0) {
     return (
-      <Card className="animate-fade-slide-up py-8 text-center shadow-warm-sm">
+      <Card className="animate-fade-slide-up py-8 text-center shadow-none">
         <p className="text-muted-foreground">No tenés tareas registradas.</p>
       </Card>
     );
@@ -65,7 +65,7 @@ export default function TaskDashboard({ userId }: Props) {
 
   return (
     <div className="animate-fade-slide-up space-y-4">
-      <Card className="shadow-warm-sm px-4 py-3 space-y-3">
+      <Card className="shadow-none px-4 py-3 space-y-3">
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">A tiempo: {stats.onTime}</span>
           <span className="text-muted-foreground">Vencidas: {stats.overdue}</span>
@@ -87,7 +87,7 @@ export default function TaskDashboard({ userId }: Props) {
 
       <div className="space-y-2">
         {tasks.map(task => (
-          <Card key={task.id} className="shadow-warm-sm px-4 py-3 flex items-center justify-between">
+          <Card key={task.id} className="shadow-none px-4 py-3 flex items-center justify-between">
             <span className="text-sm font-medium text-foreground">{task.title}</span>
             <span className="text-sm text-muted-foreground">{task.status === 'done' ? 'Hecha' : 'Pendiente'}</span>
           </Card>

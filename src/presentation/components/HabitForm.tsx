@@ -88,6 +88,7 @@ export default function HabitForm({ userId, existing, onComplete, onCancel }: Pr
           />
         </div>
 
+        <details open={Boolean(existing?.icon)} className="border-t border-border pt-2"><summary className="text-sm font-medium">Opciones adicionales</summary><div className="space-y-4 pt-3">
         <div className="space-y-2">
           <Label htmlFor="habitIcon">Ícono (opcional)</Label>
           <Input
@@ -98,6 +99,8 @@ export default function HabitForm({ userId, existing, onComplete, onCancel }: Pr
             onChange={(e) => setIcon(e.target.value)}
           />
         </div>
+
+        </div></details>
 
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium">Horario</legend>

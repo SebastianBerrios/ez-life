@@ -1,4 +1,5 @@
-import Dexie, { type Table } from 'dexie';
+import type { AchievementReceipt } from '../../core/use-cases/evaluateAchievements';
+import Dexie, { type Table, type Transaction } from 'dexie';
 import type {
   Profile,
   IncomeSource,
@@ -7,6 +8,7 @@ import type {
   ExpenseSubcategory,
   SavingsGoal,
   Movement,
+  MovementRecurrence,
   Notification,
   Debt,
   SharedSpace,
@@ -39,10 +41,32 @@ const SYNCED_TABLES = [
   'profiles', 'income_sources', 'distribution_categories',
   'expense_categories', 'expense_subcategories', 'savings_goals', 'movements',
   'notifications', 'debts', 'habits', 'habit_completions', 'goals', 'tasks',
-  'installment_loans', 'installment_payments'
+  'installment_loans', 'installment_payments', 'movement_recurrences', 'achievement_receipts'
 ] as const;
 
 export class EzLifeDB extends Dexie {
+  private remoteTransactions = new WeakSet<Transaction>();
+
+  async applyRemoteRecords(tableName: string, records: Record<string, unknown>[]): Promise<void> {
+    const table = this.table(tableName);
+    await this.transaction('rw', table, async transaction => {
+      this.remoteTransactions.add(transaction);
+      for (const record of records) {
+        const local = await table.get(String(record.id));
+        if (tableName === 'achievement_receipts' && local && record.celebration_handled && !local.celebration_handled) {
+          await table.put({ ...local, celebration_handled: true });
+          continue;
+        }
+        const localDeleted = Boolean(local?.deleted_at);
+        const remoteDeleted = Boolean(record.deleted_at);
+        if (localDeleted && !remoteDeleted) continue;
+        if (local && localDeleted === remoteDeleted && new Date(local.updated_at) >= (record.updated_at as Date)) continue;
+        if (tableName === 'achievement_receipts' && local?.celebration_handled) record.celebration_handled = true;
+        await table.put(record);
+      }
+    });
+  }
+  achievement_receipts!: Table<AchievementReceipt, string>;
   profiles!: Table<Profile, string>;
   income_sources!: Table<IncomeSource, string>;
   distribution_categories!: Table<DistributionCategory, string>;
@@ -50,6 +74,7 @@ export class EzLifeDB extends Dexie {
   expense_subcategories!: Table<ExpenseSubcategory, string>;
   savings_goals!: Table<SavingsGoal, string>;
   movements!: Table<Movement, string>;
+  movement_recurrences!: Table<MovementRecurrence, string>;
   notifications!: Table<Notification, string>;
   debts!: Table<Debt, string>;
   shared_spaces!: Table<SharedSpace, string>;
@@ -338,6 +363,11 @@ export class EzLifeDB extends Dexie {
       // Automatic upgrade handled by Dexie
     });
 
+    this.version(16).stores({
+      movement_recurrences: 'id, user_id',
+      movements: 'id, user_id, date, &[recurrence_rule_id+recurrence_month]',
+    });
+    this.version(17).stores({ achievement_receipts: 'id, user_id, &[user_id+achievement_id]' });
     this.setupSyncQueueTransactionScope();
     this.setupHooks();
   }
@@ -367,6 +397,7 @@ export class EzLifeDB extends Dexie {
       const table = this.table(tableName);
 
       table.hook('creating', (primKey, obj, trans) => {
+        if (this.remoteTransactions.has(trans)) return;
         const id = crypto.randomUUID(); // uuidv4 is fine for queue id
         trans.table('sync_queue').put({
           id,
@@ -377,6 +408,7 @@ export class EzLifeDB extends Dexie {
       });
 
       table.hook('updating', (mods, primKey, obj, trans) => {
+        if (this.remoteTransactions.has(trans)) return;
         const id = crypto.randomUUID();
         trans.table('sync_queue').put({
           id,

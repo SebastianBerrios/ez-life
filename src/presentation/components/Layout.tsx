@@ -5,6 +5,7 @@ import Navigation from './BottomNav';
 
 interface Props {
   children: React.ReactNode;
+  gamificationEnabled?: boolean;
   currentRoute: string;
   onNavigate: (route: string) => void;
   onOpenMore?: () => void;
@@ -14,10 +15,11 @@ interface Props {
   onOpenNotifications?: () => void;
 }
 
-export default function Layout({ children, currentRoute, onNavigate, onOpenMore, onNewMovement, avatarUrl, onLogout, onOpenNotifications }: Props) {
+export default function Layout({ gamificationEnabled, children, currentRoute, onNavigate, onOpenMore, onNewMovement, avatarUrl, onLogout, onOpenNotifications }: Props) {
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row">
       <Navigation
+        gamificationEnabled={gamificationEnabled}
         currentRoute={currentRoute}
         onNavigate={onNavigate}
         onOpenMore={onOpenMore}

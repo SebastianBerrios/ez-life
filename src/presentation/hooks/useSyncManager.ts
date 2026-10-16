@@ -1,17 +1,13 @@
-import { useEffect, useRef, useCallback } from 'react';
-import { CustomSyncLayer } from '../../infrastructure/sync/CustomSyncLayer';
+import { useEffect, useCallback } from 'react';
+import { sessionSync } from '../../infrastructure/sync/CustomSyncLayer';
 
 export function useSyncManager() {
-  const syncLayerRef = useRef<CustomSyncLayer | null>(null);
-  if (!syncLayerRef.current) {
-    syncLayerRef.current = new CustomSyncLayer();
-  }
 
   // Exposed so callers that need to know a sync cycle actually finished
   // (e.g. deciding whether a device needs onboarding) can await it, sharing
   // the same CustomSyncLayer instance/in-flight cycle as the background jobs
   // below instead of racing a separate one.
-  const syncNow = useCallback(() => syncLayerRef.current!.sync(), []);
+  const syncNow = useCallback(() => sessionSync.sync(), []);
 
   useEffect(() => {
     // Trigger sync on mount

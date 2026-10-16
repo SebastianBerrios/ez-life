@@ -2,13 +2,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useRecurrenceEvaluator } from './useRecurrenceEvaluator';
 import { db } from '../../infrastructure/db/db';
-import { LocalProfileRepository } from '../../infrastructure/repositories/local/LocalProfileRepository';
 
 describe('useRecurrenceEvaluator', () => {
   const userId = 'user-1';
 
   beforeEach(async () => {
     await db.movements.clear();
+    await db.movement_recurrences.clear();
     await db.profiles.clear();
     await db.sync_queue.clear();
   });
@@ -18,7 +18,7 @@ describe('useRecurrenceEvaluator', () => {
     vi.useRealTimers();
   });
 
-  it('rolls back cloned movements when the profile update fails mid-transaction', async () => {
+  it('rolls back rules and occurrences when a write fails mid-transaction', async () => {
     // Only fake Date so IndexedDB's own internal scheduling (setTimeout/microtasks)
     // keeps running on real timers.
     vi.useFakeTimers({ toFake: ['Date'] });
@@ -44,9 +44,11 @@ describe('useRecurrenceEvaluator', () => {
       updated_at: lastMonthDate,
     });
 
-    const saveSpy = vi
-      .spyOn(LocalProfileRepository.prototype, 'save')
-      .mockRejectedValue(new Error('boom'));
+    const put = db.movements.put.bind(db.movements);
+    const saveSpy = vi.spyOn(db.movements, 'put').mockImplementation(data => {
+      if (data.id !== 'recurring-1') return Promise.reject(new Error('boom')) as ReturnType<typeof put>;
+      return put(data);
+    });
 
     renderHook(() => useRecurrenceEvaluator(userId));
 
@@ -62,5 +64,6 @@ describe('useRecurrenceEvaluator', () => {
     // in the same transaction was rolled back with the failed profile save.
     expect(movements).toHaveLength(1);
     expect(movements[0].id).toBe('recurring-1');
+    expect(await db.movement_recurrences.count()).toBe(0);
   });
 });

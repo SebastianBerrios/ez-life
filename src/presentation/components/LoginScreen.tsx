@@ -51,16 +51,13 @@ export default function LoginScreen() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="max-w-sm w-full space-y-8">
         {/* Brand */}
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-2">
-            <span className="text-3xl">🌿</span>
-          </div>
-          <h1 className="text-4xl font-extrabold text-foreground tracking-tight font-heading">ez-life</h1>
+        <div className="space-y-4">
+          <h1 className="text-5xl font-medium text-foreground tracking-tight font-heading">ez-life</h1>
           <p className="text-muted-foreground text-base">Tu finanzas, sin complicaciones.</p>
         </div>
 
         {/* OAuth buttons */}
-        <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-3">
+        <div className="border-t border-border pt-6 space-y-3">
           <p className="text-sm font-medium text-muted-foreground text-center mb-4">Continuar con</p>
 
           <button

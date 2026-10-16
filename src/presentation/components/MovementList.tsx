@@ -8,6 +8,9 @@ import { calculateMonthlyCycle } from '../../core/use-cases/calculateMonthlyCycl
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import MovementForm from './MovementForm';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { onLocalChanges } from '../../infrastructure/db/localChanges';
 
 interface Props {
   userId: string;
@@ -20,6 +23,8 @@ export default function MovementList({ userId }: Props) {
   const [categoryNameById, setCategoryNameById] = useState<Map<string, string>>(new Map());
   const [subcategoryNameById, setSubcategoryNameById] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<Movement | undefined>();
+  const [error, setError] = useState('');
 
   const loadMovements = useCallback(async () => {
     try {
@@ -54,16 +59,17 @@ export default function MovementList({ userId }: Props) {
 
   useEffect(() => {
     loadMovements();
+    return onLocalChanges(['movements', 'expense_categories', 'expense_subcategories'], loadMovements);
   }, [loadMovements]);
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('¿Seguro que deseas eliminar este movimiento?')) return;
     try {
       const repo = new LocalMovementRepository();
-      await repo.delete(id);
+      await repo.delete(id, userId);
       await loadMovements();
     } catch (err) {
-      console.error(err);
+      setError(err instanceof Error ? err.message : 'No se pudo eliminar.');
     }
   };
 
@@ -79,14 +85,18 @@ export default function MovementList({ userId }: Props) {
 
   if (movements.length === 0) {
     return (
-      <Card className="animate-fade-slide-up py-8 text-center shadow-warm-sm">
+      <Card className="animate-fade-slide-up py-8 text-center shadow-none">
         <p className="text-muted-foreground">No hay movimientos en este mes.</p>
       </Card>
     );
   }
 
   return (
-    <Card className="animate-fade-slide-up overflow-hidden py-0 shadow-warm-sm">
+    <Card className="animate-fade-slide-up overflow-hidden py-0 shadow-none">
+      {error && <p role="alert" className="text-destructive p-4">{error}</p>}
+      <Dialog open={Boolean(editing)} onOpenChange={open => { if (!open) setEditing(undefined); }}>
+        <DialogContent>{editing && <MovementForm userId={userId} movement={editing} onCancel={() => setEditing(undefined)} onComplete={() => { setEditing(undefined); loadMovements(); }} />}</DialogContent>
+      </Dialog>
       <ul className="divide-y divide-border">
         {movements.map(m => {
           const categoryName = m.expense_category_id ? (categoryNameById.get(m.expense_category_id) ?? NO_CATEGORY_LABEL) : NO_CATEGORY_LABEL;
@@ -95,23 +105,25 @@ export default function MovementList({ userId }: Props) {
           return (
           <li
             key={m.id}
-            className="flex items-center justify-between p-5 transition-colors hover:bg-muted"
+            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-muted"
           >
-            <div>
-              <p className="text-base font-medium text-foreground">{m.description || 'Sin descripción'}</p>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground break-words">{m.description || 'Sin descripción'}</p>
               <p className="text-sm text-muted-foreground">
                 {new Date(m.date).toLocaleDateString()} · {categoryName}{subcategoryName ? ` / ${subcategoryName}` : ''}
               </p>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               {m.is_adjustment && (
                 <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                   Ajuste
                 </span>
               )}
-              <span className={`text-base font-bold ${m.type === 'INCOME' ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'}`}>
+              <span className={`text-sm font-semibold tabular-nums ${m.type === 'INCOME' ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'}`}>
                 {m.type === 'INCOME' ? '+' : '-'} S/ {(m.amount / 100).toFixed(2)}
               </span>
+              {!m.is_linked && !m.shared_movement_id && !m.installment_payment_id && <>
+              <Button variant="ghost" size="sm" onClick={() => setEditing(m)}>Editar</Button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -120,6 +132,7 @@ export default function MovementList({ userId }: Props) {
               >
                 Eliminar
               </Button>
+              </>}
             </div>
           </li>
           );

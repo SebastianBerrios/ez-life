@@ -12,6 +12,7 @@ vi.mock('../../infrastructure/repositories/local/LocalMovementRepository');
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const echoSave = () => vi.fn().mockImplementation((data: any) => Promise.resolve({ ...data, created_at: new Date(), updated_at: new Date() }));
 
+const echoSaveSet = (save = echoSave()) => vi.fn((_userId: string, rows: unknown[]) => Promise.all(rows.map(row => save(row))));
 describe('OnboardingStep2', () => {
   it('seeds the 3 default buckets on first load and enables submit at 100%', async () => {
     const mockSave = echoSave();
@@ -19,7 +20,7 @@ describe('OnboardingStep2', () => {
     (LocalCategoryRepository as any).mockImplementation(function () {
       return {
         getDistributionCategories: vi.fn().mockResolvedValue([]),
-        saveDistributionCategory: mockSave,
+        saveDistributionSet: echoSaveSet(mockSave),
       };
     });
 
@@ -37,7 +38,7 @@ describe('OnboardingStep2', () => {
     (LocalCategoryRepository as any).mockImplementation(function () {
       return {
         getDistributionCategories: vi.fn().mockResolvedValue([]),
-        saveDistributionCategory: mockSave,
+        saveDistributionSet: echoSaveSet(mockSave),
       };
     });
 
@@ -60,7 +61,7 @@ describe('OnboardingStep2', () => {
     (LocalCategoryRepository as any).mockImplementation(function () {
       return {
         getDistributionCategories: vi.fn().mockResolvedValue([]),
-        saveDistributionCategory: mockSave,
+        saveDistributionSet: echoSaveSet(mockSave),
       };
     });
 
@@ -85,7 +86,7 @@ describe('OnboardingStep2', () => {
     (LocalCategoryRepository as any).mockImplementation(function () {
       return {
         getDistributionCategories: vi.fn().mockResolvedValue([]),
-        saveDistributionCategory: mockSave,
+        saveDistributionSet: echoSaveSet(mockSave),
       };
     });
 
@@ -109,7 +110,7 @@ describe('OnboardingStep2', () => {
         getDistributionCategories: vi.fn().mockResolvedValue([
           { id: 'only-bucket', user_id: 'fake-id', name: 'Único', percentage: 100, is_default: true, is_savings: false },
         ]),
-        saveDistributionCategory: echoSave(),
+        saveDistributionSet: echoSaveSet(),
         countExpenseCategoriesByDistribution: vi.fn().mockResolvedValue(0),
         deleteDistributionCategory: mockDelete,
       };
@@ -134,7 +135,7 @@ describe('OnboardingStep2', () => {
           { id: 'b1', user_id: 'fake-id', name: 'Necesidades', percentage: 50, is_default: true, is_savings: false },
           { id: 'b2', user_id: 'fake-id', name: 'Gustos', percentage: 50, is_default: true, is_savings: false },
         ]),
-        saveDistributionCategory: echoSave(),
+        saveDistributionSet: echoSaveSet(),
         countExpenseCategoriesByDistribution: vi.fn().mockResolvedValue(2),
         deleteDistributionCategory: mockDelete,
       };
@@ -159,7 +160,7 @@ describe('OnboardingStep2', () => {
           { id: 'b1', user_id: 'fake-id', name: 'Necesidades', percentage: 50, is_default: true, is_savings: false },
           { id: 'b2', user_id: 'fake-id', name: 'Ahorro', percentage: 50, is_default: true, is_savings: true },
         ]),
-        saveDistributionCategory: echoSave(),
+        saveDistributionSet: echoSaveSet(),
         countExpenseCategoriesByDistribution: vi.fn().mockResolvedValue(0),
         deleteDistributionCategory: mockDeleteCategory,
       };
@@ -186,7 +187,7 @@ describe('OnboardingStep2', () => {
     (LocalCategoryRepository as any).mockImplementation(function () {
       return {
         getDistributionCategories: vi.fn().mockResolvedValue([]),
-        saveDistributionCategory: echoSave(),
+        saveDistributionSet: echoSaveSet(),
       };
     });
 
@@ -209,7 +210,7 @@ describe('OnboardingStep2', () => {
     (LocalCategoryRepository as any).mockImplementation(function () {
       return {
         getDistributionCategories: vi.fn().mockResolvedValue([]),
-        saveDistributionCategory: echoSave(),
+        saveDistributionSet: echoSaveSet(),
       };
     });
 

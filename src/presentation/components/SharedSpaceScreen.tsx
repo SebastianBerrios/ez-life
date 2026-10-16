@@ -60,7 +60,7 @@ export default function SharedSpaceScreen({ userId, onCreate, onJoin, onAddMovem
 
   if (spaces.length === 0 && leftSpaces.length === 0) {
     return (
-      <Card className="animate-fade-slide-up py-8 text-center shadow-warm-sm space-y-4">
+      <Card className="animate-fade-slide-up py-8 text-center shadow-none space-y-4">
         <p className="text-muted-foreground px-5">
           Todavía no tenés un espacio compartido. Creá uno para tu pareja o familia, o unite a uno existente con un código.
         </p>
@@ -76,7 +76,7 @@ export default function SharedSpaceScreen({ userId, onCreate, onJoin, onAddMovem
     <div className="animate-fade-slide-up space-y-4">
       {spaces.map(space => (
         <div key={space.id} className="space-y-3">
-          <Card className="shadow-warm-sm px-5 py-4">
+          <Card className="shadow-none px-5 py-4">
             <div className="flex items-center justify-between">
               <h3 className="font-heading font-bold text-foreground">{space.name}</h3>
               <Button size="sm" onClick={() => onAddMovement(space.id, membersBySpace[space.id] ?? [])}>
@@ -94,7 +94,7 @@ export default function SharedSpaceScreen({ userId, onCreate, onJoin, onAddMovem
           <h3 className="font-heading text-sm font-medium text-muted-foreground">Espacios que abandonaste</h3>
           {leftSpaces.map(space => (
             <div key={space.id} className="space-y-2">
-              <Card className="shadow-warm-sm px-5 py-4">
+              <Card className="shadow-none px-5 py-4">
                 <h4 className="font-heading font-bold text-foreground">{space.name}</h4>
                 <p className="text-xs text-muted-foreground">Saldo congelado — ya no sos miembro de este espacio.</p>
               </Card>

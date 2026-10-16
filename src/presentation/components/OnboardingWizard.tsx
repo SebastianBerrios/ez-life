@@ -3,9 +3,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
 import { LocalMovementRepository } from '../../infrastructure/repositories/local/LocalMovementRepository';
+import { LocalOnboardingRepository } from '../../infrastructure/repositories/local/LocalOnboardingRepository';
 import { validateDeletion } from '../../core/use-cases/validateDeletion';
 import { DomainError } from '../../core/domain/errors/DomainError';
-import { DistributionCategory, ExpenseCategory, ExpenseSubcategory, UUID } from '../../core/domain/models/types';
+import { DistributionCategory, ExpenseCategory, ExpenseSubcategory } from '../../core/domain/models/types';
 import { uuidv7 } from 'uuidv7';
 import OnboardingStep1 from './OnboardingStep1';
 import OnboardingStep2 from './OnboardingStep2';
@@ -19,25 +20,12 @@ import { Button } from '@/components/ui/button';
 // ---------------------------------------------------------------------------
 // FR-023: the wizard's template must pre-load example categories in EVERY
 // bucket, including the savings one — not just the two spending buckets.
-const DEFAULT_CATEGORIES = [
-  { bucket: 'primary' as const, name: 'Alimentación', subcategories: ['Desayuno', 'Almuerzo', 'Cena', 'Snack'] },
-  { bucket: 'secondary' as const, name: 'Ocio', subcategories: ['Deporte', 'Cine', 'Fiesta', 'Restaurante'] },
-  { bucket: 'primary' as const, name: 'Transporte', subcategories: ['Combustible', 'Taxi/Uber', 'Transporte público'] },
-  { bucket: 'savings' as const, name: 'Ahorro', subcategories: ['Fondo de emergencia', 'Inversiones'] },
-];
 
 // Returns undefined per slot when no bucket exists yet for it, rather than
 // falling back to '' — an empty-string distribution_category_id used to
 // slip through as a "valid" id and only fail much later, at push time,
 // against Postgres's NOT NULL constraint (see repairDanglingExpenseCategories
 // for the historical rows this already produced).
-function pickSeedBuckets(buckets: DistributionCategory[]): { primary?: UUID; secondary?: UUID; savings?: UUID } {
-  const nonSavings = [...buckets].filter(b => !b.is_savings).sort((a, b) => b.percentage - a.percentage);
-  const primary = nonSavings[0]?.id ?? buckets[0]?.id;
-  const secondary = nonSavings[1]?.id ?? primary;
-  const savingsBucket = buckets.find(b => b.is_savings)?.id ?? primary;
-  return { primary, secondary, savings: savingsBucket };
-}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -45,6 +33,7 @@ function pickSeedBuckets(buckets: DistributionCategory[]): { primary?: UUID; sec
 interface Props {
   profileId: string;
   startStep?: 1 | 2 | 3;
+  mode?: 'setup' | 'settings';
   onComplete: (profileId: string) => void;
 }
 
@@ -157,27 +146,10 @@ function Step3Categories({
     if (seedStartedRef.current) return;
     seedStartedRef.current = true;
     const init = async () => {
-      const { cats, loadedBuckets } = await loadAll();
-      if (cats.length === 0 && loadedBuckets.length > 0) {
-        const seedBuckets = pickSeedBuckets(loadedBuckets);
-        for (const def of DEFAULT_CATEGORIES) {
-          const bucketId = seedBuckets[def.bucket];
-          if (!bucketId) continue; // no valid bucket yet — skip rather than seed a dangling category
-          const catId = uuidv7();
-          await catRepo.saveExpenseCategory({
-            id: catId,
-            user_id: profileId,
-            distribution_category_id: bucketId,
-            name: def.name,
-          });
-          for (const subName of def.subcategories) {
-            await catRepo.saveSubcategory({ id: uuidv7(), category_id: catId, name: subName });
-          }
-        }
-        await loadAll();
-      }
+      await catRepo.seedDefaults(profileId);
+      await loadAll();
     };
-    init();
+    init().catch(error => { setErrors(previous => ({ ...previous, seed: error instanceof Error ? error.message : 'No se pudieron preparar las categorías.' })); setLoading(false); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -185,7 +157,7 @@ function Step3Categories({
     const name = (newCatName[bucketId] || '').trim();
     if (!name) return;
     const catId = uuidv7();
-    await catRepo.saveExpenseCategory({ id: catId, user_id: profileId, distribution_category_id: bucketId, name });
+    await catRepo.saveExpenseCategory({ id: catId, user_id: profileId, distribution_category_id: bucketId, name }, ['General']);
     setNewCatName(prev => ({ ...prev, [bucketId]: '' }));
     setAddingCatFor(null);
     await loadAll();
@@ -246,7 +218,7 @@ function Step3Categories({
   };
 
   // "Finalizar" is enabled when at least 1 category with at least 1 subcategory exists
-  const canFinish = items.some(item => item.subcategories.length > 0);
+  const canFinish = items.length > 0 && items.every(item => item.subcategories.length > 0);
 
   if (loading) {
     return <div className="text-center py-8 text-muted-foreground">Cargando...</div>;
@@ -254,7 +226,8 @@ function Step3Categories({
 
   return (
     <div className="max-w-md mx-auto px-4 space-y-4">
-      <div className="bg-card border border-border rounded-2xl shadow-warm-md p-6 space-y-5">
+      <div className="bg-card border border-border rounded-xl shadow-none p-6 space-y-5">
+        {errors.seed && <p role="alert" className="text-destructive">{errors.seed}</p>}
         <div>
           <h2 className="text-2xl font-bold text-foreground font-heading">Categorías de gasto</h2>
           <p className="text-sm text-muted-foreground mt-1">
@@ -403,7 +376,7 @@ function Step3Categories({
 // ---------------------------------------------------------------------------
 // Main wizard component
 // ---------------------------------------------------------------------------
-export default function OnboardingWizard({ profileId, startStep = 1, onComplete }: Props) {
+export default function OnboardingWizard({ profileId, startStep = 1, mode = 'setup', onComplete }: Props) {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(startStep);
   const [wizardProfileId, setWizardProfileId] = useState<string>(profileId);
 
@@ -412,17 +385,19 @@ export default function OnboardingWizard({ profileId, startStep = 1, onComplete 
     setCurrentStep(2);
   };
 
-  const handleStep2Complete = () => {
+  const handleStep2Complete = async () => {
     // Entered directly to edit distribution (e.g. from Settings) — return
     // right away instead of dragging the user into category management too.
-    if (startStep === 2) {
+    if (mode === 'settings') {
       onComplete(wizardProfileId);
       return;
     }
+    await new LocalOnboardingRepository().completeStep(wizardProfileId, 2);
     setCurrentStep(3);
   };
 
-  const handleStep3Complete = () => {
+  const handleStep3Complete = async () => {
+    if (mode === 'setup') await new LocalOnboardingRepository().completeStep(wizardProfileId, 3);
     onComplete(wizardProfileId);
   };
 
@@ -430,7 +405,7 @@ export default function OnboardingWizard({ profileId, startStep = 1, onComplete 
     <div className="min-h-screen bg-background flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md mb-2">
         <div className="flex items-center justify-center gap-2 mb-6">
-          <span className="text-3xl">🌿</span>
+
           <h1 className="text-2xl font-extrabold text-foreground tracking-tight font-heading">ez-life</h1>
         </div>
         <ProgressBar currentStep={currentStep} />

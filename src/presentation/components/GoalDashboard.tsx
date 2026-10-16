@@ -43,7 +43,7 @@ export default function GoalDashboard({ userId }: Props) {
 
   if (goals.length === 0) {
     return (
-      <Card className="animate-fade-slide-up py-8 text-center shadow-warm-sm">
+      <Card className="animate-fade-slide-up py-8 text-center shadow-none">
         <p className="text-muted-foreground">No tenés metas registradas.</p>
       </Card>
     );
@@ -59,7 +59,7 @@ export default function GoalDashboard({ userId }: Props) {
         const progressPercent = Math.round(progress * 100);
 
         return (
-          <Card key={goal.id} className="shadow-warm-sm px-4 py-3 space-y-2">
+          <Card key={goal.id} className="shadow-none px-4 py-3 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-foreground">{goal.name}</span>
               <span className="text-sm text-muted-foreground">{current} / {target}</span>

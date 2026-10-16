@@ -86,7 +86,7 @@ export default function DebtList({ userId }: Props) {
 
   if (debts.length === 0) {
     return (
-      <Card className="animate-fade-slide-up py-8 text-center shadow-warm-sm">
+      <Card className="animate-fade-slide-up py-8 text-center shadow-none">
         <p className="text-muted-foreground">No tenés préstamos registrados.</p>
       </Card>
     );
@@ -100,7 +100,7 @@ export default function DebtList({ userId }: Props) {
         const directionLabel = debt.direction === 'lent' ? 'Le prestaste a' : 'Te prestó';
 
         return (
-          <Card key={debt.id} className="relative shadow-warm-sm">
+          <Card key={debt.id} className="relative shadow-none">
             <div className="flex items-start justify-between px-5">
               <div>
                 <h3 className="font-heading font-bold text-foreground">

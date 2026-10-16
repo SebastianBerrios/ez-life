@@ -9,6 +9,9 @@ import { emitSyncCompleted } from '../../infrastructure/sync/syncEvents';
 vi.mock('../../infrastructure/repositories/local/LocalMovementRepository');
 vi.mock('../../infrastructure/repositories/local/LocalCategoryRepository');
 vi.mock('../../infrastructure/repositories/local/LocalDebtRepository');
+vi.mock('../../infrastructure/repositories/local/LocalIncomeSourceRepository', () => ({
+  LocalIncomeSourceRepository: vi.fn(function () { return { getAll: vi.fn().mockResolvedValue([{ id: 'salary', amount: 10000 }]) }; }),
+}));
 
 // Dashboard fetches the current cycle AND the previous cycle (FR-003) — this
 // mock picks which array to return based on the requested cycle's month, so

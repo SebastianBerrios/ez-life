@@ -78,6 +78,7 @@ export default function GoalForm({ userId, existing, onComplete, onCancel }: Pro
           <Input type="text" id="goalName" required value={name} onChange={(e) => setName(e.target.value)} />
         </div>
 
+        <details open={Boolean(existing?.description)} className="border-t border-border pt-2"><summary className="text-sm font-medium">Opciones adicionales</summary><div className="space-y-4 pt-3">
         <div className="space-y-2">
           <Label htmlFor="goalDescription">Descripción (opcional)</Label>
           <Input
@@ -88,6 +89,8 @@ export default function GoalForm({ userId, existing, onComplete, onCancel }: Pro
             onChange={(e) => setDescription(e.target.value)}
           />
         </div>
+
+        </div></details>
 
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium">Tipo</legend>

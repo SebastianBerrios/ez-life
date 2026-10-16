@@ -12,14 +12,15 @@ const ALL_ROUTE_IDS = [
   'shared-space',
   'control',
   'create',
+  'progress',
   'settings',
 ];
 
 describe('BottomNav grouping (FR-001, FR-003)', () => {
   it('splits the 9 destinations into a primary group of at most 4, with the rest in overflow', () => {
-    expect(navItems).toHaveLength(9);
+    expect(navItems).toHaveLength(10);
     expect(primaryNavItems.length).toBeLessThanOrEqual(4);
-    expect(primaryNavItems.length + overflowNavItems.length).toBe(9);
+    expect(primaryNavItems.length + overflowNavItems.length).toBe(10);
   });
 
   it('keeps every original route id reachable from primary or overflow, none lost, none duplicated', () => {

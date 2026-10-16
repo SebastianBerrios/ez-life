@@ -1,4 +1,6 @@
 'use client';
+import PersonalProgress from './PersonalProgress';
+import { usePersonalProgress } from '../hooks/usePersonalProgress';
 
 import React, { useState } from 'react';
 import LoginScreen from './LoginScreen';
@@ -33,17 +35,15 @@ import { useSyncManager } from '../hooks/useSyncManager';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useNotificationEvaluator } from '../hooks/useNotificationEvaluator';
 import { useTaskRecurrenceEvaluator } from '../hooks/useTaskRecurrenceEvaluator';
-import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
-import { repairOrphanedLocalRows } from '../../infrastructure/sync/repairOrphanedRows';
-import { mergeDuplicateCategories } from '../../infrastructure/sync/mergeDuplicateCategories';
-import { repairDanglingExpenseCategories } from '../../infrastructure/sync/repairDanglingExpenseCategories';
+import { observeAccountSession } from '../../infrastructure/auth/observeAccountSession';
+import { forgetLocalAccount } from '../../infrastructure/auth/localAccount';
 
 // Shared chrome for the app's dialogs (movement form, goal form,
 // notification history) — always centered on the viewport, never a
 // bottom sheet, with a single padding layer (the form/list content
 // inside renders chrome-less so it doesn't double up with this).
 const SHEET_DIALOG_CONTENT_CLASS =
-  'bg-card max-w-md rounded-2xl border border-border p-5 shadow-xl max-h-[85vh] overflow-y-auto sm:p-6';
+  'bg-card max-w-md rounded-xl border border-border p-5 shadow-xl max-h-[85vh] overflow-y-auto sm:p-6';
 
 // FR-004: per-page browser tab titles. The app has a single real Next.js
 // route (`src/app/page.tsx`) — every "page" below is client-side routing
@@ -51,6 +51,7 @@ const SHEET_DIALOG_CONTENT_CLASS =
 // `generateMetadata` can't produce a per-page title (research.md §1). This
 // mutates `document.title` directly instead, keyed off `currentRoute`.
 const routeTitles: Record<string, string> = {
+  progress: 'Mi progreso',
   dashboard: 'Resumen',
   movements: 'Historial',
   analysis: 'Análisis',
@@ -65,6 +66,7 @@ const routeTitles: Record<string, string> = {
 export default function MainFlow() {
   const [step, setStep] = useState<'loading' | 'login' | 'onboarding-wizard' | 'app'>('loading');
   const [wizardStartStep, setWizardStartStep] = useState<1 | 2 | 3>(1);
+  const [wizardMode, setWizardMode] = useState<'setup' | 'settings'>('setup');
   const [currentRoute, setCurrentRoute] = useState('dashboard');
   const [profileId, setProfileId] = useState<string | null>(null);
   const [showMoreDrawer, setShowMoreDrawer] = useState(false);
@@ -96,7 +98,8 @@ export default function MainFlow() {
   // Background Jobs
   useRecurrenceEvaluator(profileId);
   const { syncNow } = useSyncManager();
-  useNotificationEvaluator(profileId);
+  const celebration = useNotificationEvaluator(profileId);
+  const progress = usePersonalProgress(profileId ?? '');
   useTaskRecurrenceEvaluator(profileId);
   const isOnline = useOnlineStatus();
 
@@ -106,101 +109,19 @@ export default function MainFlow() {
       : 'ez-life';
   }, [currentRoute]);
 
-  React.useEffect(() => {
-    import('../../infrastructure/supabase/client').then(({ getSupabaseBrowserClient }) => {
-      const supabase = getSupabaseBrowserClient();
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const checkSessionAndCategories = async (session: any) => {
-        if (session?.user) {
-          const userId = session.user.id;
-          setProfileId(userId);
-          // Read avatar from OAuth metadata (Google / GitHub)
-          const avatar = session.user.user_metadata?.avatar_url as string | undefined;
-          setAvatarUrl(avatar);
-
-          // Explicit, app-triggered enrollment (never a trigger on
-          // auth.users, never a client-side insert) — this is what actually
-          // makes this authenticated session an ez-life *member*, not just
-          // an authenticated mvp-lab fleet user (Principio IX). Idempotent
-          // server-side; best-effort here since it needs connectivity and
-          // must never block offline-first local usage if it fails.
-          supabase.rpc('enroll_self').then(({ error }: { error: unknown }) => {
-            if (error) console.error('enroll_self failed:', error);
-          });
-
-          try {
-            // Repair any local rows orphaned by the old onboarding bug (a
-            // stale random user_id instead of the real session id) BEFORE
-            // deciding whether this device needs the wizard — otherwise
-            // already-completed onboarding data stays invisible to this
-            // check forever. Then wait for the initial pull to actually
-            // finish before reading local state, so a genuinely new device
-            // gets a chance to receive existing data first instead of the
-            // wizard being triggered from a still-empty local DB.
-            await repairOrphanedLocalRows(userId);
-            await syncNow();
-
-            // Merge duplicate default categories left over from repeated
-            // onboarding runs across devices/sessions while sync was broken
-            // (see repairOrphanedLocalRows above) — after the pull above, so
-            // it sees whatever the server already has. Then, on the
-            // now-consolidated bucket set, repair any expense category whose
-            // distribution_category_id is missing/dangling (a separate
-            // historical seeding bug — same root cause: it never used to
-            // reach Supabase, so nothing caught it). Sync once more so both
-            // corrections push out right away.
-            await mergeDuplicateCategories(userId);
-            await repairDanglingExpenseCategories(userId);
-            await syncNow();
-
-            const catRepo = new LocalCategoryRepository();
-            const cats = await catRepo.getDistributionCategories(userId);
-            const expCats = await catRepo.getExpenseCategories(userId);
-
-            if (cats.length === 0) {
-              setWizardStartStep(1);
-              setStep('onboarding-wizard');
-            } else if (expCats.length === 0) {
-              setWizardStartStep(3);
-              setStep('onboarding-wizard');
-            } else {
-              setStep('app');
-            }
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          } catch (_e) {
-            setStep('app');
-          }
-        } else {
-          setProfileId(null);
-          setAvatarUrl(undefined);
-          setStep('login');
-        }
-      };
-
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        checkSessionAndCategories(session);
-      });
-
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        if (session?.user) {
-          checkSessionAndCategories(session);
-        } else {
-          setProfileId(null);
-          setAvatarUrl(undefined);
-          setStep('login');
-        }
-      });
-
-      return () => subscription.unsubscribe();
-    });
-  }, [syncNow]);
+  React.useEffect(() => observeAccountSession(syncNow, state => {
+    setProfileId(state.account?.id ?? null);
+    setAvatarUrl(state.account?.avatarUrl);
+    setWizardStartStep(state.startStep);
+    setWizardMode('setup');
+    setStep(!state.account ? 'login' : state.completed ? 'app' : 'onboarding-wizard');
+  }), [syncNow]);
 
   if (step === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
-          <span className="text-4xl animate-pulse">🌿</span>
+
           <p className="text-muted-foreground text-sm">Cargando...</p>
         </div>
       </div>
@@ -211,26 +132,12 @@ export default function MainFlow() {
     return <LoginScreen />;
   }
 
-  if (step === 'onboarding-wizard' && !isOnline) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background px-4">
-        <div className="max-w-sm w-full bg-destructive/10 border border-destructive/20 rounded-2xl p-6 text-center space-y-2">
-          <p className="text-base font-medium text-destructive">
-            Necesitás conexión a internet para completar la configuración inicial.
-          </p>
-          <p className="text-sm text-destructive">
-            Tu progreso está guardado — apenas vuelva la conexión podés continuar donde quedaste.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   if (step === 'onboarding-wizard') {
     return (
       <OnboardingWizard
         profileId={profileId ?? ''}
         startStep={wizardStartStep}
+        mode={wizardMode}
         onComplete={(finalProfileId) => {
           setProfileId(finalProfileId);
           setStep('app');
@@ -242,33 +149,35 @@ export default function MainFlow() {
   // App Shell
   return (
     <Layout
+      gamificationEnabled={progress.visible}
       currentRoute={currentRoute}
       onNavigate={setCurrentRoute}
       onOpenMore={() => setShowMoreDrawer(true)}
       onNewMovement={() => setShowMovementForm(true)}
       avatarUrl={avatarUrl}
-      onLogout={() => setStep('login')}
+      onLogout={() => { forgetLocalAccount(); setProfileId(null); setAvatarUrl(undefined); setStep('login'); }}
       onOpenNotifications={() => setShowNotifications(true)}
     >
       <MoreDrawer
-        overflowNavItems={overflowNavItems}
+        overflowNavItems={overflowNavItems.filter(item => item.id !== 'progress' || progress.visible)}
         currentRoute={currentRoute}
         onNavigate={setCurrentRoute}
         open={showMoreDrawer}
         onOpenChange={setShowMoreDrawer}
       />
       <div className="p-5 space-y-6">
+        {!isOnline && <p role="status" className="text-sm text-muted-foreground">Sin conexión · tus cambios se guardan en este dispositivo.</p>}
         {/* Mobile header */}
         <header className="flex justify-between items-center py-2 md:hidden">
           <div className="flex items-center gap-2">
-            <span className="text-xl">🌿</span>
+
             <h1 className="text-2xl font-extrabold text-foreground tracking-tight font-heading">ez-life</h1>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowNotifications(true)}
               aria-label="Ver notificaciones"
-              className="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-muted text-muted-foreground transition-colors"
+              className="h-11 w-11 flex items-center justify-center rounded-lg hover:bg-muted text-muted-foreground transition-colors"
             >
               <Bell className="w-4 h-4" />
             </button>
@@ -288,8 +197,13 @@ export default function MainFlow() {
         </header>
 
         {currentRoute === 'dashboard' && profileId && (
-          <Dashboard userId={profileId} />
+          <Dashboard userId={profileId} onOpenProgress={() => setCurrentRoute('progress')} />
         )}
+
+        {currentRoute === 'progress' && profileId && <PersonalProgress userId={profileId} />}
+        {celebration && progress.visible && <div role="status" className="fixed top-4 left-4 right-4 md:left-auto md:w-80 z-50 bg-card border border-border rounded-xl p-4">
+          <p className="text-sm font-semibold">Un nuevo logro personal</p><button className="text-sm text-primary min-h-11" onClick={() => setCurrentRoute('progress')}>Ver mi progreso</button>
+        </div>}
 
         {currentRoute === 'movements' && profileId && (
           <div className="space-y-4">
@@ -323,9 +237,9 @@ export default function MainFlow() {
 
         {currentRoute === 'debts' && profileId && (
           <div className="space-y-4">
-            <div className="flex justify-between items-center gap-2">
+            <div className="flex flex-wrap justify-between items-center gap-3">
               <h2 className="text-xl font-bold text-foreground">Préstamos</h2>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" onClick={() => setShowInstallmentLoanForm(true)}>
                   + Con cuotas
                 </Button>
@@ -385,9 +299,9 @@ export default function MainFlow() {
         {currentRoute === 'settings' && profileId && (
           <SettingsScreen
             userId={profileId}
-            onEditDistribution={() => { setWizardStartStep(2); setStep('onboarding-wizard'); }}
-            onEditCategories={() => { setWizardStartStep(3); setStep('onboarding-wizard'); }}
-            onLogout={() => setStep('login')}
+            onEditDistribution={() => { setWizardMode('settings'); setWizardStartStep(2); setStep('onboarding-wizard'); }}
+            onEditCategories={() => { setWizardMode('settings'); setWizardStartStep(3); setStep('onboarding-wizard'); }}
+            onLogout={() => { forgetLocalAccount(); setProfileId(null); setAvatarUrl(undefined); setStep('login'); }}
           />
         )}
       </div>
@@ -399,7 +313,7 @@ export default function MainFlow() {
             <button
               onClick={() => setShowMovementForm(true)}
               aria-label="Registrar nuevo movimiento"
-              className="bg-primary text-primary-foreground w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:bg-primary/90 transition-colors active:scale-95"
+              className="bg-primary text-primary-foreground w-14 h-14 rounded-full flex items-center justify-center shadow-none hover:bg-primary/90 transition-colors active:scale-95"
             >
               <span className="text-2xl font-light leading-none">+</span>
             </button>

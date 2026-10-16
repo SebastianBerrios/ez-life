@@ -3,12 +3,15 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { LocalNotificationRepository } from '../../infrastructure/repositories/local/LocalNotificationRepository';
 import { Notification, NotificationType } from '../../core/domain/models/types';
+import { LocalProfileRepository } from '../../infrastructure/repositories/local/LocalProfileRepository';
+import { onLocalChanges } from '../../infrastructure/db/localChanges';
 import { Button } from '@/components/ui/button';
 import { X, BellOff, PiggyBank, Trophy, Bell, HandCoins, Users, Flame, AlertTriangle, CalendarClock, type LucideIcon } from 'lucide-react';
 
 // One icon per notification type (Principio XI: a single pipeline, so every
 // type this app will ever raise gets a home here, not a parallel display).
 const NOTIFICATION_ICONS: Record<NotificationType, LucideIcon> = {
+  achievement_unlocked: Trophy,
   budget_over_80: PiggyBank,
   goal_completed: Trophy,
   daily_reminder: Bell,
@@ -32,7 +35,8 @@ export default function NotificationHistory({ userId, onClose }: Props) {
     try {
       const repo = new LocalNotificationRepository();
       const data = await repo.getAllByUser(userId);
-      setNotifications(data);
+      const profile = await new LocalProfileRepository().get(userId);
+      setNotifications(profile?.gamification_enabled === false ? data.filter(n => n.type !== 'achievement_unlocked') : data);
     } catch (err) {
       console.error(err);
     } finally {
@@ -42,6 +46,7 @@ export default function NotificationHistory({ userId, onClose }: Props) {
 
   useEffect(() => {
     loadNotifications();
+    return onLocalChanges(['profiles', 'notifications'], loadNotifications);
   }, [loadNotifications]);
 
   const handleMarkRead = async (id: string) => {

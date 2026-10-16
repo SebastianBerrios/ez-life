@@ -1,5 +1,9 @@
-import { useEffect } from 'react';
+import { LocalAchievementRepository } from '../../infrastructure/repositories/local/LocalAchievementRepository';
+import { onLocalChanges } from '../../infrastructure/db/localChanges';
+import { onSyncCompleted } from '../../infrastructure/sync/syncEvents';
+import { useEffect, useState } from 'react';
 import { LocalProfileRepository } from '../../infrastructure/repositories/local/LocalProfileRepository';
+import { LocalIncomeSourceRepository } from '../../infrastructure/repositories/local/LocalIncomeSourceRepository';
 import { LocalMovementRepository } from '../../infrastructure/repositories/local/LocalMovementRepository';
 import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
 import { LocalSavingsGoalRepository } from '../../infrastructure/repositories/local/LocalSavingsGoalRepository';
@@ -29,6 +33,7 @@ const EVALUATION_INTERVAL_MS = 5 * 60 * 1000;
  * the session, so a single mount-time check isn't enough.
  */
 export function useNotificationEvaluator(userId: string | null) {
+  const [celebration, setCelebration] = useState<{ userId: string; count: number } | null>(null);
   useEffect(() => {
     if (!userId) return;
 
@@ -44,6 +49,16 @@ export function useNotificationEvaluator(userId: string | null) {
     const goalRepoGeneric = new LocalGoalRepository();
     const taskRepo = new LocalTaskRepository();
 
+    let active = true;
+    const runProgress = async () => {
+      try {
+        const ids = await new LocalAchievementRepository().reconcile(userId);
+        if (active && ids.length) setCelebration({ userId, count: ids.length });
+      } catch (error) { console.error('Error evaluating achievements:', error); }
+    };
+    const unsubscribeProgress = onLocalChanges(['movements', 'tasks', 'goals', 'habits', 'habit_completions', 'savings_goals', 'profiles'], runProgress);
+    const unsubscribeSync = onSyncCompleted(runProgress);
+    void runProgress();
     const run = async () => {
       try {
         const profile = await profileRepo.get(userId);
@@ -87,9 +102,8 @@ export function useNotificationEvaluator(userId: string | null) {
         const goals = await goalRepoGeneric.getAll(userId);
         const tasks = await taskRepo.getAll(userId);
 
-        const totalIncome = cycleMovements
-          .filter(m => m.type === 'INCOME')
-          .reduce((acc, m) => acc + m.amount, 0);
+        const sources = await new LocalIncomeSourceRepository().getAll(userId);
+        const totalIncome = sources.reduce((total, source) => total + source.amount, 0);
 
         const budgetedCategories = calculateBudgets(totalIncome, distributionCategories);
         const spentByBucketId = calculateSpentByBucket(cycleMovements, distributionCategories);
@@ -133,8 +147,14 @@ export function useNotificationEvaluator(userId: string | null) {
     };
 
     run();
-    const interval = setInterval(run, EVALUATION_INTERVAL_MS);
+    const interval = setInterval(() => { void run(); void runProgress(); }, EVALUATION_INTERVAL_MS);
 
-    return () => clearInterval(interval);
+    return () => { active = false; clearInterval(interval); unsubscribeProgress(); unsubscribeSync(); };
   }, [userId]);
+  useEffect(() => {
+    if (!celebration) return;
+    const timer = setTimeout(() => setCelebration(null), 5000);
+    return () => clearTimeout(timer);
+  }, [celebration]);
+  return celebration?.userId === userId ? celebration : null;
 }

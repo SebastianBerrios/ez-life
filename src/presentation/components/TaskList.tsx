@@ -81,7 +81,7 @@ export default function TaskList({ userId }: Props) {
 
   if (tasks.length === 0) {
     return (
-      <Card className="animate-fade-slide-up py-8 text-center shadow-warm-sm">
+      <Card className="animate-fade-slide-up py-8 text-center shadow-none">
         <p className="text-muted-foreground">No tenés tareas pendientes.</p>
       </Card>
     );
@@ -93,7 +93,7 @@ export default function TaskList({ userId }: Props) {
         .slice()
         .sort((a, b) => a.due_date.getTime() - b.due_date.getTime())
         .map(task => (
-          <Card key={task.id} className="shadow-warm-sm px-5 py-3 flex items-center justify-between">
+          <Card key={task.id} className="shadow-none px-5 py-3 flex items-center justify-between">
             <div>
               <p className="font-medium text-foreground">{task.title}</p>
               <p className="text-xs text-muted-foreground">Vence: {new Date(task.due_date).toLocaleDateString()}</p>

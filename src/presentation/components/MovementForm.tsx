@@ -1,13 +1,16 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { LocalMovementRepository } from '../../infrastructure/repositories/local/LocalMovementRepository';
 import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
 import { LocalSavingsGoalRepository } from '../../infrastructure/repositories/local/LocalSavingsGoalRepository';
+import { LocalIncomeSourceRepository } from '../../infrastructure/repositories/local/LocalIncomeSourceRepository';
+import { parseMoney } from '../../core/use-cases/parseMoney';
+import { calendarKey, parseCalendarDate } from '../../core/use-cases/calendar';
 import { validateMovementAmount } from '../../core/use-cases/validateMovementAmount';
 import { validateBalanceAdjustment } from '../../core/use-cases/validateBalanceAdjustment';
 import { DomainError } from '../../core/domain/errors/DomainError';
-import { DistributionCategory, ExpenseCategory, ExpenseSubcategory, SavingsGoal } from '../../core/domain/models/types';
+import { DistributionCategory, ExpenseCategory, ExpenseSubcategory, SavingsGoal, Movement, IncomeSource } from '../../core/domain/models/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,29 +22,34 @@ interface Props {
   userId: string;
   onComplete: () => void;
   onCancel: () => void;
+  movement?: Movement;
 }
 
-export default function MovementForm({ userId, onComplete, onCancel }: Props) {
-  const [type, setType] = useState<'EXPENSE' | 'INCOME'>('EXPENSE');
-  const [amount, setAmount] = useState<string>('');
-  const [description, setDescription] = useState<string>('');
+export default function MovementForm({ userId, onComplete, onCancel, movement }: Props) {
+  const [type, setType] = useState<'EXPENSE' | 'INCOME'>(movement?.type ?? 'EXPENSE');
+  const [amount, setAmount] = useState<string>(movement ? (movement.amount / 100).toFixed(2) : '');
+  const [description, setDescription] = useState<string>(movement?.description ?? '');
+  const [date, setDate] = useState(calendarKey(movement?.date ?? new Date()));
+  const [incomeSourceId, setIncomeSourceId] = useState(movement?.income_source_id ?? '');
+  const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([]);
+  const submitting = useRef(false);
 
   // Distribution category (bucket) — filters which expense categories are selectable below.
-  const [distCategoryId, setDistCategoryId] = useState<string>('');
+  const [distCategoryId, setDistCategoryId] = useState<string>(movement?.distribution_category_id ?? '');
   const [distCategories, setDistCategories] = useState<DistributionCategory[]>([]);
 
   // Expense category + subcategory
-  const [expenseCategoryId, setExpenseCategoryId] = useState<string>('');
+  const [expenseCategoryId, setExpenseCategoryId] = useState<string>(movement?.expense_category_id ?? '');
   const [allExpenseCategories, setAllExpenseCategories] = useState<ExpenseCategory[]>([]);
-  const [expenseSubcategoryId, setExpenseSubcategoryId] = useState<string>('');
+  const [expenseSubcategoryId, setExpenseSubcategoryId] = useState<string>(movement?.expense_subcategory_id ?? '');
   const [subcategoriesByCategory, setSubcategoriesByCategory] = useState<Record<string, ExpenseSubcategory[]>>({});
 
   // Savings goal
-  const [savingsGoalId, setSavingsGoalId] = useState<string>('');
+  const [savingsGoalId, setSavingsGoalId] = useState<string>(movement?.savings_goal_id ?? '');
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
 
-  const [isRecurring, setIsRecurring] = useState(false);
-  const [isAdjustment, setIsAdjustment] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(movement?.is_recurring ?? false);
+  const [isAdjustment, setIsAdjustment] = useState(movement?.is_adjustment ?? false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [amountError, setAmountError] = useState<string | null>(null);
@@ -55,10 +63,11 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
       const catRepo = new LocalCategoryRepository();
       const goalRepo = new LocalSavingsGoalRepository();
 
-      const [cats, expCats, goals] = await Promise.all([
+      const [cats, expCats, goals, sources] = await Promise.all([
         catRepo.getDistributionCategories(userId),
         catRepo.getExpenseCategories(userId),
         goalRepo.getAll(userId),
+        new LocalIncomeSourceRepository().getAll(userId),
       ]);
 
       const subsEntries = await Promise.all(
@@ -74,15 +83,17 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
       setAllExpenseCategories(selectableCats);
       setSubcategoriesByCategory(subsMap);
       setSavingsGoals(goals);
+      setIncomeSources(sources);
+      if (!movement?.income_source_id) setIncomeSourceId(sources[0]?.id ?? '');
 
-      const firstBucket = cats[0];
-      if (firstBucket) setDistCategoryId(firstBucket.id);
+      const firstBucket = cats.find(c => c.id === movement?.distribution_category_id) ?? cats[0];
+      if (firstBucket && !movement) setDistCategoryId(firstBucket.id);
       const firstCategoryInBucket = selectableCats.find(c => c.distribution_category_id === firstBucket?.id);
-      if (firstCategoryInBucket) setExpenseCategoryId(firstCategoryInBucket.id);
+      if (firstCategoryInBucket && !movement) setExpenseCategoryId(firstCategoryInBucket.id);
       setDataLoaded(true);
     };
     loadData();
-  }, [userId]);
+  }, [userId, movement]);
 
   const expenseCategories = useMemo(
     () => allExpenseCategories.filter(c => c.distribution_category_id === distCategoryId),
@@ -99,6 +110,7 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
     const nextCategories = allExpenseCategories.filter(c => c.distribution_category_id === id);
     setExpenseCategoryId(nextCategories[0]?.id ?? '');
     setExpenseSubcategoryId('');
+    setSavingsGoalId('');
   };
 
   const handleExpenseCategoryChange = (id: string) => {
@@ -108,10 +120,13 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current) return;
 
-    const amountInCents = Math.round(parseFloat(amount.replace(/,/g, '')) * 100);
+    let amountInCents: number;
     try {
+      amountInCents = parseMoney(amount);
       validateMovementAmount(amountInCents);
+      parseCalendarDate(date);
     } catch (err) {
       if (err instanceof DomainError) {
         setAmountError(err.message);
@@ -143,30 +158,33 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
     }
     setAdjustmentError(null);
 
+    submitting.current = true;
     setIsSubmitting(true);
 
     try {
       const repo = new LocalMovementRepository();
 
       await repo.save({
-        id: '',
+        id: movement?.id ?? '',
         user_id: userId,
         type,
         amount: amountInCents,
-        date: new Date(),
+        date: parseCalendarDate(date),
         description,
         distribution_category_id: distributionCategoryId,
         expense_category_id: expenseCategoryIdToSave,
         expense_subcategory_id: expenseSubcategoryIdToSave,
-        savings_goal_id: !isAdjustment && type === 'EXPENSE' && savingsGoalId ? savingsGoalId : undefined,
+        income_source_id: !isAdjustment && type === 'INCOME' ? incomeSourceId || undefined : undefined,
+        savings_goal_id: !isAdjustment && type === 'EXPENSE' && selectedBucket?.is_savings && savingsGoalId ? savingsGoalId : undefined,
         is_recurring: isRecurring,
         is_adjustment: isAdjustment,
       });
 
       onComplete();
     } catch (err) {
-      console.error(err);
+      setAmountError(err instanceof Error ? err.message : 'No se pudo guardar el movimiento.');
     } finally {
+      submitting.current = false;
       setIsSubmitting(false);
     }
   };
@@ -180,8 +198,20 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
 
   return (
     <div className="w-full">
-      <h2 className="mb-4 font-heading text-base leading-none font-medium">Registrar Movimiento</h2>
+      <h2 className="mb-4 font-heading text-base leading-none font-medium">{movement ? 'Editar Movimiento' : 'Registrar Movimiento'}</h2>
       <form onSubmit={handleSubmit} data-testid="movement-form" className="space-y-5">
+          <div className="space-y-2">
+            <Label htmlFor="movement-date">Fecha</Label>
+            <Input id="movement-date" type="date" required value={date} onChange={e => setDate(e.target.value)} />
+          </div>
+          {type === 'INCOME' && !isAdjustment && <div className="space-y-2">
+            <Label htmlFor="income-source">Fuente de ingreso</Label>
+            <Select value={incomeSourceId} onValueChange={value => setIncomeSourceId(value ?? '')} required>
+              <SelectTrigger id="income-source"><SelectValue placeholder="Seleccionar fuente" /></SelectTrigger>
+              <SelectContent>{incomeSources.map(source => <SelectItem key={source.id} value={source.id}>{source.name}</SelectItem>)}</SelectContent>
+            </Select>
+            {dataLoaded && incomeSources.length === 0 && <p className="text-sm text-muted-foreground">Agregá una fuente de ingreso desde Ajustes.</p>}
+          </div>}
           {/* Type toggle — visual tab style */}
           <div className="space-y-2">
             <Label>Tipo</Label>
@@ -191,22 +221,22 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
                 onClick={() => setType('EXPENSE')}
                 className={`h-11 px-3 rounded-lg text-base font-medium transition-colors ${
                   type === 'EXPENSE'
-                    ? 'bg-card text-foreground shadow-sm'
+                    ? 'bg-card text-foreground shadow-none'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                💸 Gasto
+                Gasto
               </button>
               <button
                 type="button"
                 onClick={() => setType('INCOME')}
                 className={`h-11 px-3 rounded-lg text-base font-medium transition-colors ${
                   type === 'INCOME'
-                    ? 'bg-card text-foreground shadow-sm'
+                    ? 'bg-card text-foreground shadow-none'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                💰 Ingreso
+                Ingreso
               </button>
             </div>
           </div>
@@ -308,7 +338,7 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
           {showSavingsGoal && dataLoaded && (
             <div className="space-y-2">
               <Label htmlFor="savingsGoal">Meta de Ahorro (Opcional)</Label>
-              <Select value={savingsGoalId} onValueChange={(val) => setSavingsGoalId(val || '')}>
+              <Select value={savingsGoalId} onValueChange={(val) => setSavingsGoalId(val === 'unassigned' ? '' : val || '')}>
                 <SelectTrigger id="savingsGoal">
                   <SelectValue placeholder="— Sin asignar —" />
                 </SelectTrigger>
@@ -361,6 +391,9 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
             )}
           </div>
 
+          <details open={isAdjustment || Boolean(movement?.description || movement?.is_recurring)} className="border-t border-border pt-2">
+            <summary className="text-sm font-medium">{isAdjustment ? 'Motivo obligatorio del ajuste' : 'Opciones adicionales'}</summary>
+            <div className="space-y-4 pt-3">
           {/* Description — mandatory motive when isAdjustment is active (FR-002) */}
           <div className="space-y-2">
             <Label htmlFor="description">
@@ -394,6 +427,9 @@ export default function MovementForm({ userId, onComplete, onCancel }: Props) {
               Es un gasto fijo (recurrente cada mes)
             </Label>
           </div>
+
+            </div>
+          </details>
 
           {/* Actions */}
           <div className="flex gap-3 pt-2">

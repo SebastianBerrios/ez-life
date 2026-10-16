@@ -9,7 +9,7 @@ export function validateMovementAmount(amountInCents: number): void {
     throw new DomainError('El monto ingresado no es válido.');
   }
 
-  if (!Number.isInteger(amountInCents)) {
+  if (!Number.isSafeInteger(amountInCents)) {
     throw new DomainError('El monto debe ser un número entero de céntimos.');
   }
 

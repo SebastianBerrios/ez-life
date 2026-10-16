@@ -18,7 +18,7 @@ export function calculateSavingsGoalProgress(
   movements: Movement[]
 ): SavingsGoalProgress {
   const currentAmountCents = movements
-    .filter(m => m.type === 'EXPENSE' && m.savings_goal_id === goal.id)
+    .filter(m => m.type === 'EXPENSE' && !m.is_adjustment && !m.deleted_at && m.savings_goal_id === goal.id)
     .reduce((acc, m) => acc + m.amount, 0);
 
   const percentage = goal.target_amount > 0

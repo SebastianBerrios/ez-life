@@ -53,14 +53,14 @@ export default function SharedSpaceBalances({ spaceId, currentUserId, refreshKey
 
   if (balances.length === 0) {
     return (
-      <Card className="py-6 text-center shadow-warm-sm">
+      <Card className="py-6 text-center shadow-none">
         <p className="text-muted-foreground">No hay saldos pendientes en este espacio.</p>
       </Card>
     );
   }
 
   return (
-    <Card className="shadow-warm-sm px-5 py-4 space-y-2">
+    <Card className="shadow-none px-5 py-4 space-y-2">
       <h3 className="font-heading font-bold text-foreground text-sm">Saldos</h3>
       {balances.map((b, i) => {
         const fromLabel = b.fromUserId === currentUserId ? 'Vos' : b.fromUserId;

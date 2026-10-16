@@ -9,6 +9,7 @@ import { calculateCategoryBreakdown } from '../../core/use-cases/calculateCatego
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { onLocalChanges } from '../../infrastructure/db/localChanges';
 
 interface Props {
   userId: string;
@@ -24,7 +25,10 @@ export default function AnalysisScreen({ userId }: Props) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
+    let cancelled = false;
+    let revision = 0;
     const loadData = async () => {
+      const version = ++revision;
       setLoading(true);
       try {
         const moveRepo = new LocalMovementRepository();
@@ -39,6 +43,7 @@ export default function AnalysisScreen({ userId }: Props) {
         ]);
 
         const subsPerCategory = await Promise.all(expCats.map(c => catRepo.getSubcategories(c.id)));
+        if (cancelled || version !== revision) return;
 
         setMovements(movesData);
         setDistCategories(buckets);
@@ -47,10 +52,12 @@ export default function AnalysisScreen({ userId }: Props) {
       } catch (err) {
         console.error(err);
       } finally {
-        setLoading(false);
+        if (!cancelled && version === revision) setLoading(false);
       }
     };
     loadData();
+    const unsubscribe = onLocalChanges(['movements', 'distribution_categories', 'expense_categories', 'expense_subcategories'], loadData);
+    return () => { cancelled = true; unsubscribe(); };
   }, [userId, refDate]);
 
   const goToPreviousMonth = () => setRefDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1));
@@ -86,7 +93,7 @@ export default function AnalysisScreen({ userId }: Props) {
       </div>
 
       {!hasAnyCategory ? (
-        <div className="text-center py-8 bg-card rounded-xl shadow-sm border border-border">
+        <div className="text-center py-8 bg-card rounded-xl shadow-none border border-border">
           <p className="text-muted-foreground">No hay categorías de gasto configuradas todavía.</p>
         </div>
       ) : (

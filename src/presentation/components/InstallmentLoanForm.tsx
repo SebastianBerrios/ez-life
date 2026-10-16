@@ -193,6 +193,7 @@ export default function InstallmentLoanForm({ userId, existing, onComplete, onCa
           )}
         </div>
 
+        <details open={Boolean(existing?.interest_rate)} className="border-t border-border pt-2"><summary className="text-sm font-medium">Opciones adicionales</summary><div className="space-y-4 pt-3">
         <div className="space-y-2">
           <Label htmlFor="interestRate">Interés % (Opcional, informativo)</Label>
           <Input
@@ -203,6 +204,8 @@ export default function InstallmentLoanForm({ userId, existing, onComplete, onCa
             onChange={(e) => setInterestRate(e.target.value.replace(/[^0-9.]/g, ''))}
           />
         </div>
+
+        </div></details>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 

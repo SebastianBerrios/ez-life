@@ -5,12 +5,27 @@ import MovementForm from './MovementForm';
 import { LocalMovementRepository } from '../../infrastructure/repositories/local/LocalMovementRepository';
 import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
 import { LocalSavingsGoalRepository } from '../../infrastructure/repositories/local/LocalSavingsGoalRepository';
+vi.mock('../../infrastructure/repositories/local/LocalIncomeSourceRepository', () => ({
+  LocalIncomeSourceRepository: vi.fn(function () { return { getAll: vi.fn().mockResolvedValue([{ id: 'salary', name: 'Sueldo' }]) }; }),
+}));
 
 vi.mock('../../infrastructure/repositories/local/LocalMovementRepository');
 vi.mock('../../infrastructure/repositories/local/LocalCategoryRepository');
 vi.mock('../../infrastructure/repositories/local/LocalSavingsGoalRepository');
 
 describe('MovementForm', () => {
+  it('edits the original movement ID and preserves the selected date and income source', async () => {
+    const user = userEvent.setup(); const save = vi.fn();
+    vi.mocked(LocalMovementRepository).mockImplementation(function () { return { save } as unknown as LocalMovementRepository; });
+    vi.mocked(LocalCategoryRepository).mockImplementation(function () { return { getDistributionCategories: async () => [], getExpenseCategories: async () => [] } as unknown as LocalCategoryRepository; });
+    vi.mocked(LocalSavingsGoalRepository).mockImplementation(function () { return { getAll: async () => [] } as unknown as LocalSavingsGoalRepository; });
+    render(<MovementForm userId="A" onComplete={vi.fn()} onCancel={vi.fn()} movement={{ id: 'original', user_id: 'A', type: 'INCOME', amount: 1200, date: new Date(2026, 8, 5), income_source_id: 'salary', is_recurring: false, created_at: new Date(), updated_at: new Date() }} />);
+    await screen.findByRole('combobox', { name: 'Fuente de ingreso' });
+    await user.clear(screen.getByLabelText('Monto')); await user.type(screen.getByLabelText('Monto'), '15.25');
+    fireEvent.change(screen.getByLabelText('Fecha'), { target: { value: '2026-09-06' } });
+    await user.click(screen.getByRole('button', { name: /^Guardar$/ }));
+    await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: 'original', amount: 1525, income_source_id: 'salary', date: new Date(2026, 8, 6, 12) })));
+  });
   it('should transform amount to cents and save movement', async () => {
     const user = userEvent.setup();
     const mockSave = vi.fn();
@@ -47,6 +62,11 @@ describe('MovementForm', () => {
     // Enter amount
     const amountInput = screen.getByLabelText(/monto/i);
     await user.type(amountInput, '150.50');
+
+    const disclosure = screen.getByText('Opciones adicionales').closest('details');
+    expect(disclosure).not.toHaveAttribute('open');
+    await user.click(screen.getByText('Opciones adicionales'));
+    expect(disclosure).toHaveAttribute('open');
 
     // Enter description
     const descInput = screen.getByLabelText(/descripción/i);
