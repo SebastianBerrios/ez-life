@@ -68,7 +68,7 @@ Criterios de aceptación:
 - El ciclo mensual es el mes calendario fijo (del día 1 al último día de cada mes); no existe un paso de configuración de día de inicio de ciclo.
 - Cuando el usuario completa todos los pasos del tutorial, el sistema debe marcarlo como completado y redirigirlo al dashboard.
 - Si el usuario cierra la app a mitad del tutorial, el sistema debe reanudar en el paso donde quedó al volver a abrirla.
-- El wizard completo (los 3 pasos) exige conexión a internet, ampliando la excepción offline-first de RNF-01 más allá del login inicial — ver `specs/007-network-gate-and-notifications/spec.md` RF-30. Sin red, el sistema bloquea el wizard con un mensaje explícito hasta que la conexión vuelva.
+- El wizard funciona offline después del login inicial. La constitución V/XII y la remediación 008 sustituyen el bloqueo histórico de RF-30.
 
 ---
 
@@ -180,10 +180,10 @@ Criterios de aceptación:
 - Si la fecha límite caduca y no se llegó al 100%, la meta no se bloquea; solo muestra un indicador visual (ej. texto rojo "Vencida") pero sigue permitiendo aportes.
 
 **RF-14 — Asignación y orfandad de aportes a metas**
-El sistema debe manejar la asignación estricta de ingresos a las metas de ahorro.
+El sistema debe manejar la asignación de egresos del bucket de ahorro a las metas.
 
 Criterios de aceptación:
-- Al registrar ingresos en categorías de distribución "Ahorros", se puede asignar a una meta.
+- Al registrar un egreso del bucket de ahorro, se puede asignar a una meta. Los ajustes de balance no son aportes.
 - Si el usuario intenta eliminar una meta de ahorro que tiene aportes asociados, el sistema debe impedirlo y obligarlo a reasignar esos aportes a otra meta (o a ahorro general) antes de poder eliminarla.
 
 ---
