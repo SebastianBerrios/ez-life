@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { LocalDebtRepository } from '../../infrastructure/repositories/local/LocalDebtRepository';
 import { validateMovementAmount } from '../../core/use-cases/validateMovementAmount';
 import { parseMoney } from '../../core/use-cases/parseMoney';
+import { parseCalendarDate } from '../../core/use-cases/calendar';
 import { DomainError } from '../../core/domain/errors/DomainError';
 import { DebtDirection } from '../../core/domain/models/types';
 import { Button } from '@/components/ui/button';
@@ -55,7 +56,7 @@ export default function DebtForm({ userId, onComplete, onCancel }: Props) {
         origin: 'manual',
         amount: amountInCents,
         settled_amount: 0,
-        due_date: dueDate ? new Date(dueDate) : undefined,
+        due_date: dueDate ? parseCalendarDate(dueDate) : undefined,
         interest_rate: interestRate ? Number(interestRate) : undefined,
       });
 

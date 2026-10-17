@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { addDays, calendarKey, combineDateAndTime, daysBetween, formatCycleLabel, parseCalendarDate, shiftMonth, startOfDay, timeKey, weekWindow } from './calendar';
+import { addDays, calendarKey, combineDateAndTime, daysBetween, daysUntilDue, dueDayStart, formatCycleLabel, parseCalendarDate, shiftMonth, startOfDay, timeKey, weekWindow } from './calendar';
 
 describe('timeKey', () => {
   it('formats local time as zero-padded HH:mm', () => {
@@ -94,5 +94,63 @@ describe('local-day helpers', () => {
     expect(weekWindow(new Date(2026, 11, 31, 20)).days.map(calendarKey)).toEqual([
       '2026-12-28', '2026-12-29', '2026-12-30', '2026-12-31', '2027-01-01', '2027-01-02', '2027-01-03',
     ]);
+  });
+});
+
+describe('dueDayStart', () => {
+  it('returns local midnight of the local day for a local-noon due date', () => {
+    expect(dueDayStart(parseCalendarDate('2026-10-20'))).toEqual(new Date(2026, 9, 20));
+  });
+
+  it('keeps the local day for any non-UTC-midnight time of day', () => {
+    expect(dueDayStart(new Date(2026, 9, 20, 0, 0, 1))).toEqual(new Date(2026, 9, 20));
+    expect(dueDayStart(new Date(2026, 9, 20, 23, 59, 59, 999))).toEqual(new Date(2026, 9, 20));
+  });
+
+  it('reads a legacy exact-UTC-midnight value as its UTC calendar day, whatever the local offset', () => {
+    // Legacy rows were saved via new Date('YYYY-MM-DD'); in UTC-5 that is the previous local day at 19:00.
+    expect(dueDayStart(new Date(Date.UTC(2026, 9, 20)))).toEqual(new Date(2026, 9, 20));
+    expect(dueDayStart(new Date('2026-12-31'))).toEqual(new Date(2026, 11, 31));
+    expect(dueDayStart(new Date(Date.UTC(2027, 0, 1)))).toEqual(new Date(2027, 0, 1));
+  });
+
+  it('does not treat UTC midnight plus a millisecond as legacy', () => {
+    const value = new Date(Date.UTC(2026, 9, 20) + 1);
+    expect(dueDayStart(value)).toEqual(startOfDay(value));
+  });
+});
+
+describe('daysUntilDue', () => {
+  const nowTimes: Array<[number, number, number]> = [[0, 30, 0], [5, 0, 0], [12, 0, 0], [23, 59, 59]];
+
+  it.each(nowTimes)('counts whole local calendar days for a local-noon due date at %i:%i:%i', (h, m, s) => {
+    const now = new Date(2026, 9, 17, h, m, s);
+    expect(daysUntilDue(parseCalendarDate('2026-10-17'), now)).toBe(0);
+    expect(daysUntilDue(parseCalendarDate('2026-10-16'), now)).toBe(-1);
+    expect(daysUntilDue(parseCalendarDate('2026-10-20'), now)).toBe(3);
+    expect(daysUntilDue(parseCalendarDate('2026-10-21'), now)).toBe(4);
+  });
+
+  it.each(nowTimes)('counts a legacy UTC-midnight due date by its UTC calendar day at %i:%i:%i', (h, m, s) => {
+    const now = new Date(2026, 9, 17, h, m, s);
+    expect(daysUntilDue(new Date(Date.UTC(2026, 9, 17)), now)).toBe(0);
+    expect(daysUntilDue(new Date(Date.UTC(2026, 9, 20)), now)).toBe(3);
+    expect(daysUntilDue(new Date(Date.UTC(2026, 9, 21)), now)).toBe(4);
+    expect(daysUntilDue(new Date(Date.UTC(2026, 9, 16)), now)).toBe(-1);
+  });
+
+  it('crosses month and year boundaries', () => {
+    expect(daysUntilDue(parseCalendarDate('2026-11-02'), new Date(2026, 9, 30, 23, 59))).toBe(3);
+    expect(daysUntilDue(parseCalendarDate('2027-01-02'), new Date(2026, 11, 30, 0, 30))).toBe(3);
+    expect(daysUntilDue(parseCalendarDate('2026-12-31'), new Date(2027, 0, 1, 8))).toBe(-1);
+  });
+
+  it('is DST-safe across the clock changes of the zone running the tests', () => {
+    // Every day of 2026: the distance to a date N calendar days ahead must be exactly N.
+    for (let day = 0; day < 365; day++) {
+      const now = new Date(2026, 0, 1 + day, 5);
+      expect(daysUntilDue(new Date(2026, 0, 1 + day + 3, 12), now)).toBe(3);
+      expect(daysUntilDue(new Date(2026, 0, 1 + day - 1, 12), now)).toBe(-1);
+    }
   });
 });

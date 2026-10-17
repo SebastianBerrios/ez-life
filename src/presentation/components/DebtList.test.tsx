@@ -4,6 +4,7 @@ import { beforeEach, describe, it, expect, vi } from 'vitest';
 import DebtList from './DebtList';
 import { LocalDebtRepository } from '../../infrastructure/repositories/local/LocalDebtRepository';
 import { DomainError } from '../../core/domain/errors/DomainError';
+import { formatShortDate } from '../../core/use-cases/formatMovementWhen';
 
 vi.mock('../../infrastructure/repositories/local/LocalDebtRepository');
 
@@ -44,6 +45,22 @@ describe('DebtList', () => {
     expect(within(card).getByText('75.00')).toBeInTheDocument(); // 100.00 - 25.00
     expect(within(card).getByText('100.00')).toBeInTheDocument();
     expect(within(card).getByRole('progressbar', { name: 'Devuelto de Juan' })).toHaveAttribute('aria-valuenow', '25');
+  });
+
+  it('shows a local-noon due date on its local calendar day', async () => {
+    mockRepo([{ ...lentDebt, due_date: new Date(2026, 9, 20, 12) }]);
+    render(<DebtList userId="u1" />);
+
+    const card = await screen.findByTestId('debt-debt-1');
+    expect(within(card).getByText(`Vence: ${formatShortDate(new Date(2026, 9, 20))}`)).toBeInTheDocument();
+  });
+
+  it('shows a legacy UTC-midnight due date on its UTC calendar day, not the previous local day', async () => {
+    mockRepo([{ ...lentDebt, due_date: new Date(Date.UTC(2026, 9, 20)) }]);
+    render(<DebtList userId="u1" />);
+
+    const card = await screen.findByTestId('debt-debt-1');
+    expect(within(card).getByText(`Vence: ${formatShortDate(new Date(2026, 9, 20))}`)).toBeInTheDocument();
   });
 
   it('labels a borrowed debt and shows a settled one as "Saldado" without payment controls', async () => {

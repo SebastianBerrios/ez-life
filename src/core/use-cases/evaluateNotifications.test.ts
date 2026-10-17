@@ -323,6 +323,45 @@ describe('evaluateNotifications', () => {
 
       expect(result).toHaveLength(0);
     });
+
+    describe('calendar-day window', () => {
+      const dueAt = (day: number) => new Date(2024, 5, day, 12); // local noon, as DebtForm saves it
+      const firesAt = (debt: Debt, at: Date) =>
+        evaluateNotifications(baseParams({ now: at, debts: [debt] })).some(n => n.type === 'loan_due_soon');
+
+      it('fires on the due day late in the evening', () => {
+        expect(firesAt(makeDebt({ due_date: dueAt(15) }), new Date(2024, 5, 15, 23, 30))).toBe(true);
+      });
+
+      it('does not fire the day after the due day (yesterday noon evaluated at 12:01)', () => {
+        expect(firesAt(makeDebt({ due_date: dueAt(14) }), new Date(2024, 5, 15, 12, 1))).toBe(false);
+        expect(firesAt(makeDebt({ due_date: dueAt(14) }), new Date(2024, 5, 15, 0, 30))).toBe(false);
+      });
+
+      it('fires for a due day exactly 3 calendar days ahead at any time of day', () => {
+        for (const at of [new Date(2024, 5, 15, 0, 30), new Date(2024, 5, 15, 5, 0), new Date(2024, 5, 15, 12, 0), new Date(2024, 5, 15, 23, 59)]) {
+          expect(firesAt(makeDebt({ due_date: dueAt(18) }), at)).toBe(true);
+        }
+      });
+
+      it('never fires for a due day 4 calendar days ahead', () => {
+        for (const at of [new Date(2024, 5, 15, 0, 30), new Date(2024, 5, 15, 5, 0), new Date(2024, 5, 15, 12, 0), new Date(2024, 5, 15, 23, 59)]) {
+          expect(firesAt(makeDebt({ due_date: dueAt(19) }), at)).toBe(false);
+        }
+      });
+
+      it('reads a legacy UTC-midnight due date as its UTC calendar day', () => {
+        const legacy = (day: number) => makeDebt({ due_date: new Date(Date.UTC(2024, 5, day)) });
+        expect(firesAt(legacy(18), new Date(2024, 5, 15, 5, 0))).toBe(true);
+        expect(firesAt(legacy(19), new Date(2024, 5, 15, 23, 59))).toBe(false);
+        expect(firesAt(legacy(14), new Date(2024, 5, 15, 0, 30))).toBe(false);
+        expect(firesAt(legacy(15), new Date(2024, 5, 15, 23, 30))).toBe(true);
+      });
+
+      it('still excludes a settled debt inside the window', () => {
+        expect(firesAt(makeDebt({ due_date: dueAt(16), settled_amount: 10000 }), new Date(2024, 5, 15, 12, 0))).toBe(false);
+      });
+    });
   });
 
   describe('shared_movement_added', () => {
@@ -458,6 +497,34 @@ describe('evaluateNotifications', () => {
       const result = evaluateNotifications(baseParams({ tasks: [overdueTask] }));
 
       expect(result.some(n => n.type === 'task_due')).toBe(false);
+    });
+
+    describe('calendar-day window', () => {
+      const dueAt = (day: number): Task => ({ ...baseTask, due_date: new Date(2024, 5, day, 12) }); // local noon, as TaskForm saves it
+      const firesAt = (task: Task, at: Date) =>
+        evaluateNotifications(baseParams({ now: at, tasks: [task] })).some(n => n.type === 'task_due');
+      const times = [new Date(2024, 5, 15, 0, 30), new Date(2024, 5, 15, 5, 0), new Date(2024, 5, 15, 12, 0), new Date(2024, 5, 15, 23, 59)];
+
+      it('fires on the due day late in the evening', () => {
+        expect(firesAt(dueAt(15), new Date(2024, 5, 15, 23, 30))).toBe(true);
+      });
+
+      it('does not fire the day after the due day (yesterday noon evaluated at 12:01)', () => {
+        expect(firesAt(dueAt(14), new Date(2024, 5, 15, 12, 1))).toBe(false);
+        expect(firesAt(dueAt(14), new Date(2024, 5, 15, 0, 30))).toBe(false);
+      });
+
+      it('fires for a due day exactly 3 calendar days ahead at any time of day', () => {
+        for (const at of times) expect(firesAt(dueAt(18), at)).toBe(true);
+      });
+
+      it('never fires for a due day 4 calendar days ahead', () => {
+        for (const at of times) expect(firesAt(dueAt(19), at)).toBe(false);
+      });
+
+      it('still excludes a done task inside the window', () => {
+        expect(firesAt({ ...dueAt(16), status: 'done' }, new Date(2024, 5, 15, 12, 0))).toBe(false);
+      });
     });
   });
 

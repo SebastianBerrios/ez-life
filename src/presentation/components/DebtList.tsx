@@ -7,6 +7,7 @@ import { Debt } from '../../core/domain/models/types';
 import { DomainError } from '../../core/domain/errors/DomainError';
 import { parseMoney } from '../../core/use-cases/parseMoney';
 import { formatShortDate } from '../../core/use-cases/formatMovementWhen';
+import { dueDayStart } from '../../core/use-cases/calendar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -121,7 +122,7 @@ export default function DebtList({ userId }: Props) {
                   </h4>
                   {debt.due_date && (
                     <p className="font-mono text-label-mono-xs text-muted-foreground">
-                      Vence: {formatShortDate(new Date(debt.due_date))}
+                      Vence: {formatShortDate(dueDayStart(debt.due_date))}
                     </p>
                   )}
                 </div>

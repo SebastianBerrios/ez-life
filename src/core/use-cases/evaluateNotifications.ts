@@ -1,5 +1,6 @@
 import { Debt, Goal, Notification, SavingsGoal, SharedMovement, Task, UUID } from '../domain/models/types';
 import { evaluateGoalCompletion } from './evaluateGoalCompletion';
+import { daysUntilDue } from './calendar';
 import { BudgetedCategory } from './calculateBudgets';
 
 interface SavingsGoalWithProgress {
@@ -32,7 +33,6 @@ export type NewNotification = Omit<Notification, 'id' | 'created_at' | 'updated_
 
 const BUDGET_ALERT_THRESHOLD = 0.8;
 const LOAN_DUE_SOON_DAYS_THRESHOLD = 3;
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function cycleMonthKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -141,8 +141,8 @@ export function evaluateNotifications(params: EvaluateNotificationsParams): NewN
     if (!debt.due_date) continue;
     if (debt.settled_amount >= debt.amount) continue;
 
-    const daysUntilDue = Math.ceil((debt.due_date.getTime() - now.getTime()) / MS_PER_DAY);
-    if (daysUntilDue < 0 || daysUntilDue > LOAN_DUE_SOON_DAYS_THRESHOLD) continue;
+    const daysLeft = daysUntilDue(debt.due_date, now);
+    if (daysLeft < 0 || daysLeft > LOAN_DUE_SOON_DAYS_THRESHOLD) continue;
 
     const dayKey = cycleDayKey(now);
     if (hasEquivalent(existingNotifications, 'loan_due_soon', debt.id, dayKey)) continue;
@@ -221,8 +221,8 @@ export function evaluateNotifications(params: EvaluateNotificationsParams): NewN
   for (const task of tasks) {
     if (task.status !== 'pending') continue;
 
-    const daysUntilDue = Math.ceil((task.due_date.getTime() - now.getTime()) / MS_PER_DAY);
-    if (daysUntilDue < 0 || daysUntilDue > LOAN_DUE_SOON_DAYS_THRESHOLD) continue;
+    const daysLeft = daysUntilDue(task.due_date, now);
+    if (daysLeft < 0 || daysLeft > LOAN_DUE_SOON_DAYS_THRESHOLD) continue;
 
     const dayKey = cycleDayKey(now);
     if (hasEquivalent(existingNotifications, 'task_due', task.id, dayKey)) continue;

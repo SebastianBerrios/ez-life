@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import DebtForm from './DebtForm';
 import { LocalDebtRepository } from '../../infrastructure/repositories/local/LocalDebtRepository';
+import { calendarKey, parseCalendarDate } from '../../core/use-cases/calendar';
 
 vi.mock('../../infrastructure/repositories/local/LocalDebtRepository');
 
@@ -58,7 +59,7 @@ describe('DebtForm', () => {
       expect(mockSave).toHaveBeenCalledWith(expect.objectContaining({
         direction: 'borrowed',
         amount: 5000,
-        due_date: new Date('2026-12-31'),
+        due_date: parseCalendarDate('2026-12-31'),
         interest_rate: 5,
       }));
     });
@@ -102,5 +103,38 @@ describe('DebtForm', () => {
     await user.type(screen.getByLabelText(/monto/i), '4.35');
     fireEvent.submit(screen.getByTestId('debt-form'));
     await waitFor(() => expect(mockSave).toHaveBeenCalledWith(expect.objectContaining({ amount: 435 })));
+  });
+
+  it('saves the due date as the chosen local calendar day at local noon (not UTC midnight)', async () => {
+    const user = userEvent.setup();
+    const mockSave = vi.fn();
+    vi.mocked(LocalDebtRepository).mockImplementation(function () {
+      return { save: mockSave } as unknown as InstanceType<typeof LocalDebtRepository>;
+    });
+    render(<DebtForm userId="fake-user-id" onComplete={vi.fn()} onCancel={vi.fn()} />);
+    await user.type(screen.getByLabelText(/nombre/i), 'Juan');
+    await user.type(screen.getByLabelText(/monto/i), '10');
+    fireEvent.change(screen.getByLabelText(/vencimiento/i), { target: { value: '2026-10-20' } });
+    fireEvent.submit(screen.getByTestId('debt-form'));
+
+    await waitFor(() => expect(mockSave).toHaveBeenCalled());
+    const saved = mockSave.mock.calls[0][0].due_date as Date;
+    expect(calendarKey(saved)).toBe('2026-10-20');
+    expect(saved.getHours()).toBe(12);
+  });
+
+  it('saves no due date when the field is left empty', async () => {
+    const user = userEvent.setup();
+    const mockSave = vi.fn();
+    vi.mocked(LocalDebtRepository).mockImplementation(function () {
+      return { save: mockSave } as unknown as InstanceType<typeof LocalDebtRepository>;
+    });
+    render(<DebtForm userId="fake-user-id" onComplete={vi.fn()} onCancel={vi.fn()} />);
+    await user.type(screen.getByLabelText(/nombre/i), 'Juan');
+    await user.type(screen.getByLabelText(/monto/i), '10');
+    fireEvent.submit(screen.getByTestId('debt-form'));
+
+    await waitFor(() => expect(mockSave).toHaveBeenCalled());
+    expect(mockSave.mock.calls[0][0].due_date).toBeUndefined();
   });
 });

@@ -57,6 +57,25 @@ export function daysBetween(from: Date, to: Date): number {
   return Math.round((b - a) / 86_400_000);
 }
 
+/**
+ * Local midnight of the calendar day a due date was INTENDED for.
+ * Due dates are calendar dates stored at local noon (`parseCalendarDate`). Legacy rows saved via
+ * `new Date('YYYY-MM-DD')` are exactly 00:00:00.000 UTC, which in a zone behind UTC falls on the
+ * previous local day — those can't be migrated, so an exact UTC midnight is read as its UTC y-m-d.
+ * Where local noon equals 00:00Z (UTC+12) both readings give the same day, so the heuristic is safe.
+ */
+export function dueDayStart(due: Date): Date {
+  if (due.getUTCHours() === 0 && due.getUTCMinutes() === 0 && due.getUTCSeconds() === 0 && due.getUTCMilliseconds() === 0) {
+    return new Date(due.getUTCFullYear(), due.getUTCMonth(), due.getUTCDate());
+  }
+  return startOfDay(due);
+}
+
+/** Whole local calendar days from `now` to the due day (0 = due today, negative = overdue). */
+export function daysUntilDue(due: Date, now: Date): number {
+  return daysBetween(now, dueDayStart(due));
+}
+
 export interface WeekWindow {
   /** Local midnight of the Monday. */
   start: Date;
