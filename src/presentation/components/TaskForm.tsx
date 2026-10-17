@@ -1,39 +1,43 @@
 'use client';
 
 import React, { useState } from 'react';
+import { CalendarDays, Flag, PencilLine, Repeat, Tag, AlignLeft } from 'lucide-react';
 import { LocalTaskRepository } from '../../infrastructure/repositories/local/LocalTaskRepository';
-import { DayOfWeek, Task, TaskScheduleMode } from '../../core/domain/models/types';
+import { DayOfWeek, Task, TaskPriority, TaskScheduleMode } from '../../core/domain/models/types';
+import { calendarKey, parseCalendarDate } from '../../core/use-cases/calendar';
 import { uuidv7 } from 'uuidv7';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Loader2 } from 'lucide-react';
+import { Segmented } from '@/components/ui/segmented';
+import { Switch } from '@/components/ui/switch';
+import { FieldLabel } from './quickRecordUi';
+import { FormShell, RadioChips, WeekdayChips } from './formUi';
 
 interface Props {
   userId: string;
   existing?: Task;
+  /** Hides the form's own title (the host sheet already shows one). */
+  embedded?: boolean;
   onComplete: () => void;
   onCancel: () => void;
 }
 
-const DAYS: { value: DayOfWeek; label: string }[] = [
-  { value: 'mon', label: 'Lunes' },
-  { value: 'tue', label: 'Martes' },
-  { value: 'wed', label: 'Miércoles' },
-  { value: 'thu', label: 'Jueves' },
-  { value: 'fri', label: 'Viernes' },
-  { value: 'sat', label: 'Sábado' },
-  { value: 'sun', label: 'Domingo' },
+const PRIORITIES: { value: TaskPriority; label: string }[] = [
+  { value: 'high', label: 'Alta' },
+  { value: 'medium', label: 'Media' },
+  { value: 'low', label: 'Baja' },
 ];
 
-function toDateInputValue(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
+const MODES: { value: TaskScheduleMode; label: string }[] = [
+  { value: 'fixed_days', label: 'Días fijos' },
+  { value: 'frequency', label: 'Frecuencia libre' },
+];
 
-export default function TaskForm({ userId, existing, onComplete, onCancel }: Props) {
+export default function TaskForm({ userId, existing, embedded, onComplete, onCancel }: Props) {
   const [title, setTitle] = useState(existing?.title ?? '');
   const [description, setDescription] = useState(existing?.description ?? '');
-  const [dueDate, setDueDate] = useState(existing ? toDateInputValue(existing.due_date) : '');
+  const [dueDate, setDueDate] = useState(existing ? calendarKey(existing.due_date) : '');
+  const [priority, setPriority] = useState<TaskPriority>(existing?.priority ?? 'medium');
+  const [tag, setTag] = useState(existing?.tag ?? '');
   const [isRecurring, setIsRecurring] = useState(Boolean(existing?.schedule_mode));
   const [scheduleMode, setScheduleMode] = useState<TaskScheduleMode>(existing?.schedule_mode ?? 'fixed_days');
   const [fixedDays, setFixedDays] = useState<DayOfWeek[]>(existing?.fixed_days ?? []);
@@ -58,6 +62,14 @@ export default function TaskForm({ userId, existing, onComplete, onCancel }: Pro
       return;
     }
 
+    let dueDateValue: Date;
+    try {
+      dueDateValue = parseCalendarDate(dueDate);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'La fecha no es válida.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -67,7 +79,9 @@ export default function TaskForm({ userId, existing, onComplete, onCancel }: Pro
         user_id: userId,
         title,
         description: description || undefined,
-        due_date: new Date(dueDate),
+        due_date: dueDateValue,
+        priority,
+        tag: tag.trim() || undefined,
         status: existing?.status ?? 'pending',
         done_at: existing?.done_at,
         schedule_mode: isRecurring ? scheduleMode : undefined,
@@ -86,22 +100,75 @@ export default function TaskForm({ userId, existing, onComplete, onCancel }: Pro
   };
 
   return (
-    <div className="w-full">
-      <h2 className="mb-4 font-heading text-base leading-none font-medium">{existing ? 'Editar Tarea' : 'Nueva Tarea'}</h2>
-      <form onSubmit={handleSubmit} data-testid="task-form" className="space-y-5">
-        <div className="space-y-2">
-          <Label htmlFor="taskTitle">Título</Label>
-          <Input type="text" id="taskTitle" required value={title} onChange={(e) => setTitle(e.target.value)} />
-        </div>
+    <FormShell
+      title={existing ? 'Editar Tarea' : 'Nueva Tarea'}
+      embedded={embedded}
+      testId="task-form"
+      onSubmit={handleSubmit}
+      error={error}
+      submitLabel={existing ? 'Guardar cambios' : 'Crear tarea'}
+      isSubmitting={isSubmitting}
+      onCancel={onCancel}
+    >
+      <div>
+        <FieldLabel icon={PencilLine} htmlFor="taskTitle">Título</FieldLabel>
+        <Input type="text" id="taskTitle" required value={title} onChange={(e) => setTitle(e.target.value)} />
+      </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="dueDate">Fecha límite</Label>
-          <Input type="date" id="dueDate" required value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-        </div>
+      <div>
+        <FieldLabel icon={CalendarDays} htmlFor="dueDate">Fecha límite</FieldLabel>
+        <Input type="date" id="dueDate" required value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+      </div>
 
-        <details open={Boolean(existing?.description || existing?.schedule_mode)} className="border-t border-border pt-2"><summary className="text-sm font-medium">Opciones adicionales</summary><div className="space-y-4 pt-3">
-        <div className="space-y-2">
-          <Label htmlFor="taskDescription">Descripción (opcional)</Label>
+      <div>
+        <FieldLabel icon={Flag}>Prioridad</FieldLabel>
+        <Segmented
+          ariaLabel="Prioridad"
+          fullWidth
+          value={priority}
+          onValueChange={(value) => setPriority(value as TaskPriority)}
+          options={PRIORITIES}
+        />
+      </div>
+
+      <div>
+        <FieldLabel icon={Tag} htmlFor="taskTag" hint="Opcional">Etiqueta</FieldLabel>
+        <Input type="text" id="taskTag" placeholder="Ej. Maestría / Estudio" value={tag} onChange={(e) => setTag(e.target.value)} />
+      </div>
+
+      <div className="flex min-h-11 items-center justify-between gap-3">
+        <FieldLabel icon={Repeat} className="mb-0">Repetir tarea</FieldLabel>
+        <Switch aria-label="Repetir tarea" checked={isRecurring} onCheckedChange={setIsRecurring} />
+      </div>
+
+      {isRecurring && (
+        <div className="space-y-3">
+          <div>
+            <FieldLabel id="task-recurrence-label">Repetición</FieldLabel>
+            <RadioChips name="taskScheduleMode" labelId="task-recurrence-label" value={scheduleMode} options={MODES} onChange={setScheduleMode} />
+          </div>
+
+          {scheduleMode === 'fixed_days' && <WeekdayChips value={fixedDays} onToggle={toggleDay} />}
+
+          {scheduleMode === 'frequency' && (
+            <div>
+              <FieldLabel htmlFor="taskFrequencyTarget">Veces por semana</FieldLabel>
+              <Input
+                type="text"
+                inputMode="numeric"
+                id="taskFrequencyTarget"
+                value={frequencyTarget}
+                onChange={(e) => setFrequencyTarget(e.target.value.replace(/[^0-9]/g, ''))}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      <details open={Boolean(existing?.description)} className="border-t border-border pt-3">
+        <summary className="flex min-h-11 cursor-pointer items-center font-mono text-label-mono-xs uppercase text-muted-foreground">Opciones adicionales</summary>
+        <div className="pt-2">
+          <FieldLabel icon={AlignLeft} htmlFor="taskDescription" hint="Opcional">Descripción</FieldLabel>
           <Input
             type="text"
             id="taskDescription"
@@ -110,90 +177,7 @@ export default function TaskForm({ userId, existing, onComplete, onCancel }: Pro
             onChange={(e) => setDescription(e.target.value)}
           />
         </div>
-
-        <div className="space-y-2">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              aria-label="Repetir tarea"
-              checked={isRecurring}
-              onChange={(e) => setIsRecurring(e.target.checked)}
-            />
-            Repetir tarea
-          </label>
-        </div>
-
-        {isRecurring && (
-          <>
-            <fieldset className="space-y-2">
-              <legend className="text-sm font-medium">Repetición</legend>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="radio"
-                    name="taskScheduleMode"
-                    checked={scheduleMode === 'fixed_days'}
-                    onChange={() => setScheduleMode('fixed_days')}
-                  />
-                  Días fijos
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="radio"
-                    name="taskScheduleMode"
-                    aria-label="Frecuencia libre"
-                    checked={scheduleMode === 'frequency'}
-                    onChange={() => setScheduleMode('frequency')}
-                  />
-                  Frecuencia libre
-                </label>
-              </div>
-            </fieldset>
-
-            {scheduleMode === 'fixed_days' && (
-              <div className="grid grid-cols-4 gap-2">
-                {DAYS.map(({ value, label }) => (
-                  <label key={value} className="flex items-center gap-1 text-xs">
-                    <input
-                      type="checkbox"
-                      aria-label={label}
-                      checked={fixedDays.includes(value)}
-                      onChange={() => toggleDay(value)}
-                    />
-                    {label}
-                  </label>
-                ))}
-              </div>
-            )}
-
-            {scheduleMode === 'frequency' && (
-              <div className="space-y-2">
-                <Label htmlFor="taskFrequencyTarget">Veces por semana</Label>
-                <Input
-                  type="text"
-                  id="taskFrequencyTarget"
-                  value={frequencyTarget}
-                  onChange={(e) => setFrequencyTarget(e.target.value.replace(/[^0-9]/g, ''))}
-                />
-              </div>
-            )}
-          </>
-        )}
-
-        </div></details>
-
-        {error && <p className="text-sm text-destructive">{error}</p>}
-
-        <div className="flex gap-3 pt-2">
-          <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting} className="flex-1">
-            Cancelar
-          </Button>
-          <Button type="submit" disabled={isSubmitting} className="flex-1">
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {existing ? 'Guardar cambios' : 'Crear'}
-          </Button>
-        </div>
-      </form>
-    </div>
+      </details>
+    </FormShell>
   );
 }

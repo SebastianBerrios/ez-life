@@ -23,8 +23,8 @@ async page => {
   await page.getByRole('button', { name: 'Guardar distribución', exact: true }).click();
   await page.getByText('Categorías de gasto', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Finalizar configuración', exact: true }).click();
-  await page.getByText('Balance del Mes').waitFor();
-  await page.reload(); await page.getByText('Balance del Mes').waitFor();
+  await page.getByRole('heading', { name: /Resumen Ejecutivo|Resumen del ciclo/ }).waitFor();
+  await page.reload(); await page.getByRole('heading', { name: /Resumen Ejecutivo|Resumen del ciclo/ }).waitFor();
   const state = await page.evaluate(async () => {
     const database = await new Promise(resolve => { const request = indexedDB.open('ezlife-db'); request.onsuccess = () => resolve(request.result); });
     const transaction = database.transaction(['profiles', 'income_sources']);

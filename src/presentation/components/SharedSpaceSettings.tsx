@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { LocalSharedSpaceRepository } from '../../infrastructure/repositories/local/LocalSharedSpaceRepository';
 import { LocalMembershipRepository } from '../../infrastructure/repositories/local/LocalMembershipRepository';
 import { SharedSpace } from '../../core/domain/models/types';
-import { Card } from '@/components/ui/card';
+import { Panel, PanelBody } from '@/components/ui/panel';
 import { Button } from '@/components/ui/button';
 
 interface Props {
@@ -48,26 +48,28 @@ export default function SharedSpaceSettings({ space, onChanged, onLeft }: Props)
   };
 
   return (
-    <Card className="shadow-none px-5 py-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium">Modo de permisos</p>
-          <p className="text-xs text-muted-foreground">
-            {space.permission_mode === 'strict'
-              ? 'Cada quien edita/borra solo lo suyo'
-              : 'Cualquiera puede editar/borrar cualquier movimiento'}
-          </p>
+    <Panel aria-label={`Ajustes de ${space.name}`}>
+      <PanelBody className="space-y-4 pt-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-body-md font-medium text-foreground">Modo de permisos</p>
+            <p className="text-body-sm text-muted-foreground">
+              {space.permission_mode === 'strict'
+                ? 'Cada quien edita/borra solo lo suyo'
+                : 'Cualquiera puede editar/borrar cualquier movimiento'}
+            </p>
+          </div>
+          <Button size="sm" variant="outline" onClick={handleToggleMode} disabled={isSubmitting}>
+            Cambiar a {space.permission_mode === 'strict' ? 'abierto' : 'estricto'}
+          </Button>
         </div>
-        <Button size="sm" variant="outline" onClick={handleToggleMode} disabled={isSubmitting}>
-          Cambiar a {space.permission_mode === 'strict' ? 'abierto' : 'estricto'}
+
+        {error && <p role="alert" className="text-body-md text-destructive">{error}</p>}
+
+        <Button variant="destructive" className="w-full" onClick={handleLeave} disabled={isSubmitting}>
+          Abandonar espacio
         </Button>
-      </div>
-
-      {error && <p className="text-sm text-destructive">{error}</p>}
-
-      <Button variant="outline" className="w-full text-destructive hover:bg-destructive/10" onClick={handleLeave} disabled={isSubmitting}>
-        Abandonar espacio
-      </Button>
-    </Card>
+      </PanelBody>
+    </Panel>
   );
 }

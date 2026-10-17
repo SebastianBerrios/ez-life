@@ -4,7 +4,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { LocalSharedMovementRepository } from '../../infrastructure/repositories/local/LocalSharedMovementRepository';
 import { calculateSharedBalance, PairBalance } from '../../core/use-cases/calculateSharedBalance';
 import { useSharedSpaceRealtime } from '../hooks/useSharedSpaceRealtime';
-import { Card } from '@/components/ui/card';
+import { Panel, PanelBody, PanelHeader } from '@/components/ui/panel';
+import { Money } from '@/components/ui/money';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface Props {
@@ -48,29 +49,40 @@ export default function SharedSpaceBalances({ spaceId, currentUserId, refreshKey
   }, []);
 
   if (loading) {
-    return <Skeleton className="h-20 w-full rounded-xl" />;
+    return <Skeleton className="h-20 w-full rounded-lg" />;
   }
 
   if (balances.length === 0) {
     return (
-      <Card className="py-6 text-center shadow-none">
-        <p className="text-muted-foreground">No hay saldos pendientes en este espacio.</p>
-      </Card>
+      <Panel data-testid="shared-balances-empty">
+        <PanelBody className="py-6 text-center">
+          <p className="text-body-md text-muted-foreground">No hay saldos pendientes en este espacio.</p>
+        </PanelBody>
+      </Panel>
     );
   }
 
   return (
-    <Card className="shadow-none px-5 py-4 space-y-2">
-      <h3 className="font-heading font-bold text-foreground text-sm">Saldos</h3>
-      {balances.map((b, i) => {
-        const fromLabel = b.fromUserId === currentUserId ? 'Vos' : b.fromUserId;
-        const toLabel = b.toUserId === currentUserId ? 'vos' : b.toUserId;
-        return (
-          <p key={i} className="text-sm text-muted-foreground">
-            {fromLabel} le debe a {toLabel}: <span className="text-primary font-medium">S/ {(b.amount / 100).toFixed(2)}</span>
-          </p>
-        );
-      })}
-    </Card>
+    <Panel aria-label="Saldos" data-testid="shared-balances">
+      <PanelHeader eyebrow="Quién le debe a quién" title="Saldos" titleAs="h3" />
+      <PanelBody>
+        <ul className="divide-y divide-border">
+          {balances.map((b, i) => {
+            const fromLabel = b.fromUserId === currentUserId ? 'Vos' : b.fromUserId;
+            const toLabel = b.toUserId === currentUserId ? 'vos' : b.toUserId;
+            // What the signed-in user owes reads as an expense; what they are owed reads as income.
+            const tone = b.fromUserId === currentUserId ? 'expense' : b.toUserId === currentUserId ? 'income' : 'neutral';
+            return (
+              <li key={i} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-2.5">
+                <span className="min-w-0 break-words text-body-md text-muted-foreground">
+                  {fromLabel} le debe a {toLabel}
+                </span>
+                <Money cents={b.amount} sign="never" tone={tone} size="md" className="font-semibold" />
+              </li>
+            );
+          })}
+        </ul>
+      </PanelBody>
+    </Panel>
   );
 }

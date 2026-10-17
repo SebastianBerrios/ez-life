@@ -6,7 +6,7 @@ async page => {
     account.avatarUrl = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><circle cx="16" cy="16" r="16" fill="green"/></svg>');
     localStorage.setItem('ezlife.activeAccount.v1', JSON.stringify(account)); localStorage.setItem('theme', 'system');
   });
-  await page.reload(); await page.getByText('Balance del Mes').waitFor();
+  await page.reload(); await page.getByRole('heading', { name: /Resumen Ejecutivo|Resumen del ciclo/ }).waitFor();
   await page.waitForFunction(() => Array.from(document.querySelectorAll('img[alt="Foto de perfil"]')).some(img => img.naturalWidth > 0));
   await page.getByRole('button', { name: 'Cambiar a modo claro', exact: true }).click();
   await page.waitForFunction(() => document.documentElement.classList.contains('light'));

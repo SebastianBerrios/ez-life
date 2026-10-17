@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import InstallmentLoanList from './InstallmentLoanList';
@@ -138,5 +138,80 @@ describe('InstallmentLoanList', () => {
     await user.click(screen.getByRole('button', { name: /pagar cuota/i }));
 
     expect(await screen.findByText(/no podés pagar más cuotas/i)).toBeInTheDocument();
+  });
+
+  it('parses the principal payment amount and the new installment amount to integer cents with parseMoney', async () => {
+    const user = userEvent.setup();
+    const mockRecordPrincipalPayment = vi.fn();
+    mockRepo({ recordPrincipalPayment: mockRecordPrincipalPayment } as never);
+
+    render(<InstallmentLoanList userId="fake-user-id" />);
+    await screen.findByText(/BCP/i);
+
+    await user.click(screen.getByRole('button', { name: /abono a capital/i }));
+    await user.type(screen.getByLabelText(/monto del abono/i), '1000.5');
+    await user.click(screen.getByLabelText(/reduce/i));
+    await user.click(await screen.findByRole('option', { name: /cuota \(misma/i }));
+    await user.type(screen.getByLabelText(/nuevo monto de cuota/i), '150.25');
+    await user.click(screen.getByRole('button', { name: /confirmar abono/i }));
+
+    await waitFor(() => {
+      expect(mockRecordPrincipalPayment).toHaveBeenCalledWith(
+        'loan-1',
+        100050,
+        expect.any(Date),
+        { type: 'reduce_installment_amount', newInstallmentAmountCents: 15025 }
+      );
+    });
+  });
+
+  it('shows a message and does not call the repository when the principal amount is not a valid money amount', async () => {
+    const user = userEvent.setup();
+    const mockRecordPrincipalPayment = vi.fn();
+    mockRepo({ recordPrincipalPayment: mockRecordPrincipalPayment } as never);
+
+    render(<InstallmentLoanList userId="fake-user-id" />);
+    await screen.findByText(/BCP/i);
+
+    await user.click(screen.getByRole('button', { name: /abono a capital/i }));
+    await user.type(screen.getByLabelText(/monto del abono/i), '10.123');
+    await user.click(screen.getByLabelText(/reduce/i));
+    await user.click(await screen.findByRole('option', { name: /plazo/i }));
+    await user.type(screen.getByLabelText(/nuevo número de cuotas/i), '7');
+    await user.click(screen.getByRole('button', { name: /confirmar abono/i }));
+
+    expect(await screen.findByText(/hasta dos decimales/i)).toBeInTheDocument();
+    expect(mockRecordPrincipalPayment).not.toHaveBeenCalled();
+  });
+
+  it('summarizes a loan from the user-entered terms: original amount, current installment, installments left and progress', async () => {
+    mockRepo();
+    render(<InstallmentLoanList userId="fake-user-id" />);
+    const card = await screen.findByTestId('installment-loan-loan-1');
+    expect(within(card).getByText('Activo')).toBeInTheDocument();
+    expect(within(card).getByText('2,000.00')).toBeInTheDocument();
+    expect(within(card).getByText('200.00')).toBeInTheDocument();
+    expect(within(card).getByText('10 de 12 cuotas restantes')).toBeInTheDocument();
+    expect(within(card).getByText('15% (informativo)')).toBeInTheDocument();
+    expect(within(card).getByRole('progressbar', { name: 'Avance de cuotas de BCP' })).toHaveAttribute('aria-valuenow', '17');
+  });
+
+  it('lists the payment history on demand', async () => {
+    const user = userEvent.setup();
+    mockRepo({
+      getPayments: vi.fn().mockResolvedValue([
+        { id: 'p1', installment_loan_id: 'loan-1', kind: 'installment', amount: 20000, date: new Date(2026, 9, 10), created_at: new Date(), updated_at: new Date() },
+        { id: 'p2', installment_loan_id: 'loan-1', kind: 'principal', amount: 50000, date: new Date(2026, 9, 12), created_at: new Date(), updated_at: new Date() },
+      ]),
+    } as never);
+    render(<InstallmentLoanList userId="fake-user-id" />);
+    await screen.findByText(/BCP/i);
+
+    await user.click(screen.getByRole('button', { name: /ver historial de pagos/i }));
+    expect(await screen.findByText('· Cuota')).toBeInTheDocument();
+    expect(screen.getByText('· Abono a capital')).toBeInTheDocument();
+    expect(screen.getByText('10 oct 2026')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /ocultar historial/i }));
+    expect(screen.queryByText('10 oct 2026')).toBeNull();
   });
 });

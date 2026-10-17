@@ -1,31 +1,28 @@
 'use client';
 
 import React, { useState } from 'react';
+import { CalendarDays, PencilLine, Smile } from 'lucide-react';
 import { LocalHabitRepository } from '../../infrastructure/repositories/local/LocalHabitRepository';
 import { DayOfWeek, Habit, HabitScheduleMode } from '../../core/domain/models/types';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Loader2 } from 'lucide-react';
+import { FieldLabel } from './quickRecordUi';
+import { FormShell, RadioChips, WeekdayChips } from './formUi';
 
 interface Props {
   userId: string;
   existing?: Habit;
+  /** Hides the form's own title (the host sheet already shows one). */
+  embedded?: boolean;
   onComplete: () => void;
   onCancel: () => void;
 }
 
-const DAYS: { value: DayOfWeek; label: string }[] = [
-  { value: 'mon', label: 'Lunes' },
-  { value: 'tue', label: 'Martes' },
-  { value: 'wed', label: 'Miércoles' },
-  { value: 'thu', label: 'Jueves' },
-  { value: 'fri', label: 'Viernes' },
-  { value: 'sat', label: 'Sábado' },
-  { value: 'sun', label: 'Domingo' },
+const MODES: { value: HabitScheduleMode; label: string }[] = [
+  { value: 'fixed_days', label: 'Días fijos' },
+  { value: 'frequency', label: 'Frecuencia libre' },
 ];
 
-export default function HabitForm({ userId, existing, onComplete, onCancel }: Props) {
+export default function HabitForm({ userId, existing, embedded, onComplete, onCancel }: Props) {
   const [name, setName] = useState(existing?.name ?? '');
   const [icon, setIcon] = useState(existing?.icon ?? '');
   const [scheduleMode, setScheduleMode] = useState<HabitScheduleMode>(existing?.schedule_mode ?? 'fixed_days');
@@ -73,24 +70,52 @@ export default function HabitForm({ userId, existing, onComplete, onCancel }: Pr
   };
 
   return (
-    <div className="w-full">
-      <h2 className="mb-4 font-heading text-base leading-none font-medium">{existing ? 'Editar Hábito' : 'Nuevo Hábito'}</h2>
-      <form onSubmit={handleSubmit} data-testid="habit-form" className="space-y-5">
-        <div className="space-y-2">
-          <Label htmlFor="habitName">Nombre</Label>
+    <FormShell
+      title={existing ? 'Editar Hábito' : 'Nuevo Hábito'}
+      embedded={embedded}
+      testId="habit-form"
+      onSubmit={handleSubmit}
+      error={error}
+      submitLabel={existing ? 'Guardar cambios' : 'Crear hábito'}
+      isSubmitting={isSubmitting}
+      onCancel={onCancel}
+    >
+      <div>
+        <FieldLabel icon={PencilLine} htmlFor="habitName">Nombre</FieldLabel>
+        <Input
+          type="text"
+          id="habitName"
+          required
+          placeholder="Ej. Correr"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+      </div>
+
+      <div>
+        <FieldLabel icon={CalendarDays} id="habit-schedule-label">Horario</FieldLabel>
+        <RadioChips name="scheduleMode" labelId="habit-schedule-label" value={scheduleMode} options={MODES} onChange={setScheduleMode} />
+      </div>
+
+      {scheduleMode === 'fixed_days' && <WeekdayChips value={fixedDays} onToggle={toggleDay} />}
+
+      {scheduleMode === 'frequency' && (
+        <div>
+          <FieldLabel htmlFor="frequencyTarget">Veces por semana</FieldLabel>
           <Input
             type="text"
-            id="habitName"
-            required
-            placeholder="Ej. Correr"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            inputMode="numeric"
+            id="frequencyTarget"
+            value={frequencyTarget}
+            onChange={(e) => setFrequencyTarget(e.target.value.replace(/[^0-9]/g, ''))}
           />
         </div>
+      )}
 
-        <details open={Boolean(existing?.icon)} className="border-t border-border pt-2"><summary className="text-sm font-medium">Opciones adicionales</summary><div className="space-y-4 pt-3">
-        <div className="space-y-2">
-          <Label htmlFor="habitIcon">Ícono (opcional)</Label>
+      <details open={Boolean(existing?.icon)} className="border-t border-border pt-3">
+        <summary className="flex min-h-11 cursor-pointer items-center font-mono text-label-mono-xs uppercase text-muted-foreground">Opciones adicionales</summary>
+        <div className="pt-2">
+          <FieldLabel icon={Smile} htmlFor="habitIcon" hint="Opcional">Ícono</FieldLabel>
           <Input
             type="text"
             id="habitIcon"
@@ -99,74 +124,7 @@ export default function HabitForm({ userId, existing, onComplete, onCancel }: Pr
             onChange={(e) => setIcon(e.target.value)}
           />
         </div>
-
-        </div></details>
-
-        <fieldset className="space-y-2">
-          <legend className="text-sm font-medium">Horario</legend>
-          <div className="flex gap-4">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name="scheduleMode"
-                checked={scheduleMode === 'fixed_days'}
-                onChange={() => setScheduleMode('fixed_days')}
-              />
-              Días fijos
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name="scheduleMode"
-                aria-label="Frecuencia libre"
-                checked={scheduleMode === 'frequency'}
-                onChange={() => setScheduleMode('frequency')}
-              />
-              Frecuencia libre
-            </label>
-          </div>
-        </fieldset>
-
-        {scheduleMode === 'fixed_days' && (
-          <div className="grid grid-cols-4 gap-2">
-            {DAYS.map(({ value, label }) => (
-              <label key={value} className="flex items-center gap-1 text-xs">
-                <input
-                  type="checkbox"
-                  aria-label={label}
-                  checked={fixedDays.includes(value)}
-                  onChange={() => toggleDay(value)}
-                />
-                {label}
-              </label>
-            ))}
-          </div>
-        )}
-
-        {scheduleMode === 'frequency' && (
-          <div className="space-y-2">
-            <Label htmlFor="frequencyTarget">Veces por semana</Label>
-            <Input
-              type="text"
-              id="frequencyTarget"
-              value={frequencyTarget}
-              onChange={(e) => setFrequencyTarget(e.target.value.replace(/[^0-9]/g, ''))}
-            />
-          </div>
-        )}
-
-        {error && <p className="text-sm text-destructive">{error}</p>}
-
-        <div className="flex gap-3 pt-2">
-          <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting} className="flex-1">
-            Cancelar
-          </Button>
-          <Button type="submit" disabled={isSubmitting} className="flex-1">
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {existing ? 'Guardar cambios' : 'Crear'}
-          </Button>
-        </div>
-      </form>
-    </div>
+      </details>
+    </FormShell>
   );
 }

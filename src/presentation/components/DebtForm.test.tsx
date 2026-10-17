@@ -63,4 +63,44 @@ describe('DebtForm', () => {
       }));
     });
   });
+
+  it.each([['1.2.3'], ['10.123']])('shows an error and does not save when the amount is not valid money (%s)', async (value) => {
+    const user = userEvent.setup();
+    const mockSave = vi.fn();
+    vi.mocked(LocalDebtRepository).mockImplementation(function () {
+      return { save: mockSave } as unknown as InstanceType<typeof LocalDebtRepository>;
+    });
+
+    render(<DebtForm userId="fake-user-id" onComplete={vi.fn()} onCancel={vi.fn()} />);
+    await user.type(screen.getByLabelText(/nombre/i), 'Juan');
+    await user.type(screen.getByLabelText(/monto/i), value);
+    fireEvent.submit(screen.getByTestId('debt-form'));
+
+    expect(await screen.findByText(/hasta dos decimales/i)).toBeInTheDocument();
+    expect(mockSave).not.toHaveBeenCalled();
+  });
+
+  it('shows the amount error for an empty amount', async () => {
+    const mockSave = vi.fn();
+    vi.mocked(LocalDebtRepository).mockImplementation(function () {
+      return { save: mockSave } as unknown as InstanceType<typeof LocalDebtRepository>;
+    });
+    render(<DebtForm userId="fake-user-id" onComplete={vi.fn()} onCancel={vi.fn()} />);
+    fireEvent.submit(screen.getByTestId('debt-form'));
+    expect(await screen.findByText(/hasta dos decimales/i)).toBeInTheDocument();
+    expect(mockSave).not.toHaveBeenCalled();
+  });
+
+  it('converts an amount with decimals to exact cents', async () => {
+    const user = userEvent.setup();
+    const mockSave = vi.fn();
+    vi.mocked(LocalDebtRepository).mockImplementation(function () {
+      return { save: mockSave } as unknown as InstanceType<typeof LocalDebtRepository>;
+    });
+    render(<DebtForm userId="fake-user-id" onComplete={vi.fn()} onCancel={vi.fn()} />);
+    await user.type(screen.getByLabelText(/nombre/i), 'Juan');
+    await user.type(screen.getByLabelText(/monto/i), '4.35');
+    fireEvent.submit(screen.getByTestId('debt-form'));
+    await waitFor(() => expect(mockSave).toHaveBeenCalledWith(expect.objectContaining({ amount: 435 })));
+  });
 });

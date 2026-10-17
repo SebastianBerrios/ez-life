@@ -10,85 +10,111 @@
   }
 }
 
+/*
+ * Obsidian Precision tokens (spec 010).
+ * HSL triplets (no alpha) so tailwind.config.ts can consume them as
+ * `hsl(var(--x) / <alpha-value>)`. Hairline borders are the OPAQUE equivalent of
+ * white 8% (dark) / #0B0D12 8% (light) over the card surface, because a triplet cannot carry alpha.
+ * Full table + contrast ratios: specs/010-rediseno-obsidian/tokens.md
+ */
 @layer base {
+  /* Light theme: derived variant of Obsidian (default theme is dark, see layout.tsx) */
   :root {
-    /* Warm cream base — not pure white */
-    --background: 38 30% 96%;
-    --foreground: 25 25% 15%;
+    color-scheme: light;
 
-    /* Cards slightly whiter than background */
-    --card: 0 0% 100%;
-    --card-foreground: 25 25% 15%;
+    --background: 220 23.1% 97.5%; /* #F7F8FA */
+    --foreground: 222.9 24.1% 5.7%; /* #0B0D12 */
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 25 25% 15%;
+    --card: 0 0% 100%; /* #FFFFFF (surface-1) */
+    --card-foreground: 222.9 24.1% 5.7%;
 
-    /* Sage green — more saturated and expressive */
-    --primary: 155 38% 40%;
+    --popover: 0 0% 100%; /* #FFFFFF: floating layers stay white in light */
+    --popover-foreground: 222.9 24.1% 5.7%;
+
+    --surface-2: 216 21.7% 95.5%; /* #F1F3F6 */
+    --surface-3: 220 22% 92%; /* #E6E9EF */
+
+    /* #047857: #059669 only reaches 3.77:1 against white, below AA 4.5:1 */
+    --primary: 162.9 93.5% 24.3%; /* #047857 */
+    --primary-hover: 163.1 88.1% 19.8%; /* #065F46 */
     --primary-foreground: 0 0% 100%;
 
-    /* Warm peach/beige secondary */
-    --secondary: 35 45% 91%;
-    --secondary-foreground: 25 25% 20%;
+    --secondary: 216 21.7% 95.5%;
+    --secondary-foreground: 222.9 24.1% 5.7%;
 
-    /* Warm muted tones */
-    --muted: 38 20% 91%;
-    --muted-foreground: 30 15% 45%;
+    --muted: 220 22% 92%;
+    --muted-foreground: 215.3 19.3% 34.5%; /* #475569 */
 
-    /* Accent: warm amber touch */
-    --accent: 35 45% 91%;
-    --accent-foreground: 25 25% 20%;
+    --accent: 220 22% 92%;
+    --accent-foreground: 222.9 24.1% 5.7%;
 
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 345.3 82.7% 40.8%; /* #BE123C (rose-700: #E11D48 was 3.8:1 on tinted badges) */
+    --destructive-foreground: 0 0% 100%;
+    --expense: 345.3 82.7% 40.8%; /* #BE123C */
 
-    --warning: 38 92% 45%;
-    --warning-foreground: 25 25% 15%;
+    --success: 163.1 88.1% 19.8%; /* #065F46 (emerald-800: #047857 was 4.4:1 on tinted badges) */
 
-    --border: 35 18% 84%;
-    --input: 35 18% 84%;
-    --ring: 155 38% 40%;
+    --warning: 22.7 82.5% 31.4%; /* #92400E (amber-800: #B45309 was 4.4:1 on tinted badges) */
+    --warning-foreground: 0 0% 100%;
 
-    /* More rounded = warmer feel */
-    --radius: 0.75rem;
+    --subtle: 215.4 16.3% 46.9%; /* #64748B */
+
+    --border: 180 2.6% 92.4%; /* #0B0D12 @ 8% over #FFFFFF */
+    --border-strong: 240 1.3% 84.9%; /* #0B0D12 @ 16% over #FFFFFF */
+    --input: 180 2.6% 92.4%;
+    --ring: 162.9 93.5% 24.3%;
+
+    /* 8px base: sm 4px, md 6px, lg 8px (xl 12px is fixed in tailwind.config.ts) */
+    --radius: 0.5rem;
     --radius-sm: calc(var(--radius) - 4px);
     --radius-md: calc(var(--radius) - 2px);
     --radius-lg: var(--radius);
   }
 
+  /* Dark theme: Obsidian (default) */
   .dark {
-    /* Slate-blue dark — warmer than pure green-dark */
-    --background: 222 20% 11%;
-    --foreground: 38 20% 92%;
+    color-scheme: dark;
 
-    --card: 222 20% 14%;
-    --card-foreground: 38 20% 92%;
+    --background: 230 25% 4.7%; /* #090A0F canvas */
+    --foreground: 210 20% 98%; /* #F9FAFB */
 
-    --popover: 222 20% 14%;
-    --popover-foreground: 38 20% 92%;
+    --card: 225 18.2% 8.6%; /* #12141A surface-1 */
+    --card-foreground: 210 20% 98%;
 
-    /* Sage green — brighter in dark for contrast */
-    --primary: 155 38% 52%;
-    --primary-foreground: 155 35% 10%;
+    --popover: 225 18.8% 12.5%; /* #1A1D26 surface-2 */
+    --popover-foreground: 210 20% 98%;
 
-    --secondary: 222 15% 22%;
-    --secondary-foreground: 38 20% 88%;
+    --surface-2: 225 18.8% 12.5%; /* #1A1D26 */
+    --surface-3: 226.7 20.9% 16.9%; /* #222634 */
 
-    --muted: 222 15% 22%;
-    --muted-foreground: 222 10% 72%;
+    --primary: 160.1 84.1% 39.4%; /* #10B981 */
+    --primary-hover: 158.1 64.4% 51.6%; /* #34D399 */
+    --primary-foreground: 230 25% 4.7%; /* dark canvas on emerald */
 
-    --accent: 222 15% 22%;
-    --accent-foreground: 38 20% 88%;
+    --secondary: 225 18.8% 12.5%;
+    --secondary-foreground: 210 20% 98%;
 
-    --destructive: 0 55% 42%;
-    --destructive-foreground: 0 0% 98%;
+    --muted: 226.7 20.9% 16.9%;
+    --muted-foreground: 215 20.2% 65.1%; /* #94A3B8 */
 
-    --warning: 38 80% 55%;
-    --warning-foreground: 25 15% 10%;
+    --accent: 226.7 20.9% 16.9%;
+    --accent-foreground: 210 20% 98%;
 
-    --border: 222 12% 24%;
-    --input: 222 12% 24%;
-    --ring: 155 38% 52%;
+    --destructive: 351.3 94.5% 71.4%; /* #FB7185 (rose-400: #F43F5E fell to 4.2:1 on tinted badges) */
+    --destructive-foreground: 210 20% 98%;
+    --expense: 351.3 94.5% 71.4%; /* #FB7185 */
+
+    --success: 158.1 64.4% 51.6%; /* #34D399 */
+
+    --warning: 37.7 92.1% 50.2%; /* #F59E0B */
+    --warning-foreground: 230 25% 4.7%;
+
+    --subtle: 215.3 19.3% 34.5%; /* #475569 */
+
+    --border: 222.9 8.6% 15.9%; /* white @ 8% over #12141A */
+    --border-strong: 228 7.4% 26.7%; /* white @ 16% over #1A1D26 */
+    --input: 222.9 8.6% 15.9%;
+    --ring: 160.1 84.1% 39.4%;
   }
 
   * {
@@ -104,6 +130,18 @@
   }
 }
 
+/* Typography helpers: Tailwind `fontSize` cannot set family / numeric features. */
+@layer components {
+  .text-label-mono-sm,
+  .text-label-mono-xs {
+    font-family: theme("fontFamily.mono");
+  }
+  .text-metric-num-lg,
+  .text-metric-num-md {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
 @layer base {
   button, summary, [role="button"] { min-height: 44px; min-width: 44px; }
   input:not([type="checkbox"]):not([type="radio"]), select { min-height: 44px; }
@@ -112,10 +150,14 @@
   :is(button, a, input, summary, [role="button"]):focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; }
   summary { cursor: pointer; display: flex; align-items: center; }
 }
-.personal-progress { appearance: none; border: 0; border-radius: 2px; overflow: hidden; background: hsl(var(--muted)); }
-.personal-progress::-webkit-progress-bar { background: hsl(var(--muted)); }
-.personal-progress::-webkit-progress-value { background: hsl(var(--primary)); }
+/* Native <progress> used by PersonalProgress: 4px track, primary fill (same look as ui/progress) */
+.personal-progress { appearance: none; border: 0; border-radius: 2px; overflow: hidden; background: hsl(var(--surface-3)); }
+.personal-progress::-webkit-progress-bar { background: hsl(var(--surface-3)); }
+.personal-progress::-webkit-progress-value { background: hsl(var(--primary)); transition: width 300ms ease-out; }
 .personal-progress::-moz-progress-bar { background: hsl(var(--primary)); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
+
+/* Element revealed by a ⌘K navigation (see useRevealTarget): a static ring, no animation, so it is motion-safe. */
+[data-reveal] { outline: 2px solid hsl(var(--primary)); outline-offset: 2px; }

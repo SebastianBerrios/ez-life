@@ -81,6 +81,31 @@ describe('InstallmentLoanForm', () => {
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
+  it.each([['amount', '10.123', '200.00'], ['installment amount', '2000.00', '1.2.3']])(
+    'rejects an invalid %s with a message and never creates the loan (parseMoney)',
+    async (_label, amount, installmentAmount) => {
+      const user = userEvent.setup();
+      const mockCreate = vi.fn();
+      mockCategories();
+      vi.mocked(LocalInstallmentLoanRepository).mockImplementation(function () {
+        return { create: mockCreate } as unknown as InstanceType<typeof LocalInstallmentLoanRepository>;
+      });
+
+      render(<InstallmentLoanForm userId="fake-user-id" onComplete={vi.fn()} onCancel={vi.fn()} />);
+
+      await user.type(screen.getByLabelText(/entidad/i), 'BCP');
+      await user.type(screen.getByLabelText(/^monto$/i), amount);
+      await user.type(screen.getByLabelText(/n° de cuotas/i), '12');
+      await user.type(screen.getByLabelText(/monto de cuota/i), installmentAmount);
+      await user.click(await screen.findByLabelText(/categoría/i));
+      await user.click(await screen.findByRole('option', { name: /necesidades/i }));
+      fireEvent.submit(screen.getByTestId('installment-loan-form'));
+
+      expect(await screen.findByText(/hasta dos decimales/i)).toBeInTheDocument();
+      expect(mockCreate).not.toHaveBeenCalled();
+    },
+  );
+
   it('never lets the interest rate reach any calculation — it is passed through untouched (FR-013)', async () => {
     const user = userEvent.setup();
     const mockCreate = vi.fn();

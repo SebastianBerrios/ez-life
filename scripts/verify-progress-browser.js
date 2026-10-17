@@ -6,7 +6,7 @@ async page => {
   await page.goto(origin);
   await page.evaluate(() => localStorage.setItem('ezlife.activeAccount.v1', JSON.stringify({ id: 'progress-user' })));
   await page.reload();
-  await page.getByText(/Paso 1: Configuración Básica|Balance del Mes/).waitFor();
+  await page.getByText(/Paso 1: Configuración Básica|Resumen Ejecutivo|Resumen del ciclo/).waitFor();
   await page.evaluate(async () => {
     const database = await new Promise((resolve, reject) => {
       const request = indexedDB.open('ezlife-db'); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
@@ -24,28 +24,31 @@ async page => {
       transaction.oncomplete = resolve; transaction.onerror = () => reject(transaction.error);
     }); database.close();
   });
-  await page.reload(); await page.getByText('Balance del Mes').waitFor();
+  await page.reload(); await page.getByRole('heading', { name: /Resumen Ejecutivo|Resumen del ciclo/ }).waitFor();
   await page.evaluate(() => document.fonts.ready);
   const typography = await page.evaluate(() => ({
     body: getComputedStyle(document.body).fontFamily,
     heading: getComputedStyle(document.querySelector('h1')).fontFamily,
   }));
-  if (!typography.body.includes('Jakarta') || !typography.heading.includes('Fraunces')) throw new Error(`Incorrect typography: ${JSON.stringify(typography)}`);
+  if (!/geist/i.test(typography.body) || !/geist/i.test(typography.heading)) throw new Error(`Incorrect typography: ${JSON.stringify(typography)}`);
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
   const cache = await page.evaluate(async () => ({ keys: await caches.keys(), assets: (await (await caches.open((await caches.keys()).find(key => key.startsWith('ez-life-')))).keys()).length }));
   await page.context().setOffline(true);
-  await page.reload(); await page.getByText('Balance del Mes').waitFor();
-  await page.getByRole('button', { name: 'Nuevo', exact: true }).click();
+  await page.reload(); await page.getByRole('heading', { name: /Resumen Ejecutivo|Resumen del ciclo/ }).waitFor();
+  await page.getByRole('button', { name: 'Nuevo Registro', exact: true }).click();
+  // Spec 010 "Nuevo Registro" sheet (Gasto tab): amount, concept (always visible) and the first
+  // expense category card is pre-selected; "Opciones adicionales" is no longer needed.
+  await page.getByRole('dialog', { name: 'Nuevo Registro' }).waitFor();
   await page.getByLabel('Monto', { exact: true }).fill('12.34');
-  await page.getByText('Opciones adicionales', { exact: true }).click();
-  await page.getByLabel('Descripción', { exact: true }).fill('Escritura offline verificada');
-  await page.getByRole('button', { name: 'Guardar', exact: true }).click();
-  await page.getByText('Balance del Mes').waitFor();
-  await page.getByText('S/ -12.34', { exact: true }).waitFor();
-  await page.reload(); await page.getByText('S/ -12.34', { exact: true }).waitFor();
+  await page.getByLabel('Concepto / descripción', { exact: true }).fill('Escritura offline verificada');
+  await page.getByRole('button', { name: 'Guardar Registro', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Nuevo Registro' }).waitFor({ state: 'detached' });
+  await page.getByRole('heading', { name: /Resumen Ejecutivo|Resumen del ciclo/ }).waitFor();
+  await page.getByText('Escritura offline verificada').first().waitFor();
+  await page.reload(); await page.getByText('Escritura offline verificada').first().waitFor();
   const reopened = await page.context().newPage();
-  await reopened.goto(origin); await reopened.getByText('S/ -12.34', { exact: true }).waitFor();
+  await reopened.goto(origin); await reopened.getByText('Escritura offline verificada').first().waitFor();
   await reopened.close(); await page.context().setOffline(false);
   const screens = [];
   for (const width of [390, 1440]) {
@@ -53,36 +56,52 @@ async page => {
     for (const theme of ['light', 'dark']) {
       await page.evaluate(theme => { localStorage.setItem('theme', theme); document.documentElement.classList.toggle('dark', theme === 'dark'); }, theme);
       await page.emulateMedia({ reducedMotion: 'reduce' });
-      const labels = ['Resumen', 'Movimientos', 'Préstamos', 'Control', 'Análisis', 'Metas de Ahorro', 'Espacio', 'Crear', 'Mi progreso', 'Ajustes'];
-      for (const label of labels) {
-        if (width < 768 && !['Resumen', 'Movimientos', 'Préstamos', 'Control'].includes(label)) {
-          await page.getByRole('button', { name: 'Más', exact: true }).click();
-          await page.getByRole('dialog').getByRole('button', { name: label, exact: true }).click();
+      // Spec 010 navigation: 6 desktop destinations; mobile has Inicio/Finanzas/+/Hábitos/Ajustes and
+      // reaches Espacio compartido / Mi progreso through the entry rows on Inicio and Ajustes.
+      const routes = [
+        { id: 'dashboard', desktop: 'Resumen', mobile: 'Inicio' },
+        { id: 'finances', desktop: 'Finanzas', mobile: 'Finanzas' },
+        { id: 'control', desktop: 'Control & Hábitos', mobile: 'Hábitos' },
+        { id: 'shared-space', desktop: 'Espacio Compartido', mobile: 'Espacio compartido', mobileRow: true },
+        { id: 'progress', desktop: 'Mi Progreso', mobile: 'Mi progreso', mobileRow: true },
+        { id: 'settings', desktop: 'Ajustes', mobile: 'Ajustes' },
+      ];
+      for (const route of routes) {
+        const label = route.id;
+        if (width >= 768) {
+          await page.getByRole('complementary', { name: 'Barra lateral' }).getByRole('button', { name: route.desktop, exact: true }).click();
         } else {
-          const nav = width < 768 ? page.getByRole('navigation', { name: 'Navegación principal' }) : page.getByRole('complementary', { name: 'Barra lateral' });
-          await nav.getByRole('button', { name: label, exact: true }).click();
+          const mobileNav = page.getByRole('navigation', { name: 'Navegación principal' });
+          if (route.mobileRow) {
+            await mobileNav.getByRole('button', { name: 'Inicio', exact: true }).click();
+            // Mi progreso has its own card on Inicio (4b); only Espacio compartido keeps an entry row.
+            if (route.id === 'progress') await page.getByRole('main').getByRole('button', { name: /Mi progreso/i }).first().click();
+            else await page.getByTestId('mobile-route-links').getByRole('button', { name: route.mobile, exact: true }).click();
+          } else {
+            await mobileNav.getByRole('button', { name: route.mobile, exact: true }).click();
+          }
         }
         await page.waitForTimeout(200);
         const dimensions = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, width: innerWidth }));
         if (dimensions.scroll > dimensions.width + 1) throw new Error(`Overflow: ${label}, ${width}, ${theme}`);
-        if (label === 'Mi progreso') await page.getByText('Registro constante', { exact: true }).waitFor();
-        if (['Resumen', 'Mi progreso', 'Movimientos'].includes(label)) await page.screenshot({ path: `.playwright-cli/progress-${label}-${width}-${theme}.png`, fullPage: true });
+        if (label === 'progress') await page.getByText('Registro constante', { exact: true }).waitFor();
+        if (['dashboard', 'progress', 'finances'].includes(label)) await page.screenshot({ path: `.playwright-cli/progress-${label}-${width}-${theme}.png`, fullPage: true });
         screens.push({ label, width, theme, noOverflow: true });
       }
     }
   }
   await page.context().setOffline(true);
-  await page.reload(); await page.getByText('Balance del Mes').waitFor();
-  await page.getByRole('complementary', { name: 'Barra lateral' }).getByRole('button', { name: 'Mi progreso', exact: true }).click();
+  await page.reload(); await page.getByRole('heading', { name: /Resumen Ejecutivo|Resumen del ciclo/ }).waitFor();
+  await page.getByRole('complementary', { name: 'Barra lateral' }).getByRole('button', { name: 'Mi Progreso', exact: true }).click();
   await page.getByText('Registro constante', { exact: true }).waitFor();
   await page.getByRole('complementary', { name: 'Barra lateral' }).getByRole('button', { name: 'Ajustes', exact: true }).click();
-  await page.getByLabel('Mostrar logros personales y celebraciones').uncheck();
-  await page.getByRole('complementary', { name: 'Barra lateral' }).getByRole('button', { name: 'Mi progreso', exact: true }).waitFor({ state: 'hidden' });
-  await page.reload(); await page.getByText('Balance del Mes').waitFor();
-  await page.getByRole('complementary', { name: 'Barra lateral' }).getByRole('button', { name: 'Mi progreso', exact: true }).waitFor({ state: 'hidden' });
+  await page.getByRole('switch', { name: 'Mostrar logros personales y celebraciones' }).click(); // Switch (was a checkbox): turns it off
+  await page.getByRole('complementary', { name: 'Barra lateral' }).getByRole('button', { name: 'Mi Progreso', exact: true }).waitFor({ state: 'hidden' });
+  await page.reload(); await page.getByRole('heading', { name: /Resumen Ejecutivo|Resumen del ciclo/ }).waitFor();
+  await page.getByRole('complementary', { name: 'Barra lateral' }).getByRole('button', { name: 'Mi Progreso', exact: true }).waitFor({ state: 'hidden' });
   await page.getByRole('complementary', { name: 'Barra lateral' }).getByRole('button', { name: 'Ajustes', exact: true }).click();
-  await page.getByLabel('Mostrar logros personales y celebraciones').check();
-  await page.getByRole('complementary', { name: 'Barra lateral' }).getByRole('button', { name: 'Mi progreso', exact: true }).waitFor();
+  await page.getByRole('switch', { name: 'Mostrar logros personales y celebraciones' }).click(); // turns it back on
+  await page.getByRole('complementary', { name: 'Barra lateral' }).getByRole('button', { name: 'Mi Progreso', exact: true }).waitFor();
   await page.keyboard.press('Tab');
   const focused = await page.evaluate(() => getComputedStyle(document.activeElement).outlineStyle);
   await page.context().setOffline(false);

@@ -145,4 +145,41 @@ describe('HabitForm', () => {
     });
     expect(mockSave.mock.calls[0][0].icon).toBeUndefined();
   });
+  it('offers days fixed / frequency as radio chips and weekday chips as checkboxes with the full day as name', async () => {
+    const user = userEvent.setup();
+    vi.mocked(LocalHabitRepository).mockImplementation(function () {
+      return { save: vi.fn() } as unknown as InstanceType<typeof LocalHabitRepository>;
+    });
+    render(<HabitForm userId="user-1" onComplete={vi.fn()} onCancel={vi.fn()} />);
+
+    expect(screen.getByRole('radiogroup', { name: /horario/i })).toBeInTheDocument();
+    expect(screen.getByLabelText('Días fijos')).toBeChecked();
+    expect(screen.getAllByRole('checkbox').map(box => box.getAttribute('aria-label'))).toEqual(
+      ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'],
+    );
+    await user.click(screen.getByLabelText('Viernes'));
+    expect(screen.getByLabelText('Viernes')).toBeChecked();
+    await user.click(screen.getByLabelText('Viernes'));
+    expect(screen.getByLabelText('Viernes')).not.toBeChecked();
+
+    await user.click(screen.getByLabelText(/frecuencia libre/i));
+    expect(screen.queryByLabelText('Lunes')).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/veces por semana/i)).toBeInTheDocument();
+  });
+
+  it('shows its own title standalone, none when embedded, and a primary full-width submit plus Cancelar', async () => {
+    const user = userEvent.setup();
+    vi.mocked(LocalHabitRepository).mockImplementation(function () {
+      return { save: vi.fn() } as unknown as InstanceType<typeof LocalHabitRepository>;
+    });
+    const onCancel = vi.fn();
+    const { unmount } = render(<HabitForm userId="user-1" onComplete={vi.fn()} onCancel={onCancel} />);
+    expect(screen.getByRole('heading', { name: 'Nuevo Hábito' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Crear hábito' })).toHaveClass('w-full');
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(onCancel).toHaveBeenCalled();
+    unmount();
+    render(<HabitForm userId="user-1" embedded onComplete={vi.fn()} onCancel={vi.fn()} />);
+    expect(screen.queryByRole('heading', { name: 'Nuevo Hábito' })).not.toBeInTheDocument();
+  });
 });

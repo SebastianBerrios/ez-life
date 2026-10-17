@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import SharedSpaceScreen from './SharedSpaceScreen';
 import { LocalSharedSpaceRepository } from '../../infrastructure/repositories/local/LocalSharedSpaceRepository';
@@ -76,5 +77,38 @@ describe('SharedSpaceScreen', () => {
     );
 
     expect(await screen.findByText(/todavía no tenés un espacio compartido/i)).toBeInTheDocument();
+    expect(screen.getByTestId('shared-space-empty')).toBeInTheDocument();
+  });
+
+  it('wires the empty-state buttons and the per-space "+ Movimiento" action', async () => {
+    const user = userEvent.setup();
+    const onCreate = vi.fn();
+    const onJoin = vi.fn();
+    const onAddMovement = vi.fn();
+    const now = new Date();
+    const space = { id: 'space-1', name: 'Casa', permission_mode: 'strict' as const, status: 'active' as const, created_by: 'u1', created_at: now, updated_at: now };
+    const members = [{ id: 'm1', shared_space_id: 'space-1', user_id: 'u1', joined_at: now, created_at: now, updated_at: now }];
+
+    vi.mocked(LocalSharedSpaceRepository).mockImplementation(function () {
+      return { getAllForUser: vi.fn().mockResolvedValue([]), getLeftForUser: vi.fn().mockResolvedValue([]) } as unknown as InstanceType<typeof LocalSharedSpaceRepository>;
+    });
+    vi.mocked(LocalMembershipRepository).mockImplementation(function () {
+      return { getMembers: vi.fn().mockResolvedValue(members) } as unknown as InstanceType<typeof LocalMembershipRepository>;
+    });
+    const empty = render(<SharedSpaceScreen userId="u1" onCreate={onCreate} onJoin={onJoin} onAddMovement={onAddMovement} refreshKey={0} />);
+    await user.click(await screen.findByRole('button', { name: 'Crear espacio' }));
+    await user.click(screen.getByRole('button', { name: 'Unirme con código' }));
+    expect(onCreate).toHaveBeenCalledTimes(1);
+    expect(onJoin).toHaveBeenCalledTimes(1);
+    empty.unmount();
+
+    vi.mocked(LocalSharedSpaceRepository).mockImplementation(function () {
+      return { getAllForUser: vi.fn().mockResolvedValue([space]), getLeftForUser: vi.fn().mockResolvedValue([]) } as unknown as InstanceType<typeof LocalSharedSpaceRepository>;
+    });
+    render(<SharedSpaceScreen userId="u1" onCreate={onCreate} onJoin={onJoin} onAddMovement={onAddMovement} refreshKey={0} />);
+    await user.click(await screen.findByRole('button', { name: '+ Movimiento' }));
+    expect(onAddMovement).toHaveBeenCalledWith('space-1', members);
+    await user.click(screen.getByRole('button', { name: 'Unirme a otro espacio' }));
+    expect(onJoin).toHaveBeenCalledTimes(2);
   });
 });

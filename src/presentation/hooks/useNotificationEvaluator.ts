@@ -13,8 +13,7 @@ import { LocalSharedSpaceRepository } from '../../infrastructure/repositories/lo
 import { LocalSharedMovementRepository } from '../../infrastructure/repositories/local/LocalSharedMovementRepository';
 import { SharedMovement } from '../../core/domain/models/types';
 import { LocalHabitRepository } from '../../infrastructure/repositories/local/LocalHabitRepository';
-import { buildFixedDaysLog, evaluateFixedDaysStreak } from '../../core/use-cases/evaluateHabitStreak';
-import { HabitPendingToday } from '../../core/use-cases/evaluateNotifications';
+import { findHabitsPendingToday } from '../../core/use-cases/findHabitsPendingToday';
 import { LocalGoalRepository } from '../../infrastructure/repositories/local/LocalGoalRepository';
 import { LocalTaskRepository } from '../../infrastructure/repositories/local/LocalTaskRepository';
 import { calculateMonthlyCycle } from '../../core/use-cases/calculateMonthlyCycle';
@@ -81,23 +80,10 @@ export function useNotificationEvaluator(userId: string | null) {
         const sharedMovements: SharedMovement[] = sharedMovementLists.flat();
 
         const habits = await habitRepo.getAll(userId);
-        const fixedDaysHabits = habits.filter(h => h.schedule_mode === 'fixed_days');
-        const today = new Date();
-        const todayCode = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][today.getUTCDay()];
-
-        const habitsPendingToday: HabitPendingToday[] = [];
-        for (const habit of fixedDaysHabits) {
-          if (!habit.fixed_days?.includes(todayCode as typeof habit.fixed_days[number])) continue;
-
-          const completions = await habitRepo.getCompletions(habit.id);
-          const todayLog = buildFixedDaysLog(habit.fixed_days, completions, today, today);
-          if (todayLog[0]?.completed) continue; // already done today
-
-          const historyLog = buildFixedDaysLog(habit.fixed_days, completions, habit.created_at, today);
-          const { tokensAvailable } = evaluateFixedDaysStreak(historyLog.slice(0, -1)); // exclude today (not completed)
-
-          habitsPendingToday.push({ habitId: habit.id, habitName: habit.name, hasTokensAvailable: tokensAvailable > 0 });
-        }
+        const completionsByHabit = Object.fromEntries(
+          await Promise.all(habits.map(async habit => [habit.id, await habitRepo.getCompletions(habit.id)] as const)),
+        );
+        const habitsPendingToday = findHabitsPendingToday(habits, completionsByHabit, new Date());
 
         const goals = await goalRepoGeneric.getAll(userId);
         const tasks = await taskRepo.getAll(userId);

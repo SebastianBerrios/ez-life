@@ -4,7 +4,7 @@ async page => {
   await page.context().setOffline(false);
   await page.evaluate(() => localStorage.setItem('ezlife.activeAccount.v1', JSON.stringify({ id: 'audit-user' })));
   await page.reload();
-  await page.getByText(/Paso 1: Configuración Básica|Balance del Mes/).waitFor();
+  await page.getByText(/Paso 1: Configuración Básica|Resumen Ejecutivo|Resumen del ciclo/).waitFor();
   await page.evaluate(async () => {
     const database = await new Promise((resolve, reject) => {
       const request = indexedDB.open('ezlife-db'); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
@@ -22,17 +22,17 @@ async page => {
       transaction.oncomplete = resolve; transaction.onerror = () => reject(transaction.error);
     }); database.close();
   });
-  await page.reload(); await page.getByText('Balance del Mes').waitFor();
+  await page.reload(); await page.getByRole('heading', { name: /Resumen Ejecutivo|Resumen del ciclo/ }).waitFor();
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
   const cache = await page.evaluate(async () => ({ keys: await caches.keys(), assets: (await (await caches.open((await caches.keys()).find(key => key.startsWith('ez-life-')))).keys()).length }));
   await page.context().setOffline(true);
-  await page.reload(); await page.getByText('Balance del Mes').waitFor();
+  await page.reload(); await page.getByRole('heading', { name: /Resumen Ejecutivo|Resumen del ciclo/ }).waitFor();
   await page.getByRole('button', { name: 'Nuevo', exact: true }).click();
   await page.getByLabel('Monto', { exact: true }).fill('12.34');
   await page.getByLabel('Descripción', { exact: true }).fill('Escritura offline verificada');
   await page.getByRole('button', { name: 'Guardar', exact: true }).click();
-  await page.getByText('Balance del Mes').waitFor();
+  await page.getByRole('heading', { name: /Resumen Ejecutivo|Resumen del ciclo/ }).waitFor();
   await page.getByText('S/ -12.34', { exact: true }).waitFor();
   await page.reload(); await page.getByText('S/ -12.34', { exact: true }).waitFor();
   const reopened = await page.context().newPage();

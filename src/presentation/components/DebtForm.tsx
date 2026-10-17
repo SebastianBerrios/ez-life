@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { LocalDebtRepository } from '../../infrastructure/repositories/local/LocalDebtRepository';
 import { validateMovementAmount } from '../../core/use-cases/validateMovementAmount';
+import { parseMoney } from '../../core/use-cases/parseMoney';
 import { DomainError } from '../../core/domain/errors/DomainError';
 import { DebtDirection } from '../../core/domain/models/types';
 import { Button } from '@/components/ui/button';
@@ -29,8 +30,9 @@ export default function DebtForm({ userId, onComplete, onCancel }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const amountInCents = Math.round(parseFloat(amount.replace(/,/g, '')) * 100);
+    let amountInCents = 0;
     try {
+      amountInCents = parseMoney(amount);
       validateMovementAmount(amountInCents);
     } catch (err) {
       if (err instanceof DomainError) {

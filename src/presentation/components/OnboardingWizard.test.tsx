@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import OnboardingWizard from './OnboardingWizard';
@@ -58,5 +58,32 @@ describe('OnboardingWizard — Step 3 category seeding (FR-023)', () => {
 
     // Confirm the finish button actually reflects the seeded state.
     await waitFor(() => expect(screen.getByRole('button', { name: /finalizar configuración/i })).toBeEnabled());
+  });
+});
+
+describe('OnboardingWizard — progress indicator', () => {
+  beforeEach(async () => {
+    await db.profiles.clear();
+    await db.distribution_categories.clear();
+    await db.expense_categories.clear();
+    await db.expense_subcategories.clear();
+  });
+
+  it('lists the three steps and marks the current one for assistive technology', async () => {
+    render(<OnboardingWizard profileId="user-1" startStep={2} onComplete={() => {}} />);
+    const steps = screen.getByRole('list', { name: 'Progreso de la configuración' });
+    const items = within(steps).getAllByRole('listitem');
+    expect(items).toHaveLength(3);
+    expect(items.map(item => item.getAttribute('aria-current'))).toEqual([null, 'step', null]);
+    expect(items[0]).toHaveTextContent('Completado');
+    expect(items[1]).toHaveTextContent('Paso 2 de 3, actual');
+    expect(items[2]).toHaveTextContent('Paso 3 de 3');
+    expect(await screen.findByRole('button', { name: 'Guardar distribución' })).toBeInTheDocument();
+  });
+
+  it('shows the product name as the page heading', async () => {
+    render(<OnboardingWizard profileId="user-1" startStep={1} onComplete={() => {}} />);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('ez·life');
+    expect(await screen.findByRole('heading', { name: /configuración básica/i })).toBeInTheDocument();
   });
 });

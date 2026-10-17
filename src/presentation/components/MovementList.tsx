@@ -1,143 +1,249 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LocalMovementRepository } from '../../infrastructure/repositories/local/LocalMovementRepository';
-import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
-import { Movement } from '../../core/domain/models/types';
-import { calculateMonthlyCycle } from '../../core/use-cases/calculateMonthlyCycle';
-import { Card } from '@/components/ui/card';
+import type { Movement } from '../../core/domain/models/types';
+import { describeMovement, type MovementLookups } from '../../core/use-cases/describeMovement';
+import { useRevealTarget } from '../hooks/useRevealTarget';
+import {
+  categoryOptions, countByFilter, DEFAULT_SELECTION, isSelectionActive, selectMovements, type MovementSelection,
+} from '../../core/use-cases/filterMovements';
+import { groupByDay } from '../../core/use-cases/groupMovementsByDay';
+import { pageNumbers, paginate } from '../../core/use-cases/paginate';
+import { Panel, PanelHeader } from '@/components/ui/panel';
 import { Button } from '@/components/ui/button';
+import { Money } from '@/components/ui/money';
 import { Skeleton } from '@/components/ui/skeleton';
-import MovementForm from './MovementForm';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { onLocalChanges } from '../../infrastructure/db/localChanges';
+import { cn } from '@/lib/utils';
+import MovementForm from './MovementForm';
+import MovementToolbar, { SearchField } from './finances/MovementToolbar';
+import { MovementCard, MovementTable } from './finances/MovementRows';
+
+/** Rows per page on the desktop table. */
+export const MOVEMENT_PAGE_SIZE = 20;
 
 interface Props {
   userId: string;
+  /** Movements of the selected month (the screen reads them through `useFinancesData`). */
+  movements: Movement[];
+  lookups: MovementLookups;
+  /** Ids of movements with changes not yet pushed to the server (desktop "Estado" column). */
+  pendingIds: ReadonlySet<string>;
+  /** Net balance of the whole cycle (income - expense, transfers excluded), shown in the table footer. */
+  balanceCents: number;
+  /** Moment "Hoy"/"Ayer" are relative to. */
+  today: Date;
+  loading: boolean;
+  desktop: boolean;
+  /** Called after an edit or delete so the screen can refresh its data. */
+  onChanged: () => void;
+  /** Movement a ⌘K selection wants shown: editable ones open their edit dialog, the rest are revealed in the list. */
+  focusId?: string;
+  /** Changes every time the same movement is requested again. */
+  focusNonce?: number;
+  /** Called once the request was served, or abandoned because the movement is not in this month. */
+  onFocusHandled?: () => void;
 }
 
-const NO_CATEGORY_LABEL = 'Sin categoría';
+/** A request whose movement never shows up (deleted, other month) is dropped after this long. */
+const FOCUS_GIVE_UP_MS = 4000;
 
-export default function MovementList({ userId }: Props) {
-  const [movements, setMovements] = useState<Movement[]>([]);
-  const [categoryNameById, setCategoryNameById] = useState<Map<string, string>>(new Map());
-  const [subcategoryNameById, setSubcategoryNameById] = useState<Map<string, string>>(new Map());
-  const [loading, setLoading] = useState(true);
+function emptyMessage(selection: MovementSelection): string {
+  if (selection.query.trim() !== '' || selection.categoryId !== DEFAULT_SELECTION.categoryId) {
+    return 'No hay movimientos que coincidan con tu búsqueda o filtro.';
+  }
+  switch (selection.filter) {
+    case 'expense': return 'No hay gastos en este mes.';
+    case 'income': return 'No hay ingresos en este mes.';
+    case 'transfer': return 'No hay transferencias en este mes.';
+    case 'shared': return 'No hay movimientos compartidos en este mes.';
+    default: return 'No hay movimientos en este mes.';
+  }
+}
+
+function Pager({ page, pageCount, onPage }: { page: number; pageCount: number; onPage: (page: number) => void }) {
+  const pageButton = 'min-w-11 px-2 font-mono text-label-mono-sm tabular-nums';
+  return (
+    <nav aria-label="Paginación de movimientos" className="flex flex-wrap items-center gap-1">
+      <Button type="button" variant="ghost" disabled={page <= 1} onClick={() => onPage(page - 1)}>Anterior</Button>
+      {pageNumbers(page, pageCount).map((number, index) =>
+        number === null ? (
+          <span key={`gap-${index}`} aria-hidden="true" className="px-1 text-muted-foreground">…</span>
+        ) : (
+          <Button
+            key={number}
+            type="button"
+            variant={number === page ? 'default' : 'ghost'}
+            aria-label={`Página ${number}`}
+            aria-current={number === page ? 'page' : undefined}
+            onClick={() => onPage(number)}
+            className={pageButton}
+          >
+            {number}
+          </Button>
+        ),
+      )}
+      <Button type="button" variant="ghost" disabled={page >= pageCount} onClick={() => onPage(page + 1)}>Siguiente</Button>
+    </nav>
+  );
+}
+
+/**
+ * Movement history of the selected month: tab filters with counts, local search, category filter,
+ * date sort, edit/delete through a row menu. Mobile groups rows by day; desktop shows a paginated table.
+ * All selection logic lives in `core/use-cases`; this component only renders and wires events.
+ */
+export default function MovementList({
+  userId, movements, lookups, pendingIds, balanceCents, today, loading, desktop, onChanged, focusId, focusNonce, onFocusHandled,
+}: Props) {
+  const [selection, setSelection] = useState<MovementSelection>(DEFAULT_SELECTION);
+  const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Movement | undefined>();
   const [error, setError] = useState('');
+  const [revealId, setRevealId] = useState<string | undefined>();
+  const servedFocus = useRef<string | null>(null);
 
-  const loadMovements = useCallback(async () => {
-    try {
-      const repo = new LocalMovementRepository();
-      const catRepo = new LocalCategoryRepository();
-      const [start, end] = calculateMonthlyCycle(new Date());
+  const counts = useMemo(() => countByFilter(movements), [movements]);
+  const categories = useMemo(() => categoryOptions(movements, lookups), [movements, lookups]);
+  const selected = useMemo(() => selectMovements(movements, lookups, selection), [movements, lookups, selection]);
+  const current = useMemo(() => paginate(selected, page, MOVEMENT_PAGE_SIZE), [selected, page]);
+  const groups = useMemo(() => groupByDay(selected, today), [selected, today]);
 
-      const [data, expenseCategories] = await Promise.all([
-        repo.getAllByCycle(userId, start, end),
-        catRepo.getExpenseCategories(userId),
-      ]);
-      // Sort newest first
-      data.sort((a, b) => b.date.getTime() - a.date.getTime());
+  const changeSelection = (next: MovementSelection) => {
+    setSelection(next);
+    setPage(1);
+  };
 
-      // Category/subcategory lookup built once per load (research.md §7) —
-      // resolving id -> name here is presentation-only assembly, not
-      // business logic, so it stays in this component rather than in
-      // core/use-cases (Principio III).
-      const subcategoriesByCategory = await Promise.all(
-        expenseCategories.map(cat => catRepo.getSubcategories(cat.id))
-      );
-
-      setMovements(data);
-      setCategoryNameById(new Map(expenseCategories.map(cat => [cat.id, cat.name])));
-      setSubcategoryNameById(new Map(subcategoriesByCategory.flat().map(sub => [sub.id, sub.name])));
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [userId]);
-
-  useEffect(() => {
-    loadMovements();
-    return onLocalChanges(['movements', 'expense_categories', 'expense_subcategories'], loadMovements);
-  }, [loadMovements]);
-
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (movement: Movement) => {
     if (!window.confirm('¿Seguro que deseas eliminar este movimiento?')) return;
     try {
-      const repo = new LocalMovementRepository();
-      await repo.delete(id, userId);
-      await loadMovements();
+      await new LocalMovementRepository().delete(movement.id, userId);
+      setError('');
+      onChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo eliminar.');
     }
   };
 
-  if (loading) {
-    return (
-      <div className="space-y-3">
-        <Skeleton className="h-20 w-full rounded-xl" />
-        <Skeleton className="h-20 w-full rounded-xl" />
-        <Skeleton className="h-20 w-full rounded-xl" />
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!focusId || loading) return;
+    const request = `${focusId}:${focusNonce ?? ''}`;
+    if (servedFocus.current === request) return;
+    const movement = movements.find(item => item.id === focusId);
+    if (!movement) {
+      const giveUp = setTimeout(() => onFocusHandled?.(), FOCUS_GIVE_UP_MS);
+      return () => clearTimeout(giveUp);
+    }
+    servedFocus.current = request;
+    // Show it unfiltered, on the page that holds it.
+    setSelection(DEFAULT_SELECTION);
+    const position = selectMovements(movements, lookups, DEFAULT_SELECTION).findIndex(item => item.id === focusId);
+    setPage(Math.floor(Math.max(position, 0) / MOVEMENT_PAGE_SIZE) + 1);
+    if (describeMovement(movement, lookups).editable) setEditing(movement);
+    else setRevealId(movement.id);
+    onFocusHandled?.();
+  }, [focusId, focusNonce, loading, movements, lookups, onFocusHandled]);
+  useRevealTarget(revealId ? `movement-${revealId}` : undefined, focusNonce, true, () => setRevealId(undefined));
 
-  if (movements.length === 0) {
-    return (
-      <Card className="animate-fade-slide-up py-8 text-center shadow-none">
-        <p className="text-muted-foreground">No hay movimientos en este mes.</p>
-      </Card>
-    );
-  }
+  const actions = { onEdit: setEditing, onDelete: handleDelete };
+  const filtered = isSelectionActive(selection);
+
+  const editDialog = (
+    <Dialog open={Boolean(editing)} onOpenChange={open => { if (!open) setEditing(undefined); }}>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-md">
+        {editing && (
+          <MovementForm
+            userId={userId}
+            movement={editing}
+            onCancel={() => setEditing(undefined)}
+            onComplete={() => { setEditing(undefined); onChanged(); }}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+
+  // The desktop panel has its own padding; on mobile the rows sit directly on the page background.
+  const pad = desktop ? 'px-5' : '';
+
+  const body = loading ? (
+    <div className={cn('flex flex-col gap-3 pb-5', pad)} aria-busy="true">
+      <Skeleton className="h-14 w-full rounded-lg" />
+      <Skeleton className="h-14 w-full rounded-lg" />
+      <Skeleton className="h-14 w-full rounded-lg" />
+    </div>
+  ) : movements.length === 0 ? (
+    <p className={cn('pb-6 text-body-md text-muted-foreground', pad)}>{emptyMessage(DEFAULT_SELECTION)}</p>
+  ) : (
+    <>
+      <MovementToolbar
+        selection={selection}
+        onChange={changeSelection}
+        counts={counts}
+        categories={categories}
+        desktop={desktop}
+        part={desktop ? 'filters' : 'all'}
+        className={cn('pb-4', pad)}
+      />
+      {error && <p role="alert" className={cn('pb-3 text-body-md text-destructive', pad)}>{error}</p>}
+      {selected.length === 0 ? (
+        <div className={cn('flex flex-col items-start gap-3 pb-6', pad)}>
+          <p className="text-body-md text-muted-foreground">{emptyMessage(selection)}</p>
+          {filtered && <Button type="button" variant="outline" onClick={() => changeSelection(DEFAULT_SELECTION)}>Limpiar filtros</Button>}
+        </div>
+      ) : desktop ? (
+        <>
+          <MovementTable movements={current.items} lookups={lookups} pendingIds={pendingIds} {...actions} />
+          <div className={cn('flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-3', pad)}>
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-label-mono-sm text-muted-foreground">
+              <span>
+                Mostrando {current.items.length} de {selected.length}{' '}
+                {filtered
+                  ? `${selected.length === 1 ? 'registro filtrado' : 'registros filtrados'} (${movements.length} del mes)`
+                  : `${selected.length === 1 ? 'registro' : 'registros'} del mes`}
+              </span>
+              <span aria-hidden="true" className="h-4 w-px bg-border" />
+              <span className="flex items-center gap-1.5">
+                Balance neto del ciclo:
+                <Money cents={balanceCents} sign="always" tone="auto" size="sm" className="font-semibold" />
+              </span>
+            </p>
+            {current.pageCount > 1 && <Pager page={current.page} pageCount={current.pageCount} onPage={setPage} />}
+          </div>
+        </>
+      ) : (
+        <div className={cn('flex flex-col gap-4 pb-5', pad)}>
+          {groups.map(group => (
+            <section key={group.key} aria-label={group.label} className="flex flex-col gap-2">
+              <h3 className="font-mono text-label-mono-xs uppercase text-muted-foreground">{group.label}</h3>
+              <ul className="flex flex-col gap-2">
+                {group.items.map(movement => (
+                  <MovementCard key={movement.id} movement={movement} lookups={lookups} {...actions} />
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      )}
+    </>
+  );
 
   return (
-    <Card className="animate-fade-slide-up overflow-hidden py-0 shadow-none">
-      {error && <p role="alert" className="text-destructive p-4">{error}</p>}
-      <Dialog open={Boolean(editing)} onOpenChange={open => { if (!open) setEditing(undefined); }}>
-        <DialogContent>{editing && <MovementForm userId={userId} movement={editing} onCancel={() => setEditing(undefined)} onComplete={() => { setEditing(undefined); loadMovements(); }} />}</DialogContent>
-      </Dialog>
-      <ul className="divide-y divide-border">
-        {movements.map(m => {
-          const categoryName = m.expense_category_id ? (categoryNameById.get(m.expense_category_id) ?? NO_CATEGORY_LABEL) : NO_CATEGORY_LABEL;
-          const subcategoryName = m.expense_subcategory_id ? subcategoryNameById.get(m.expense_subcategory_id) : undefined;
-
-          return (
-          <li
-            key={m.id}
-            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-muted"
-          >
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground break-words">{m.description || 'Sin descripción'}</p>
-              <p className="text-sm text-muted-foreground">
-                {new Date(m.date).toLocaleDateString()} · {categoryName}{subcategoryName ? ` / ${subcategoryName}` : ''}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              {m.is_adjustment && (
-                <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                  Ajuste
-                </span>
-              )}
-              <span className={`text-sm font-semibold tabular-nums ${m.type === 'INCOME' ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'}`}>
-                {m.type === 'INCOME' ? '+' : '-'} S/ {(m.amount / 100).toFixed(2)}
-              </span>
-              {!m.is_linked && !m.shared_movement_id && !m.installment_payment_id && <>
-              <Button variant="ghost" size="sm" onClick={() => setEditing(m)}>Editar</Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleDelete(m.id)}
-                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-              >
-                Eliminar
-              </Button>
-              </>}
-            </div>
-          </li>
-          );
-        })}
-      </ul>
-    </Card>
+    <Panel aria-label="Historial de movimientos" className={cn(desktop ? '' : 'border-0 bg-transparent')} data-testid="history-panel">
+      {desktop ? (
+        <PanelHeader
+          eyebrow="Historial"
+          title="Historial detallado de transacciones"
+          action={movements.length > 0 && !loading ? (
+            <SearchField selection={selection} onChange={changeSelection} className="w-72" />
+          ) : undefined}
+        />
+      ) : (
+        <PanelHeader eyebrow="Historial" title="Movimientos del mes" titleAs="h3" className="px-0" />
+      )}
+      {editDialog}
+      <div className="flex flex-col">{body}</div>
+    </Panel>
   );
 }

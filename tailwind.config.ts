@@ -1,5 +1,8 @@
 import type { Config } from "tailwindcss";
 
+// Colors are HSL triplets in src/app/globals.css; `<alpha-value>` enables `bg-primary/10` etc.
+const token = (name: string) => `hsl(var(--${name}) / <alpha-value>)`;
+
 const config: Config = {
   darkMode: ["class"],
   content: [
@@ -11,57 +14,86 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['var(--font-jakarta)', 'sans-serif'],
-        heading: ['var(--font-fraunces)', 'serif'],
+        sans: ["var(--font-geist)", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ["var(--font-jetbrains)", "ui-monospace", "SFMono-Regular", "monospace"],
+        // Alias kept so existing `font-heading` classes keep working (now Geist, no serif).
+        heading: ["var(--font-geist)", "ui-sans-serif", "system-ui", "sans-serif"],
+      },
+      fontSize: {
+        "display-hero": ["44px", { lineHeight: "52px", letterSpacing: "-0.03em", fontWeight: "600" }],
+        "display-hero-mobile": ["32px", { lineHeight: "40px", letterSpacing: "-0.025em", fontWeight: "600" }],
+        "headline-lg": ["30px", { lineHeight: "38px", letterSpacing: "-0.02em", fontWeight: "600" }],
+        "headline-lg-mobile": ["24px", { lineHeight: "32px", letterSpacing: "-0.015em", fontWeight: "600" }],
+        "headline-md": ["20px", { lineHeight: "28px", letterSpacing: "-0.015em", fontWeight: "500" }],
+        "headline-sm": ["16px", { lineHeight: "24px", letterSpacing: "-0.01em", fontWeight: "500" }],
+        "body-lg": ["16px", { lineHeight: "24px", letterSpacing: "-0.005em", fontWeight: "400" }],
+        "body-md": ["14px", { lineHeight: "20px", letterSpacing: "0em", fontWeight: "400" }],
+        "body-sm": ["12px", { lineHeight: "16px", letterSpacing: "0.005em", fontWeight: "400" }],
+        "metric-num-lg": ["36px", { lineHeight: "44px", letterSpacing: "-0.03em", fontWeight: "600" }],
+        "metric-num-md": ["22px", { lineHeight: "28px", letterSpacing: "-0.02em", fontWeight: "500" }],
+        "label-mono-sm": ["11px", { lineHeight: "14px", letterSpacing: "0.04em", fontWeight: "500" }],
+        "label-mono-xs": ["10px", { lineHeight: "12px", letterSpacing: "0.06em", fontWeight: "400" }],
       },
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
+        border: {
+          DEFAULT: token("border"),
+          strong: token("border-strong"),
+        },
+        input: token("input"),
+        ring: token("ring"),
+        background: token("background"),
+        foreground: token("foreground"),
+        "surface-2": token("surface-2"),
+        "surface-3": token("surface-3"),
+        success: token("success"),
+        expense: token("expense"),
+        subtle: token("subtle"),
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
+          DEFAULT: token("primary"),
+          hover: token("primary-hover"),
+          foreground: token("primary-foreground"),
         },
         secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
+          DEFAULT: token("secondary"),
+          foreground: token("secondary-foreground"),
         },
         destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
+          DEFAULT: token("destructive"),
+          foreground: token("destructive-foreground"),
         },
         warning: {
-          DEFAULT: "hsl(var(--warning))",
-          foreground: "hsl(var(--warning-foreground))",
+          DEFAULT: token("warning"),
+          foreground: token("warning-foreground"),
         },
         muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
+          DEFAULT: token("muted"),
+          foreground: token("muted-foreground"),
         },
         accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+          DEFAULT: token("accent"),
+          foreground: token("accent-foreground"),
         },
         popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
+          DEFAULT: token("popover"),
+          foreground: token("popover-foreground"),
         },
         card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
+          DEFAULT: token("card"),
+          foreground: token("card-foreground"),
         },
       },
+      // 4px badges/kbd, 8px buttons/inputs/cards, 12px dialogs/sheets. No soft shadows.
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        md: "calc(var(--radius) - 2px)",
+        lg: "var(--radius)",
+        xl: "12px",
       },
       boxShadow: {
-        "warm-sm": "0 1px 2px 0 hsl(30 25% 15% / 0.06)",
-        "warm-md": "0 4px 12px -2px hsl(30 25% 15% / 0.10), 0 2px 4px -2px hsl(30 25% 15% / 0.06)",
-        "warm-lg": "0 12px 32px -4px hsl(30 25% 15% / 0.16), 0 4px 8px -4px hsl(30 25% 15% / 0.08)",
+        // Only deliberate shadows: the deep dialog/sheet layer and the emerald focus glow.
+        dialog: "0 20px 40px -10px rgb(0 0 0 / 0.8)",
+        focus: "0 0 0 1px hsl(var(--primary)), 0 0 12px hsl(var(--primary) / 0.15)",
+        "focus-destructive": "0 0 0 1px hsl(var(--destructive)), 0 0 12px hsl(var(--destructive) / 0.15)",
       },
       keyframes: {
         "fade-slide-up": {
@@ -76,11 +108,20 @@ const config: Config = {
           "0%": { opacity: "0" },
           "100%": { opacity: "1" },
         },
+        // `from`-only keyframes: the end state is the element's own transform (centering-safe).
+        "sheet-in": {
+          from: { transform: "translateY(100%)" },
+        },
+        "sheet-fade-in": {
+          from: { opacity: "0" },
+        },
       },
       animation: {
         "fade-slide-up": "fade-slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both",
         "scale-in": "scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both",
         "overlay-in": "overlay-in 0.15s ease-out both",
+        "sheet-in": "sheet-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) both",
+        "sheet-fade-in": "sheet-fade-in 0.2s ease-out both",
       },
     },
   },

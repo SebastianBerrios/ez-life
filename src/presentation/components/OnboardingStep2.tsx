@@ -10,6 +10,8 @@ import { stableId } from '../../core/use-cases/stableId';
 import { Info, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Panel, PanelBody, PanelHeader } from '@/components/ui/panel';
+import { cn } from '@/lib/utils';
 
 interface Props {
   profileId: string;
@@ -152,48 +154,48 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
   };
 
   if (loading) {
-    return <div className="text-center py-8 text-muted-foreground">Cargando...</div>;
+    return <div className="py-8 text-center text-muted-foreground" role="status">Cargando...</div>;
   }
 
   return (
-    <div className="max-w-md mx-auto px-4">
-      <div className="bg-card border border-border rounded-xl shadow-none overflow-hidden">
-        {/* Header */}
-        <div className="px-6 pt-6 pb-4">
-          <h2 className="text-2xl font-bold text-foreground font-heading">Tu distribución de ingresos</h2>
-          <p className="text-sm text-muted-foreground mt-1">
+    <div className="mx-auto w-full max-w-md px-4">
+      <Panel className="overflow-hidden">
+        <PanelHeader eyebrow="Paso 2 de 3" title="Tu distribución de ingresos" titleAs="h2">
+          <p className="mt-1 text-body-md text-muted-foreground">
             Definí en qué categorías querés distribuir lo que ganás cada mes. Podés agregar, renombrar o eliminar las que necesites.
           </p>
-        </div>
+        </PanelHeader>
 
         {/* Tutorial collapsible */}
-        <div className="mx-6 mb-4 border-y border-border overflow-hidden">
+        <div className="mx-5 mb-4 border-y border-border">
           <button
             type="button"
             onClick={() => setTutorialOpen(v => !v)}
-            className="w-full flex items-center justify-between px-4 py-3 text-left"
+            aria-expanded={tutorialOpen}
+            aria-controls="onboarding-502030-tutorial"
+            className="flex w-full items-center justify-between gap-2 px-1 py-3 text-left outline-none focus-visible:shadow-focus"
           >
-            <div className="flex items-center gap-2">
-              <Info className="w-4 h-4 text-primary shrink-0" />
-              <span className="text-base font-semibold text-primary">¿Qué es el método 50/30/20?</span>
-            </div>
+            <span className="flex items-center gap-2">
+              <Info className="size-4 shrink-0 text-primary" />
+              <span className="text-body-md font-semibold text-primary">¿Qué es el método 50/30/20?</span>
+            </span>
             {tutorialOpen
-              ? <ChevronUp className="w-4 h-4 text-primary shrink-0" />
-              : <ChevronDown className="w-4 h-4 text-primary shrink-0" />
+              ? <ChevronUp className="size-4 shrink-0 text-primary" />
+              : <ChevronDown className="size-4 shrink-0 text-primary" />
             }
           </button>
 
           {tutorialOpen && (
-            <div className="px-4 pb-4 space-y-3">
-              <p className="text-sm text-foreground/80">
+            <div id="onboarding-502030-tutorial" className="space-y-3 px-1 pb-4">
+              <p className="text-body-md text-foreground">
                 Una regla simple para organizar tus ingresos en categorías:
               </p>
               <div className="space-y-2">
-                <TutorialItem label="50% — Necesidades" description="Alquiler, comida, transporte, servicios." color="text-foreground" />
-                <TutorialItem label="30% — Gustos" description="Salidas, streaming, ropa, hobbies." color="text-foreground" />
-                <TutorialItem label="20% — Ahorro" description="Fondo de emergencia, inversiones, metas." color="text-foreground" />
+                <TutorialItem label="50% — Necesidades" description="Alquiler, comida, transporte, servicios." />
+                <TutorialItem label="30% — Gustos" description="Salidas, streaming, ropa, hobbies." />
+                <TutorialItem label="20% — Ahorro" description="Fondo de emergencia, inversiones, metas." />
               </div>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-body-md text-muted-foreground">
                 Es solo un punto de partida — agregá, renombrá o eliminá categorías según tu realidad. Solo asegurate de que sumen 100%.
               </p>
             </div>
@@ -201,87 +203,97 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="px-6 pb-6 space-y-4">
-          <div className="space-y-3">
-            {buckets.map((bucket, idx) => (
-              <div key={bucket.id} className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="text"
-                    aria-label={`Nombre de la categoría ${idx + 1}`}
-                    value={bucket.name}
-                    onChange={(e) => updateBucket(bucket.id, { name: e.target.value })}
-                    placeholder="Nombre de la categoría"
-                    className="flex-1"
-                  />
-                  <Input
-                    type="number"
-                    aria-label={`Porcentaje de la categoría ${idx + 1}`}
-                    min="0"
-                    max="100"
-                    value={bucket.percentage}
-                    onChange={(e) => updateBucket(bucket.id, { percentage: Number(e.target.value) })}
-                    className="w-20"
-                  />
-                  <span className="text-sm text-muted-foreground">%</span>
-                  <label className="flex items-center gap-1 text-xs text-muted-foreground shrink-0 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="savingsBucket"
-                      aria-label={`Marcar categoría ${idx + 1} como ahorro`}
-                      checked={bucket.is_savings}
-                      onChange={() => handleSetSavingsBucket(bucket.id)}
-                      className="h-4 w-4 accent-primary"
+        <PanelBody>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-3">
+              {buckets.map((bucket, idx) => (
+                <div key={bucket.id} className="space-y-1">
+                  <div className="space-y-2">
+                    <Input
+                      type="text"
+                      aria-label={`Nombre de la categoría ${idx + 1}`}
+                      value={bucket.name}
+                      onChange={(e) => updateBucket(bucket.id, { name: e.target.value })}
+                      placeholder="Nombre de la categoría"
+                      className="w-full"
                     />
-                    Ahorro
-                  </label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDeleteBucket(bucket.id)}
-                    aria-label={`Eliminar categoría ${bucket.name || idx + 1}`}
-                    className="text-destructive hover:text-destructive/80 shrink-0"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number"
+                          aria-label={`Porcentaje de la categoría ${idx + 1}`}
+                          min="0"
+                          max="100"
+                          value={bucket.percentage}
+                          onChange={(e) => updateBucket(bucket.id, { percentage: Number(e.target.value) })}
+                          className="w-20 tabular-nums"
+                        />
+                        <span className="font-mono text-body-md text-muted-foreground">%</span>
+                      </div>
+                      <label className="flex shrink-0 cursor-pointer items-center gap-1.5 font-mono text-label-mono-sm uppercase text-muted-foreground">
+                        <input
+                          type="radio"
+                          name="savingsBucket"
+                          aria-label={`Marcar categoría ${idx + 1} como ahorro`}
+                          checked={bucket.is_savings}
+                          onChange={() => handleSetSavingsBucket(bucket.id)}
+                          className="size-4 accent-primary"
+                        />
+                        Ahorro
+                      </label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteBucket(bucket.id)}
+                        aria-label={`Eliminar categoría ${bucket.name || idx + 1}`}
+                        className="ml-auto shrink-0 text-destructive hover:text-destructive"
+                      >
+                        <Trash2 />
+                      </Button>
+                    </div>
+                  </div>
+                  {deleteErrors[bucket.id] && (
+                    <p role="alert" className="text-body-md text-destructive">{deleteErrors[bucket.id]}</p>
+                  )}
                 </div>
-                {deleteErrors[bucket.id] && (
-                  <p className="text-sm text-destructive">{deleteErrors[bucket.id]}</p>
-                )}
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleAddBucket}
-            className="w-full border-dashed text-muted-foreground hover:text-foreground"
-          >
-            + Nueva categoría de distribución
-          </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleAddBucket}
+              className="w-full border-dashed text-muted-foreground hover:text-foreground"
+            >
+              + Nueva categoría de distribución
+            </Button>
 
-          <div className={`text-base font-medium px-4 py-3 rounded-xl ${isValid ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive'}`}>
-            Total: {total}% {isValid ? '✓ Perfecto' : '— Debe sumar exactamente 100%'}
-          </div>
+            <div
+              role="status"
+              className={cn(
+                'rounded-lg border px-4 py-3 text-body-md font-medium',
+                isValid ? 'border-primary/25 bg-primary/10 text-primary' : 'border-destructive/25 bg-destructive/10 text-destructive',
+              )}
+            >
+              Total: {total}% {isValid ? '✓ Perfecto' : '— Debe sumar exactamente 100%'}
+            </div>
 
-          <Button type="submit" size="lg" disabled={!isValid || isSubmitting} className="w-full">
-            {isSubmitting ? 'Guardando...' : 'Guardar distribución'}
-          </Button>
-        </form>
-      </div>
+            <Button type="submit" size="lg" disabled={!isValid || isSubmitting} className="w-full">
+              {isSubmitting ? 'Guardando...' : 'Guardar distribución'}
+            </Button>
+          </form>
+        </PanelBody>
+      </Panel>
     </div>
   );
 }
 
-function TutorialItem({ label, description, color }: { label: string; description: string; color: string }) {
+function TutorialItem({ label, description }: { label: string; description: string }) {
   return (
-    <div className="flex gap-3">
-      <div>
-        <p className={`text-sm font-semibold ${color}`}>{label}</p>
-        <p className="text-sm text-muted-foreground">{description}</p>
-      </div>
+    <div>
+      <p className="text-body-md font-semibold text-foreground">{label}</p>
+      <p className="text-body-md text-muted-foreground">{description}</p>
     </div>
   );
 }

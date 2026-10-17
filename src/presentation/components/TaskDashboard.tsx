@@ -4,15 +4,15 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { LocalTaskRepository } from '../../infrastructure/repositories/local/LocalTaskRepository';
 import { Task } from '../../core/domain/models/types';
 import { calculateTaskCompletionStats } from '../../core/use-cases/calculateTaskCompletionStats';
-import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { onLocalChanges } from '../../infrastructure/db/localChanges';
+import { onSyncCompleted } from '../../infrastructure/sync/syncEvents';
+import { useChartColors } from '../hooks/useChartColors';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface Props {
   userId: string;
 }
-
-const STATS_COLOR = { onTime: '#10b981', overdue: '#ef4444', pending: '#f59e0b' } as const;
 
 /**
  * Tasks dashboard (FR-006, extended in 004 with FR-005's on-time vs. overdue
@@ -25,6 +25,7 @@ const STATS_COLOR = { onTime: '#10b981', overdue: '#ef4444', pending: '#f59e0b' 
 export default function TaskDashboard({ userId }: Props) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const colors = useChartColors();
 
   const load = useCallback(async () => {
     try {
@@ -41,16 +42,16 @@ export default function TaskDashboard({ userId }: Props) {
     load();
   }, [load]);
 
+  // Keep the overview in step with checks, edits and sync while the section stays open.
+  useEffect(() => onLocalChanges(['tasks'], () => { void load(); }), [load]);
+  useEffect(() => onSyncCompleted(() => { void load(); }), [load]);
+
   if (loading) {
-    return <Skeleton className="h-24 w-full rounded-xl" />;
+    return <Skeleton className="h-24 w-full rounded-lg" />;
   }
 
   if (tasks.length === 0) {
-    return (
-      <Card className="animate-fade-slide-up py-8 text-center shadow-none">
-        <p className="text-muted-foreground">No tenés tareas registradas.</p>
-      </Card>
-    );
+    return <p className="rounded-lg border border-dashed border-border-strong p-4 text-body-md text-muted-foreground">No tenés tareas registradas.</p>;
   }
 
   const stats = calculateTaskCompletionStats(tasks, new Date());
@@ -58,41 +59,44 @@ export default function TaskDashboard({ userId }: Props) {
   // distinct from each task row's own "Pendiente" status label below, so
   // /pendiente/i queries in tests keep matching exactly one thing.
   const chartData = [
-    { name: 'A tiempo', count: stats.onTime, fill: STATS_COLOR.onTime },
-    { name: 'Vencidas', count: stats.overdue, fill: STATS_COLOR.overdue },
-    { name: 'Por vencer', count: stats.pending, fill: STATS_COLOR.pending },
+    { name: 'A tiempo', count: stats.onTime, fill: colors.primary },
+    { name: 'Vencidas', count: stats.overdue, fill: colors.expense },
+    { name: 'Por vencer', count: stats.pending, fill: colors.warning },
   ];
 
   return (
-    <div className="animate-fade-slide-up space-y-4">
-      <Card className="shadow-none px-4 py-3 space-y-3">
-        <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">A tiempo: {stats.onTime}</span>
-          <span className="text-muted-foreground">Vencidas: {stats.overdue}</span>
-          <span className="text-muted-foreground">Por vencer: {stats.pending}</span>
+    <div className="space-y-3">
+      <div className="space-y-3 rounded-lg bg-surface-2 p-4">
+        <div className="flex flex-wrap justify-between gap-x-4 gap-y-1 font-mono text-label-mono-sm text-muted-foreground">
+          <span>A tiempo: {stats.onTime}</span>
+          <span>Vencidas: {stats.overdue}</span>
+          <span>Por vencer: {stats.pending}</span>
         </div>
         <div data-testid="task-completion-chart" className="h-40 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData}>
-              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-              <Tooltip />
-              <Bar dataKey="count">
+              <XAxis dataKey="name" tick={{ fontSize: 12, fill: colors.mutedForeground }} axisLine={{ stroke: colors.border }} tickLine={{ stroke: colors.border }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: colors.mutedForeground }} axisLine={{ stroke: colors.border }} tickLine={{ stroke: colors.border }} />
+              <Tooltip
+                cursor={{ fill: colors.muted, opacity: 0.4 }}
+                contentStyle={{ background: colors.card, border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.foreground }}
+              />
+              <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                 {chartData.map(entry => <Cell key={entry.name} fill={entry.fill} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </Card>
-
-      <div className="space-y-2">
-        {tasks.map(task => (
-          <Card key={task.id} className="shadow-none px-4 py-3 flex items-center justify-between">
-            <span className="text-sm font-medium text-foreground">{task.title}</span>
-            <span className="text-sm text-muted-foreground">{task.status === 'done' ? 'Hecha' : 'Pendiente'}</span>
-          </Card>
-        ))}
       </div>
+
+      <ul className="space-y-2">
+        {tasks.map(task => (
+          <li key={task.id} className="flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-4 py-3">
+            <span className="min-w-0 break-words text-body-md font-medium text-foreground">{task.title}</span>
+            <span className="shrink-0 font-mono text-label-mono-xs text-muted-foreground">{task.status === 'done' ? 'Hecha' : 'Pendiente'}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

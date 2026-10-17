@@ -4,9 +4,10 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { LocalGoalRepository } from '../../infrastructure/repositories/local/LocalGoalRepository';
 import { Goal } from '../../core/domain/models/types';
 import { calculateGoalProgress } from '../../core/use-cases/calculateGoalProgress';
-import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { onLocalChanges } from '../../infrastructure/db/localChanges';
+import { onSyncCompleted } from '../../infrastructure/sync/syncEvents';
 
 interface Props {
   userId: string;
@@ -14,9 +15,8 @@ interface Props {
 
 /**
  * Minimal goals dashboard (FR-007): every goal (including already-completed
- * ones) with its current progress — a full overview, unlike GoalList (used
- * in ControlPage's "Metas activas"), which deliberately excludes completed
- * goals.
+ * ones) with its current progress — a full overview, unlike the "Metas activas"
+ * panel, which deliberately excludes completed goals.
  */
 export default function GoalDashboard({ userId }: Props) {
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -37,20 +37,20 @@ export default function GoalDashboard({ userId }: Props) {
     load();
   }, [load]);
 
+  // Keep the overview in step with checks, edits and sync while the section stays open.
+  useEffect(() => onLocalChanges(['goals'], () => { void load(); }), [load]);
+  useEffect(() => onSyncCompleted(() => { void load(); }), [load]);
+
   if (loading) {
-    return <Skeleton className="h-24 w-full rounded-xl" />;
+    return <Skeleton className="h-24 w-full rounded-lg" />;
   }
 
   if (goals.length === 0) {
-    return (
-      <Card className="animate-fade-slide-up py-8 text-center shadow-none">
-        <p className="text-muted-foreground">No tenés metas registradas.</p>
-      </Card>
-    );
+    return <p className="rounded-lg border border-dashed border-border-strong p-4 text-body-md text-muted-foreground">No tenés metas registradas.</p>;
   }
 
   return (
-    <div className="animate-fade-slide-up space-y-2">
+    <ul className="space-y-2">
       {goals.map(goal => {
         const isNumeric = goal.kind === 'numeric';
         const current = isNumeric ? (goal.current_value ?? 0) : (goal.milestones ?? []).filter(m => m.done).length;
@@ -59,18 +59,18 @@ export default function GoalDashboard({ userId }: Props) {
         const progressPercent = Math.round(progress * 100);
 
         return (
-          <Card key={goal.id} className="shadow-none px-4 py-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-foreground">{goal.name}</span>
-              <span className="text-sm text-muted-foreground">{current} / {target}</span>
+          <li key={goal.id} className="space-y-2 rounded-lg bg-surface-2 px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="min-w-0 break-words text-body-md font-medium text-foreground">{goal.name}</span>
+              <span className="shrink-0 font-mono text-label-mono-sm text-muted-foreground">{current} / {target}</span>
             </div>
-            <div className="flex items-center gap-2">
-              <Progress value={progressPercent} className="flex-1" />
-              <span className="text-xs font-medium text-muted-foreground">{`${progressPercent}%`}</span>
+            <div className="flex items-center gap-3">
+              <Progress value={progressPercent} aria-label={`Progreso de ${goal.name}`} className="flex-1" />
+              <span className="font-mono text-label-mono-xs text-muted-foreground">{`${progressPercent}%`}</span>
             </div>
-          </Card>
+          </li>
         );
       })}
-    </div>
+    </ul>
   );
 }

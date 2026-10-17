@@ -1,23 +1,39 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { Landmark } from 'lucide-react';
 import { LocalInstallmentLoanRepository } from '../../infrastructure/repositories/local/LocalInstallmentLoanRepository';
 import { InstallmentAdjustmentType, InstallmentLoan, InstallmentPayment } from '../../core/domain/models/types';
 import { DomainError } from '../../core/domain/errors/DomainError';
-import { Card } from '@/components/ui/card';
+import { parseMoney } from '../../core/use-cases/parseMoney';
+import { formatShortDate } from '../../core/use-cases/formatMovementWhen';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Money } from '@/components/ui/money';
+import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { onLocalChanges } from '../../infrastructure/db/localChanges';
 import InstallmentLoanForm from './InstallmentLoanForm';
+import { FORM_DIALOG_CONTENT_CLASS } from './dialogChrome';
 
 interface Props {
   userId: string;
 }
 
-const centsToDisplay = (cents: number) => (cents / 100).toFixed(2);
+const EYEBROW = 'font-mono text-label-mono-xs uppercase text-muted-foreground';
+
+function Metric({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <dt className={EYEBROW}>{label}</dt>
+      <dd className="text-body-md text-foreground">{children}</dd>
+    </div>
+  );
+}
 
 export default function InstallmentLoanList({ userId }: Props) {
   const [loans, setLoans] = useState<InstallmentLoan[]>([]);
@@ -53,6 +69,8 @@ export default function InstallmentLoanList({ userId }: Props) {
 
   useEffect(() => {
     loadLoans();
+    // A loan changed from another tab or by a sync pull must show up without remounting.
+    return onLocalChanges(['installment_loans'], loadLoans);
   }, [loadLoans]);
 
   const handlePayInstallments = async (loan: InstallmentLoan) => {
@@ -72,22 +90,21 @@ export default function InstallmentLoanList({ userId }: Props) {
   };
 
   const handleConfirmPrincipalPayment = async (loan: InstallmentLoan) => {
-    const amountDraft = principalAmountDrafts[loan.id] ?? '';
-    const amountInCents = Math.round(parseFloat(amountDraft.replace(/,/g, '')) * 100);
     const adjustmentType = adjustmentTypeDrafts[loan.id];
-    const resultingDraft = resultingValueDrafts[loan.id] ?? '';
 
     if (!adjustmentType) {
       setPrincipalErrors(prev => ({ ...prev, [loan.id]: 'Elegí si el abono reduce el plazo o la cuota.' }));
       return;
     }
 
-    const adjustment = adjustmentType === 'reduce_term'
-      ? { type: 'reduce_term' as const, newRemainingInstallments: parseInt(resultingDraft, 10) }
-      : { type: 'reduce_installment_amount' as const, newInstallmentAmountCents: Math.round(parseFloat(resultingDraft.replace(/,/g, '')) * 100) };
-
     setPrincipalSubmitting(prev => ({ ...prev, [loan.id]: true }));
     try {
+      const amountInCents = parseMoney(principalAmountDrafts[loan.id] ?? '');
+      const resultingDraft = resultingValueDrafts[loan.id] ?? '';
+      const adjustment = adjustmentType === 'reduce_term'
+        ? { type: 'reduce_term' as const, newRemainingInstallments: parseInt(resultingDraft, 10) }
+        : { type: 'reduce_installment_amount' as const, newInstallmentAmountCents: parseMoney(resultingDraft) };
+
       const repo = new LocalInstallmentLoanRepository();
       await repo.recordPrincipalPayment(loan.id, amountInCents, new Date(), adjustment);
       setPrincipalAmountDrafts(prev => ({ ...prev, [loan.id]: '' }));
@@ -129,8 +146,8 @@ export default function InstallmentLoanList({ userId }: Props) {
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-28 w-full rounded-xl" />
+      <div className="space-y-3">
+        <Skeleton className="h-28 w-full rounded-lg" />
       </div>
     );
   }
@@ -140,19 +157,29 @@ export default function InstallmentLoanList({ userId }: Props) {
   }
 
   return (
-    <div className="animate-fade-slide-up space-y-4">
+    <div className="animate-fade-slide-up flex flex-col gap-3" data-testid="installment-loans">
+      <p className={EYEBROW}>Con cuotas</p>
       {loans.map(loan => {
         const isSettled = loan.status === 'settled';
+        const paid = Math.max(0, loan.installment_count - loan.remaining_installments);
+        const paidPercent = loan.installment_count > 0 ? Math.round((paid * 100) / loan.installment_count) : 0;
 
         return (
-          <Card key={loan.id} className="relative shadow-none">
-            <div className="flex items-start justify-between px-5">
-              <div>
-                <h3 className="font-heading font-bold text-foreground">{loan.lender_name}</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {loan.remaining_installments} de {loan.installment_count} cuotas restantes · S/ {centsToDisplay(loan.installment_amount)} c/u
-                  {loan.interest_rate !== undefined && ` · ${loan.interest_rate}% (informativo)`}
-                </p>
+          <article key={loan.id} className="flex flex-col gap-4 rounded-lg border border-border bg-background p-4" data-testid={`installment-loan-${loan.id}`}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-primary">
+                  <Landmark className="size-5" />
+                </span>
+                <div className="min-w-0">
+                  <h4 className="flex flex-wrap items-center gap-2 text-headline-sm text-foreground">
+                    {loan.lender_name}
+                    <Badge variant={isSettled ? 'positive' : 'primary'}>{isSettled ? 'Saldado' : 'Activo'}</Badge>
+                  </h4>
+                  <p className="font-mono text-label-mono-xs text-muted-foreground">
+                    {loan.interest_rate !== undefined ? `${loan.interest_rate}% (informativo)` : 'Sin tasa informada'}
+                  </p>
+                </div>
               </div>
               <div className="flex gap-1">
                 <Button variant="ghost" size="sm" onClick={() => setEditingLoan(loan)}>
@@ -169,146 +196,166 @@ export default function InstallmentLoanList({ userId }: Props) {
               </div>
             </div>
 
-            <div className="mt-4 space-y-1 px-5">
-              <div className="flex justify-between text-sm">
-                <span className="text-primary font-medium">S/ {centsToDisplay(loan.amount)} monto original</span>
-                <Button variant="link" size="sm" className="h-auto p-0" onClick={() => toggleHistory(loan)}>
-                  {historyOpenFor === loan.id ? 'Ocultar historial' : 'Ver historial de pagos'}
-                </Button>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 md:grid-cols-3">
+              <Metric label="Monto original">
+                <Money cents={loan.amount} size="sm" className="font-semibold text-primary" />
+              </Metric>
+              <Metric label="Cuota actual">
+                <Money cents={loan.installment_amount} size="sm" className="font-semibold" />
+                <span className="text-muted-foreground"> c/u</span>
+              </Metric>
+              <Metric label="Cuotas">
+                <span className="tabular-nums">{loan.remaining_installments} de {loan.installment_count} cuotas restantes</span>
+              </Metric>
+            </dl>
+
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-baseline justify-between gap-2 font-mono text-label-mono-xs text-muted-foreground">
+                <span>Avance de cuotas</span>
+                <span>{paidPercent}%</span>
               </div>
+              <Progress value={paidPercent} aria-label={`Avance de cuotas de ${loan.lender_name}`} />
+            </div>
+
+            <div className="flex">
+              <Button variant="link" size="sm" className="h-auto min-h-11 p-0" onClick={() => toggleHistory(loan)}>
+                {historyOpenFor === loan.id ? 'Ocultar historial' : 'Ver historial de pagos'}
+              </Button>
             </div>
 
             {historyOpenFor === loan.id && (
-              <div className="mt-2 px-5 space-y-1">
+              <ul className="flex flex-col gap-1">
                 {(paymentHistory[loan.id] ?? []).length === 0 && (
-                  <p className="text-sm text-muted-foreground">Todavía no hay pagos registrados.</p>
+                  <li className="text-body-sm text-muted-foreground">Todavía no hay pagos registrados.</li>
                 )}
                 {(paymentHistory[loan.id] ?? []).map(payment => (
-                  <p key={payment.id} className="text-sm text-muted-foreground">
-                    {new Date(payment.date).toLocaleDateString()} · S/ {centsToDisplay(payment.amount)} ·{' '}
-                    {payment.kind === 'installment' ? 'Cuota' : 'Abono a capital'}
-                  </p>
+                  <li key={payment.id} className="flex flex-wrap items-baseline gap-x-2 text-body-sm text-muted-foreground">
+                    <span className="font-mono text-label-mono-sm">{formatShortDate(new Date(payment.date))}</span>
+                    <Money cents={payment.amount} size="sm" className="text-foreground" />
+                    <span>· {payment.kind === 'installment' ? 'Cuota' : 'Abono a capital'}</span>
+                  </li>
                 ))}
-              </div>
+              </ul>
             )}
 
             {!isSettled && !loan.distribution_category_id && (
-              <div className="mt-4 px-5">
-                <p className="text-sm text-muted-foreground">
-                  Asigná una categoría de distribución (50/30/20) desde &quot;Corregir términos&quot; antes de registrar un pago — la necesita para poder generar el movimiento de gasto correspondiente.
-                </p>
-              </div>
+              <p className="text-body-sm text-muted-foreground">
+                Asigná una categoría de distribución (50/30/20) desde &quot;Corregir términos&quot; antes de registrar un pago — la necesita para poder generar el movimiento de gasto correspondiente.
+              </p>
             )}
 
             {!isSettled && loan.distribution_category_id && (
-              <div className="mt-4 px-5 space-y-4">
-                <div className="space-y-2">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pagar cuota(s)</h4>
-                  <div className="flex gap-2 items-end">
-                    <div className="flex-1 space-y-1">
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-2">
+                  <h5 className={EYEBROW}>Pagar cuota(s)</h5>
+                  <div className="flex items-end gap-2">
+                    <div className="flex flex-1 flex-col gap-1">
                       <Label htmlFor={`installments-${loan.id}`}>Cuotas a pagar</Label>
                       <Input
                         id={`installments-${loan.id}`}
                         type="text"
+                        inputMode="numeric"
                         placeholder="1"
                         value={installmentDrafts[loan.id] ?? ''}
                         onChange={(e) => setInstallmentDrafts(prev => ({ ...prev, [loan.id]: e.target.value.replace(/[^0-9]/g, '') }))}
                       />
                     </div>
-                    <Button size="sm" onClick={() => handlePayInstallments(loan)}>
+                    <Button onClick={() => handlePayInstallments(loan)}>
                       Pagar cuota(s)
                     </Button>
                   </div>
-                  {installmentErrors[loan.id] && <p className="text-sm text-destructive">{installmentErrors[loan.id]}</p>}
+                  {installmentErrors[loan.id] && <p className="text-body-sm text-destructive">{installmentErrors[loan.id]}</p>}
                 </div>
 
-                <div className="border-t pt-3 space-y-2">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Registrar abono a capital</h4>
+                <div className="flex flex-col gap-2 border-t border-border pt-3">
+                  <h5 className={EYEBROW}>Registrar abono a capital</h5>
 
                   {!showPrincipalFlow[loan.id] && (
-                    <Button variant="outline" size="sm" className="w-full" onClick={() => setShowPrincipalFlow(prev => ({ ...prev, [loan.id]: true }))}>
+                    <Button variant="outline" className="w-full" onClick={() => setShowPrincipalFlow(prev => ({ ...prev, [loan.id]: true }))}>
                       Registrar abono a capital
                     </Button>
                   )}
 
-                {showPrincipalFlow[loan.id] && (
-                  <div className="space-y-2 rounded-md border p-3">
-                    <div className="space-y-1">
-                      <Label htmlFor={`principal-amount-${loan.id}`}>Monto del abono</Label>
-                      <Input
-                        id={`principal-amount-${loan.id}`}
-                        type="text"
-                        placeholder="0.00"
-                        value={principalAmountDrafts[loan.id] ?? ''}
-                        onChange={(e) => setPrincipalAmountDrafts(prev => ({ ...prev, [loan.id]: e.target.value.replace(/[^0-9.]/g, '') }))}
-                      />
-                    </div>
+                  {showPrincipalFlow[loan.id] && (
+                    <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3">
+                      <div className="flex flex-col gap-1">
+                        <Label htmlFor={`principal-amount-${loan.id}`}>Monto del abono</Label>
+                        <Input
+                          id={`principal-amount-${loan.id}`}
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0.00"
+                          value={principalAmountDrafts[loan.id] ?? ''}
+                          onChange={(e) => setPrincipalAmountDrafts(prev => ({ ...prev, [loan.id]: e.target.value.replace(/[^0-9.]/g, '') }))}
+                        />
+                      </div>
 
-                    <div className="space-y-1">
-                      <Label htmlFor={`adjustment-${loan.id}`}>¿Este abono reduce el plazo o la cuota?</Label>
-                      <Select
-                        value={adjustmentTypeDrafts[loan.id] ?? ''}
-                        onValueChange={(val) => setAdjustmentTypeDrafts(prev => ({ ...prev, [loan.id]: val as InstallmentAdjustmentType }))}
+                      <div className="flex flex-col gap-1">
+                        <Label htmlFor={`adjustment-${loan.id}`}>¿Este abono reduce el plazo o la cuota?</Label>
+                        <Select
+                          value={adjustmentTypeDrafts[loan.id] ?? ''}
+                          onValueChange={(val) => setAdjustmentTypeDrafts(prev => ({ ...prev, [loan.id]: val as InstallmentAdjustmentType }))}
+                        >
+                          <SelectTrigger id={`adjustment-${loan.id}`} className="w-full">
+                            <SelectValue placeholder="Elegir..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="reduce_term">Reducir plazo (menos cuotas)</SelectItem>
+                            <SelectItem value="reduce_installment_amount">Reducir cuota (misma cantidad de cuotas)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {adjustmentTypeDrafts[loan.id] === 'reduce_term' && (
+                        <div className="flex flex-col gap-1">
+                          <Label htmlFor={`resulting-${loan.id}`}>Nuevo número de cuotas restantes</Label>
+                          <Input
+                            id={`resulting-${loan.id}`}
+                            type="text"
+                            inputMode="numeric"
+                            value={resultingValueDrafts[loan.id] ?? ''}
+                            onChange={(e) => setResultingValueDrafts(prev => ({ ...prev, [loan.id]: e.target.value.replace(/[^0-9]/g, '') }))}
+                          />
+                        </div>
+                      )}
+                      {adjustmentTypeDrafts[loan.id] === 'reduce_installment_amount' && (
+                        <div className="flex flex-col gap-1">
+                          <Label htmlFor={`resulting-${loan.id}`}>Nuevo monto de cuota</Label>
+                          <Input
+                            id={`resulting-${loan.id}`}
+                            type="text"
+                            inputMode="decimal"
+                            value={resultingValueDrafts[loan.id] ?? ''}
+                            onChange={(e) => setResultingValueDrafts(prev => ({ ...prev, [loan.id]: e.target.value.replace(/[^0-9.]/g, '') }))}
+                          />
+                        </div>
+                      )}
+
+                      {principalErrors[loan.id] && <p className="text-body-sm text-destructive">{principalErrors[loan.id]}</p>}
+
+                      <Button
+                        className="w-full"
+                        disabled={Boolean(principalSubmitting[loan.id])}
+                        onClick={() => handleConfirmPrincipalPayment(loan)}
                       >
-                        <SelectTrigger id={`adjustment-${loan.id}`}>
-                          <SelectValue placeholder="Elegir..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="reduce_term">Reducir plazo (menos cuotas)</SelectItem>
-                          <SelectItem value="reduce_installment_amount">Reducir cuota (misma cantidad de cuotas)</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        Confirmar abono
+                      </Button>
                     </div>
-
-                    {adjustmentTypeDrafts[loan.id] === 'reduce_term' && (
-                      <div className="space-y-1">
-                        <Label htmlFor={`resulting-${loan.id}`}>Nuevo número de cuotas restantes</Label>
-                        <Input
-                          id={`resulting-${loan.id}`}
-                          type="text"
-                          value={resultingValueDrafts[loan.id] ?? ''}
-                          onChange={(e) => setResultingValueDrafts(prev => ({ ...prev, [loan.id]: e.target.value.replace(/[^0-9]/g, '') }))}
-                        />
-                      </div>
-                    )}
-                    {adjustmentTypeDrafts[loan.id] === 'reduce_installment_amount' && (
-                      <div className="space-y-1">
-                        <Label htmlFor={`resulting-${loan.id}`}>Nuevo monto de cuota</Label>
-                        <Input
-                          id={`resulting-${loan.id}`}
-                          type="text"
-                          value={resultingValueDrafts[loan.id] ?? ''}
-                          onChange={(e) => setResultingValueDrafts(prev => ({ ...prev, [loan.id]: e.target.value.replace(/[^0-9.]/g, '') }))}
-                        />
-                      </div>
-                    )}
-
-                    {principalErrors[loan.id] && <p className="text-sm text-destructive">{principalErrors[loan.id]}</p>}
-
-                    <Button
-                      size="sm"
-                      className="w-full"
-                      disabled={Boolean(principalSubmitting[loan.id])}
-                      onClick={() => handleConfirmPrincipalPayment(loan)}
-                    >
-                      Confirmar abono
-                    </Button>
-                  </div>
-                )}
+                  )}
                 </div>
               </div>
             )}
 
             {isSettled && (
-              <p className="mt-4 px-5 text-sm text-primary font-medium">Pagado/Saldado ✓</p>
+              <p className="text-body-md font-medium text-success">Pagado/Saldado ✓</p>
             )}
-          </Card>
+          </article>
         );
       })}
 
       {editingLoan && (
         <Dialog open onOpenChange={(open) => !open && setEditingLoan(null)}>
-          <DialogContent>
+          <DialogContent className={FORM_DIALOG_CONTENT_CLASS}>
             <InstallmentLoanForm
               userId={userId}
               existing={editingLoan}

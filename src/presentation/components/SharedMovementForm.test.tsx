@@ -156,4 +156,124 @@ describe('SharedMovementForm', () => {
       }));
     });
   });
+  it('pre-fills the total amount from `initial` and still submits it as integer cents', async () => {
+    const mockCreate = vi.fn().mockResolvedValue({ id: 'sm-1' });
+    vi.mocked(LocalSharedMovementRepository).mockImplementation(function () {
+      return { create: mockCreate } as unknown as InstanceType<typeof LocalSharedMovementRepository>;
+    });
+
+    render(
+      <SharedMovementForm
+        spaceId="space-1"
+        currentUserId="ana"
+        members={members}
+        initial={{ amount: '45.90' }}
+        onComplete={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+
+    expect(screen.getByLabelText(/monto total/i)).toHaveValue('45.90');
+    fireEvent.submit(screen.getByTestId('shared-movement-form'));
+
+    await waitFor(() => {
+      expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ totalAmountCents: 4590 }));
+    });
+  });
+
+  it('starts empty when no `initial` is given', () => {
+    render(
+      <SharedMovementForm spaceId="space-1" currentUserId="ana" members={members} onComplete={vi.fn()} onCancel={vi.fn()} />
+    );
+    expect(screen.getByLabelText(/monto total/i)).toHaveValue('');
+  });
+});
+
+describe('SharedMovementForm — money is parsed into integer cents with parseMoney', () => {
+  const setup = () => {
+    const create = vi.fn().mockResolvedValue({ id: 'sm-1' });
+    vi.mocked(LocalSharedMovementRepository).mockImplementation(function () {
+      return { create } as unknown as InstanceType<typeof LocalSharedMovementRepository>;
+    });
+    vi.mocked(LocalCategoryRepository).mockImplementation(function () {
+      return { getDistributionCategories: vi.fn().mockResolvedValue([]) } as unknown as InstanceType<typeof LocalCategoryRepository>;
+    });
+    render(<SharedMovementForm spaceId="space-1" currentUserId="ana" members={members} onComplete={vi.fn()} onCancel={vi.fn()} />);
+    return create;
+  };
+  const submit = () => fireEvent.submit(screen.getByTestId('shared-movement-form'));
+
+  it.each(['100', '100.00', '45.9', '0.01', '1234.56', '19.99', '0.1', '8.2', '1.15', '1000000.5', '0.07'])(
+    'gives the same cents as the old parseFloat formula for a valid amount (%s)',
+    async (amount) => {
+      const user = userEvent.setup();
+      const create = setup();
+      await user.type(screen.getByLabelText(/monto total/i), amount);
+      submit();
+      await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+      expect(create).toHaveBeenCalledWith(expect.objectContaining({ totalAmountCents: Math.round(parseFloat(amount) * 100) }));
+    },
+  );
+
+  it.each(['10.123', '1.2.3', '.5', '5.'])('rejects %s instead of silently rounding it', async (amount) => {
+    const user = userEvent.setup();
+    const create = setup();
+    await user.type(screen.getByLabelText(/monto total/i), amount);
+    submit();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ingresá un monto con hasta dos decimales.');
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('rejects an empty or zero amount with a message', async () => {
+    const user = userEvent.setup();
+    const create = setup();
+    submit();
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    await user.type(screen.getByLabelText(/monto total/i), '0');
+    submit();
+    expect(await screen.findByText('El monto debe ser mayor a 0.')).toBeInTheDocument();
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('parses fixed-amount shares as cents and sends them when they add up', async () => {
+    const user = userEvent.setup();
+    const create = setup();
+    await user.type(screen.getByLabelText(/monto total/i), '100.00');
+    await user.click(screen.getByLabelText(/monto fijo/i));
+    const [first, second] = screen.getAllByLabelText(/parte de/i);
+    await user.clear(first);
+    await user.type(first, '40.10');
+    await user.clear(second);
+    await user.type(second, '59.90');
+    submit();
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({
+      splitMode: 'fixed_amount',
+      splits: [{ user_id: 'ana', share_cents: 4010 }, { user_id: 'bob', share_cents: 5990 }],
+    }));
+  });
+
+  it('rejects a fixed-amount share with more than two decimals', async () => {
+    const user = userEvent.setup();
+    const create = setup();
+    await user.type(screen.getByLabelText(/monto total/i), '100.00');
+    await user.click(screen.getByLabelText(/monto fijo/i));
+    const [first, second] = screen.getAllByLabelText(/parte de/i);
+    await user.clear(first);
+    await user.type(first, '40.123');
+    await user.clear(second);
+    await user.type(second, '59.877');
+    submit();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ingresá un monto con hasta dos decimales.');
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('labels the shares in percent or soles depending on the split mode', async () => {
+    const user = userEvent.setup();
+    setup();
+    expect(screen.getAllByLabelText(/parte de .*\(%\)/i)).toHaveLength(2);
+    await user.click(screen.getByLabelText(/monto fijo/i));
+    expect(screen.getAllByLabelText(/parte de .*\(S\/\)/i)).toHaveLength(2);
+    expect(screen.getByRole('radiogroup', { name: '¿Cómo se divide?' })).toBeInTheDocument();
+  });
 });

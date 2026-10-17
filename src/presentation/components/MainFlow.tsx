@@ -2,34 +2,30 @@
 import PersonalProgress from './PersonalProgress';
 import { usePersonalProgress } from '../hooks/usePersonalProgress';
 
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import LoginScreen from './LoginScreen';
 import OnboardingWizard from './OnboardingWizard';
 import Layout from './Layout';
-import MoreDrawer from './MoreDrawer';
-import { overflowNavItems } from './BottomNav';
 import Dashboard from './Dashboard';
-import MovementList from './MovementList';
-import MovementForm from './MovementForm';
-import SavingsGoalList from './SavingsGoalList';
-import SavingsGoalForm from './SavingsGoalForm';
-import DebtList from './DebtList';
-import DebtForm from './DebtForm';
-import InstallmentLoanList from './InstallmentLoanList';
-import InstallmentLoanForm from './InstallmentLoanForm';
+import QuickRecordSheet, { type QuickRecordKind, type QuickRecordSavedKind, type QuickRecordTab } from './QuickRecordSheet';
+import FinancesScreen, { type FinancesTab } from './FinancesScreen';
+import MobileRouteLinks from './MobileRouteLinks';
+import { FORM_DIALOG_CONTENT_CLASS } from './dialogChrome';
 import SharedSpaceScreen from './SharedSpaceScreen';
 import SharedSpaceCreate from './SharedSpaceCreate';
 import SharedSpaceJoin from './SharedSpaceJoin';
 import SharedMovementForm from './SharedMovementForm';
 import ControlPage from './ControlPage';
-import CreatePage from './CreatePage';
-import AnalysisScreen from './AnalysisScreen';
 import { Membership } from '../../core/domain/models/types';
 import SettingsScreen from './SettingsScreen';
 import NotificationHistory from './NotificationHistory';
-import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Bell } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import CommandPalette from './CommandPalette';
+import { isAccountFocus, isControlFocus, isMovementFocus, type FocusTarget, type NavigateOptions } from '../../core/use-cases/paletteCommand';
+import { useHotkey } from '../hooks/useHotkey';
+import { shiftMonth } from '../../core/use-cases/calendar';
+import { useHasUnreadNotifications } from '../hooks/useHasUnreadNotifications';
 import { useRecurrenceEvaluator } from '../hooks/useRecurrenceEvaluator';
 import { useSyncManager } from '../hooks/useSyncManager';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
@@ -37,13 +33,7 @@ import { useNotificationEvaluator } from '../hooks/useNotificationEvaluator';
 import { useTaskRecurrenceEvaluator } from '../hooks/useTaskRecurrenceEvaluator';
 import { observeAccountSession } from '../../infrastructure/auth/observeAccountSession';
 import { forgetLocalAccount } from '../../infrastructure/auth/localAccount';
-
-// Shared chrome for the app's dialogs (movement form, goal form,
-// notification history) — always centered on the viewport, never a
-// bottom sheet, with a single padding layer (the form/list content
-// inside renders chrome-less so it doesn't double up with this).
-const SHEET_DIALOG_CONTENT_CLASS =
-  'bg-card max-w-md rounded-xl border border-border p-5 shadow-xl max-h-[85vh] overflow-y-auto sm:p-6';
+import { LocalPaymentAccountRepository } from '../../infrastructure/repositories/local/LocalPaymentAccountRepository';
 
 // FR-004: per-page browser tab titles. The app has a single real Next.js
 // route (`src/app/page.tsx`) — every "page" below is client-side routing
@@ -53,13 +43,9 @@ const SHEET_DIALOG_CONTENT_CLASS =
 const routeTitles: Record<string, string> = {
   progress: 'Mi progreso',
   dashboard: 'Resumen',
-  movements: 'Historial',
-  analysis: 'Análisis',
-  goals: 'Mis Metas',
-  debts: 'Préstamos',
+  finances: 'Finanzas',
   'shared-space': 'Espacio Compartido',
-  control: 'Control',
-  create: 'Crear',
+  control: 'Control & Hábitos',
   settings: 'Ajustes',
 };
 
@@ -68,32 +54,25 @@ export default function MainFlow() {
   const [wizardStartStep, setWizardStartStep] = useState<1 | 2 | 3>(1);
   const [wizardMode, setWizardMode] = useState<'setup' | 'settings'>('setup');
   const [currentRoute, setCurrentRoute] = useState('dashboard');
+  // Sub-tab Finanzas opens on; set by deep links (Inicio -> Préstamos), reset by any other navigation.
+  const [financesTab, setFinancesTab] = useState<FinancesTab>('movements');
   const [profileId, setProfileId] = useState<string | null>(null);
-  const [showMoreDrawer, setShowMoreDrawer] = useState(false);
-  const [showMovementForm, setShowMovementForm] = useState(false);
+  // Single entry point of "Nuevo Registro" (central "+", sidebar button, Finanzas, Inicio quick actions).
+  const [quickRecord, setQuickRecord] = useState<{ open: boolean; tab: QuickRecordTab; kind?: QuickRecordKind }>({ open: false, tab: 'expense' });
   const [movementsRefreshKey, setMovementsRefreshKey] = useState(0);
-  const [showGoalForm, setShowGoalForm] = useState(false);
-  const [goalsRefreshKey, setGoalsRefreshKey] = useState(0);
-  // FR-003: shared between the 'create' and 'control' routes — a habit/task
-  // saved from CreatePage bumps the counter ControlPage forwards as `key` to
-  // its own HabitList/TaskList, same refresh-by-key pattern as goalsRefreshKey.
-  const [habitsRefreshKey, setHabitsRefreshKey] = useState(0);
-  const [tasksRefreshKey, setTasksRefreshKey] = useState(0);
-  // FR-003: same pattern, dedicated to the generic Goal checklist/numeric
-  // entity shown in Control's GoalList/GoalDashboard — distinct from
-  // `goalsRefreshKey` above, which belongs to the unrelated SavingsGoal
-  // ("Metas de Ahorro") route.
-  const [goalsControlRefreshKey, setGoalsControlRefreshKey] = useState(0);
-  const [showDebtForm, setShowDebtForm] = useState(false);
-  const [debtsRefreshKey, setDebtsRefreshKey] = useState(0);
-  const [showInstallmentLoanForm, setShowInstallmentLoanForm] = useState(false);
-  const [installmentLoansRefreshKey, setInstallmentLoansRefreshKey] = useState(0);
   const [showSharedSpaceCreate, setShowSharedSpaceCreate] = useState(false);
   const [showSharedSpaceJoin, setShowSharedSpaceJoin] = useState(false);
   const [sharedSpacesRefreshKey, setSharedSpacesRefreshKey] = useState(0);
   const [addMovementTarget, setAddMovementTarget] = useState<{ spaceId: string; members: Membership[] } | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
+  const [accountName, setAccountName] = useState<string | undefined>(undefined);
+  const [accountEmail, setAccountEmail] = useState<string | undefined>(undefined);
+  // First day of the month shown by the shared selector (dashboard + finances).
+  const [refDate, setRefDate] = useState(() => shiftMonth(new Date(), 0));
   const [showNotifications, setShowNotifications] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  // Item a palette selection asks the destination screen to reveal; `nonce` re-triggers the same target.
+  const [focus, setFocus] = useState<{ target: FocusTarget; nonce: number } | null>(null);
 
   // Background Jobs
   useRecurrenceEvaluator(profileId);
@@ -102,6 +81,12 @@ export default function MainFlow() {
   const progress = usePersonalProgress(profileId ?? '');
   useTaskRecurrenceEvaluator(profileId);
   const isOnline = useOnlineStatus();
+  const hasUnreadNotifications = useHasUnreadNotifications(profileId, progress.visible);
+
+  const clearFocus = useCallback(() => setFocus(null), []);
+
+  // ⌘K / Ctrl+K toggles the palette from anywhere inside the app (never over the login or onboarding).
+  useHotkey('mod+k', () => setPaletteOpen(open => !open), { enabled: step === 'app', allowInDialog: '[data-command-palette]' });
 
   React.useEffect(() => {
     document.title = routeTitles[currentRoute]
@@ -109,9 +94,18 @@ export default function MainFlow() {
       : 'ez-life';
   }, [currentRoute]);
 
+  // Spec 011: every user owns an "Efectivo" account. Runs when the app shell is
+  // reached — both on a normal start and right after onboarding completes.
+  React.useEffect(() => {
+    if (step !== 'app' || !profileId) return;
+    new LocalPaymentAccountRepository().ensureDefault(profileId).catch(error => console.error(error));
+  }, [step, profileId]);
+
   React.useEffect(() => observeAccountSession(syncNow, state => {
     setProfileId(state.account?.id ?? null);
     setAvatarUrl(state.account?.avatarUrl);
+    setAccountName(state.account?.name);
+    setAccountEmail(state.account?.email);
     setWizardStartStep(state.startStep);
     setWizardMode('setup');
     setStep(!state.account ? 'login' : state.completed ? 'app' : 'onboarding-wizard');
@@ -146,118 +140,101 @@ export default function MainFlow() {
     );
   }
 
+  const openQuickRecord = (tab: QuickRecordTab = 'expense', kind?: QuickRecordKind) => setQuickRecord({ open: true, tab, kind });
+  const navigate = (route: string, options?: NavigateOptions) => {
+    setFinancesTab(options?.financesTab ?? 'movements');
+    const target = options?.focus;
+    setFocus(target ? { target, nonce: Date.now() } : null);
+    // A movement from another month is only visible once the shared selector shows that month.
+    if (target?.kind === 'movement' && target.date) setRefDate(shiftMonth(target.date, 0));
+    setCurrentRoute(route);
+  };
+
+  // Each save refreshes what the matching screens show; the sheet itself decides whether it closes.
+  // Habits, tasks and goals need nothing here: Control reads them through `useControlData`, which
+  // refreshes on every local change by itself.
+  const handleQuickRecordSaved = (kind: QuickRecordSavedKind) => {
+    switch (kind) {
+      case 'movement':
+        setMovementsRefreshKey(k => k + 1);
+        setSharedSpacesRefreshKey(k => k + 1); // a shared expense also creates a linked personal movement
+        break;
+      case 'transfer':
+        setMovementsRefreshKey(k => k + 1);
+        break;
+    }
+  };
+
+  const resetSession = () => {
+    forgetLocalAccount();
+    setProfileId(null);
+    setAvatarUrl(undefined);
+    setAccountName(undefined);
+    setAccountEmail(undefined);
+    setStep('login');
+  };
+
   // App Shell
   return (
     <Layout
       gamificationEnabled={progress.visible}
       currentRoute={currentRoute}
-      onNavigate={setCurrentRoute}
-      onOpenMore={() => setShowMoreDrawer(true)}
-      onNewMovement={() => setShowMovementForm(true)}
+      onNavigate={navigate}
+      onNewMovement={() => openQuickRecord('expense')}
       avatarUrl={avatarUrl}
-      onLogout={() => { forgetLocalAccount(); setProfileId(null); setAvatarUrl(undefined); setStep('login'); }}
+      accountName={accountName}
+      accountEmail={accountEmail}
+      onLogout={resetSession}
       onOpenNotifications={() => setShowNotifications(true)}
+      onOpenSearch={() => setPaletteOpen(true)}
+      hasUnreadNotifications={hasUnreadNotifications}
+      refDate={refDate}
+      onShiftMonth={delta => setRefDate(current => shiftMonth(current, delta))}
     >
-      <MoreDrawer
-        overflowNavItems={overflowNavItems.filter(item => item.id !== 'progress' || progress.visible)}
-        currentRoute={currentRoute}
-        onNavigate={setCurrentRoute}
-        open={showMoreDrawer}
-        onOpenChange={setShowMoreDrawer}
-      />
-      <div className="p-5 space-y-6">
-        {!isOnline && <p role="status" className="text-sm text-muted-foreground">Sin conexión · tus cambios se guardan en este dispositivo.</p>}
-        {/* Mobile header */}
-        <header className="flex justify-between items-center py-2 md:hidden">
-          <div className="flex items-center gap-2">
-
-            <h1 className="text-2xl font-extrabold text-foreground tracking-tight font-heading">ez-life</h1>
+      <div className="space-y-6">
+        {!isOnline && (
+          <div role="status">
+            <Badge variant="warning" className="h-auto whitespace-normal py-1.5">
+              Sin conexión · tus cambios se guardan en este dispositivo.
+            </Badge>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowNotifications(true)}
-              aria-label="Ver notificaciones"
-              className="h-11 w-11 flex items-center justify-center rounded-lg hover:bg-muted text-muted-foreground transition-colors"
-            >
-              <Bell className="w-4 h-4" />
-            </button>
-            {avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={avatarUrl}
-                alt="Foto de perfil"
-                className="w-8 h-8 rounded-full object-cover border border-border"
-              />
-            ) : (
-              <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center text-primary font-bold text-sm">
-                U
-              </div>
-            )}
-          </div>
-        </header>
+        )}
 
         {currentRoute === 'dashboard' && profileId && (
-          <Dashboard userId={profileId} onOpenProgress={() => setCurrentRoute('progress')} />
+          <>
+            <Dashboard
+              userId={profileId}
+              refDate={refDate}
+              onOpenProgress={() => navigate('progress')}
+              onOpenQuickRecord={openQuickRecord}
+              onNavigate={navigate}
+            />
+            {/* Mi Progreso already has its own card on Inicio; only the Espacio compartido row remains. */}
+            <MobileRouteLinks onNavigate={navigate} showProgress={false} />
+          </>
         )}
 
         {currentRoute === 'progress' && profileId && <PersonalProgress userId={profileId} />}
         {celebration && progress.visible && <div role="status" className="fixed top-4 left-4 right-4 md:left-auto md:w-80 z-50 bg-card border border-border rounded-xl p-4">
-          <p className="text-sm font-semibold">Un nuevo logro personal</p><button className="text-sm text-primary min-h-11" onClick={() => setCurrentRoute('progress')}>Ver mi progreso</button>
+          <p className="text-sm font-semibold">Un nuevo logro personal</p><button className="text-sm text-primary min-h-11" onClick={() => navigate('progress')}>Ver mi progreso</button>
         </div>}
 
-        {currentRoute === 'movements' && profileId && (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold text-foreground">Historial</h2>
-            </div>
-            <MovementList key={movementsRefreshKey} userId={profileId} />
-          </div>
-        )}
-
-        {currentRoute === 'analysis' && profileId && (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold text-foreground">Análisis</h2>
-            </div>
-            <AnalysisScreen userId={profileId} />
-          </div>
-        )}
-
-        {currentRoute === 'goals' && profileId && (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold text-foreground">Mis Metas</h2>
-              <Button size="sm" onClick={() => setShowGoalForm(true)}>
-                + Nueva meta
-              </Button>
-            </div>
-            <SavingsGoalList key={goalsRefreshKey} userId={profileId} />
-          </div>
-        )}
-
-        {currentRoute === 'debts' && profileId && (
-          <div className="space-y-4">
-            <div className="flex flex-wrap justify-between items-center gap-3">
-              <h2 className="text-xl font-bold text-foreground">Préstamos</h2>
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" onClick={() => setShowInstallmentLoanForm(true)}>
-                  + Con cuotas
-                </Button>
-                <Button size="sm" onClick={() => setShowDebtForm(true)}>
-                  + Nuevo préstamo
-                </Button>
-              </div>
-            </div>
-            <InstallmentLoanList key={installmentLoansRefreshKey} userId={profileId} />
-            <DebtList key={debtsRefreshKey} userId={profileId} />
-          </div>
+        {currentRoute === 'finances' && profileId && (
+          <FinancesScreen
+            userId={profileId}
+            refDate={refDate}
+            initialTab={financesTab}
+            focus={isMovementFocus(focus?.target) ? focus?.target : undefined}
+            focusNonce={focus?.nonce}
+            onFocusHandled={clearFocus}
+            onNewMovement={() => openQuickRecord('expense')}
+            movementsRefreshKey={movementsRefreshKey}
+          />
         )}
 
         {currentRoute === 'shared-space' && profileId && (
           <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold text-foreground">Espacio Compartido</h2>
-            </div>
+            <h2 className="text-headline-lg-mobile md:text-headline-lg text-foreground">Espacio Compartido</h2>
             <SharedSpaceScreen
               userId={profileId}
               refreshKey={sharedSpacesRefreshKey}
@@ -269,119 +246,48 @@ export default function MainFlow() {
         )}
 
         {currentRoute === 'control' && profileId && (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold text-foreground">Control</h2>
-            </div>
-            <ControlPage
-              userId={profileId}
-              habitsRefreshKey={habitsRefreshKey}
-              tasksRefreshKey={tasksRefreshKey}
-              goalsControlRefreshKey={goalsControlRefreshKey}
-            />
-          </div>
-        )}
-
-        {currentRoute === 'create' && profileId && (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold text-foreground">Crear</h2>
-            </div>
-            <CreatePage
-              userId={profileId}
-              onHabitSaved={() => setHabitsRefreshKey(k => k + 1)}
-              onTaskSaved={() => setTasksRefreshKey(k => k + 1)}
-              onGoalSaved={() => setGoalsControlRefreshKey(k => k + 1)}
-            />
-          </div>
+          <ControlPage
+            userId={profileId}
+            onOpenQuickRecord={openQuickRecord}
+            onOpenProgress={() => navigate('progress')}
+            focus={isControlFocus(focus?.target) ? focus?.target : undefined}
+            focusNonce={focus?.nonce}
+            onFocusHandled={clearFocus}
+          />
         )}
 
         {currentRoute === 'settings' && profileId && (
-          <SettingsScreen
-            userId={profileId}
-            onEditDistribution={() => { setWizardMode('settings'); setWizardStartStep(2); setStep('onboarding-wizard'); }}
-            onEditCategories={() => { setWizardMode('settings'); setWizardStartStep(3); setStep('onboarding-wizard'); }}
-            onLogout={() => { forgetLocalAccount(); setProfileId(null); setAvatarUrl(undefined); setStep('login'); }}
-          />
+          <>
+            <MobileRouteLinks onNavigate={navigate} showProgress={progress.visible} />
+            <SettingsScreen
+              userId={profileId}
+              onEditDistribution={() => { setWizardMode('settings'); setWizardStartStep(2); setStep('onboarding-wizard'); }}
+              onEditCategories={() => { setWizardMode('settings'); setWizardStartStep(3); setStep('onboarding-wizard'); }}
+              onLogout={resetSession}
+              accountName={accountName}
+              accountEmail={accountEmail}
+              focus={isAccountFocus(focus?.target) ? focus?.target : undefined}
+              focusNonce={focus?.nonce}
+              onFocusHandled={clearFocus}
+            />
+          </>
         )}
       </div>
 
-      {/* FAB — mobile only, visible on all routes except settings */}
-      {currentRoute !== 'settings' && profileId && (
-        <>
-          <div className="fixed bottom-[4.5rem] right-5 z-50 md:hidden">
-            <button
-              onClick={() => setShowMovementForm(true)}
-              aria-label="Registrar nuevo movimiento"
-              className="bg-primary text-primary-foreground w-14 h-14 rounded-full flex items-center justify-center shadow-none hover:bg-primary/90 transition-colors active:scale-95"
-            >
-              <span className="text-2xl font-light leading-none">+</span>
-            </button>
-          </div>
-
-          <Dialog open={showMovementForm} onOpenChange={(open) => !open && setShowMovementForm(false)}>
-            <DialogContent className={SHEET_DIALOG_CONTENT_CLASS}>
-              <MovementForm
-                userId={profileId}
-                onComplete={() => {
-                  setShowMovementForm(false);
-                  setMovementsRefreshKey(k => k + 1);
-                }}
-                onCancel={() => setShowMovementForm(false)}
-              />
-            </DialogContent>
-          </Dialog>
-        </>
-      )}
-
       {profileId && (
-        <Dialog open={showGoalForm} onOpenChange={(open) => !open && setShowGoalForm(false)}>
-          <DialogContent className={SHEET_DIALOG_CONTENT_CLASS}>
-            <SavingsGoalForm
-              userId={profileId}
-              onComplete={() => {
-                setShowGoalForm(false);
-                setGoalsRefreshKey(k => k + 1);
-              }}
-              onCancel={() => setShowGoalForm(false)}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {profileId && (
-        <Dialog open={showInstallmentLoanForm} onOpenChange={(open) => !open && setShowInstallmentLoanForm(false)}>
-          <DialogContent className={SHEET_DIALOG_CONTENT_CLASS}>
-            <InstallmentLoanForm
-              userId={profileId}
-              onComplete={() => {
-                setShowInstallmentLoanForm(false);
-                setInstallmentLoansRefreshKey(k => k + 1);
-              }}
-              onCancel={() => setShowInstallmentLoanForm(false)}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {profileId && (
-        <Dialog open={showDebtForm} onOpenChange={(open) => !open && setShowDebtForm(false)}>
-          <DialogContent className={SHEET_DIALOG_CONTENT_CLASS}>
-            <DebtForm
-              userId={profileId}
-              onComplete={() => {
-                setShowDebtForm(false);
-                setDebtsRefreshKey(k => k + 1);
-              }}
-              onCancel={() => setShowDebtForm(false)}
-            />
-          </DialogContent>
-        </Dialog>
+        <QuickRecordSheet
+          open={quickRecord.open}
+          onOpenChange={open => setQuickRecord(current => ({ ...current, open }))}
+          userId={profileId}
+          initialTab={quickRecord.tab}
+          initialKind={quickRecord.kind}
+          onSaved={handleQuickRecordSaved}
+        />
       )}
 
       {profileId && (
         <Dialog open={showSharedSpaceCreate} onOpenChange={(open) => !open && setShowSharedSpaceCreate(false)}>
-          <DialogContent className={SHEET_DIALOG_CONTENT_CLASS}>
+          <DialogContent className={FORM_DIALOG_CONTENT_CLASS}>
             <SharedSpaceCreate
               onComplete={() => {
                 setShowSharedSpaceCreate(false);
@@ -395,7 +301,7 @@ export default function MainFlow() {
 
       {profileId && (
         <Dialog open={showSharedSpaceJoin} onOpenChange={(open) => !open && setShowSharedSpaceJoin(false)}>
-          <DialogContent className={SHEET_DIALOG_CONTENT_CLASS}>
+          <DialogContent className={FORM_DIALOG_CONTENT_CLASS}>
             <SharedSpaceJoin
               onComplete={() => {
                 setShowSharedSpaceJoin(false);
@@ -407,9 +313,20 @@ export default function MainFlow() {
         </Dialog>
       )}
 
+      {profileId && (
+        <CommandPalette
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          userId={profileId}
+          gamificationVisible={progress.visible}
+          onNavigate={navigate}
+          onOpenQuickRecord={openQuickRecord}
+        />
+      )}
+
       {profileId && addMovementTarget && (
         <Dialog open={!!addMovementTarget} onOpenChange={(open) => !open && setAddMovementTarget(null)}>
-          <DialogContent className={SHEET_DIALOG_CONTENT_CLASS}>
+          <DialogContent className={FORM_DIALOG_CONTENT_CLASS}>
             <SharedMovementForm
               spaceId={addMovementTarget.spaceId}
               currentUserId={profileId}
@@ -426,7 +343,7 @@ export default function MainFlow() {
 
       {profileId && (
         <Dialog open={showNotifications} onOpenChange={(open) => !open && setShowNotifications(false)}>
-          <DialogContent showCloseButton={false} className={SHEET_DIALOG_CONTENT_CLASS}>
+          <DialogContent showCloseButton={false} className={FORM_DIALOG_CONTENT_CLASS}>
             <NotificationHistory
               userId={profileId}
               onClose={() => setShowNotifications(false)}

@@ -3,9 +3,15 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { LocalHabitRepository } from '../../infrastructure/repositories/local/LocalHabitRepository';
 import { Habit, HabitCompletion } from '../../core/domain/models/types';
-import { buildFixedDaysLog, evaluateFixedDaysStreak, evaluateFrequencyStreak, calculateHabitStreakHistory } from '../../core/use-cases/evaluateHabitStreak';
-import { Card } from '@/components/ui/card';
+import { currentHabitStreak } from '../../core/use-cases/buildHabitStreak';
+import { calculateHabitCompletionRate } from '../../core/use-cases/calculateHabitCompletionRate';
+import { calculateHabitStreakHistory } from '../../core/use-cases/evaluateHabitStreak';
+import { addDays, startOfDay } from '../../core/use-cases/calendar';
 import { Skeleton } from '@/components/ui/skeleton';
+import { onLocalChanges } from '../../infrastructure/db/localChanges';
+import { onSyncCompleted } from '../../infrastructure/sync/syncEvents';
+import { cn } from '@/lib/utils';
+import { useChartColors } from '../hooks/useChartColors';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface Props {
@@ -14,6 +20,7 @@ interface Props {
 
 interface HabitWithStreak extends Habit {
   streak: number;
+  completionRate: number;
   completions: HabitCompletion[];
 }
 
@@ -25,13 +32,13 @@ const DEFAULT_RANGE_DAYS = 30;
  * Habits dashboard (FR-005, extended in 004 with FR-004's streak-evolution
  * chart): every habit with its current streak plus a day-by-day history
  * chart driven by `calculateHabitStreakHistory` — a full overview, unlike
- * HabitList's "hoy" agenda, which only shows today-relevant state alongside
- * a not-today marker.
+ * the "Hábitos diarios" panel, which only shows today-relevant state.
  */
 export default function HabitDashboard({ userId }: Props) {
   const [habits, setHabits] = useState<HabitWithStreak[]>([]);
   const [loading, setLoading] = useState(true);
   const [rangeDays, setRangeDays] = useState<number>(DEFAULT_RANGE_DAYS);
+  const colors = useChartColors();
 
   const load = useCallback(async () => {
     try {
@@ -42,15 +49,9 @@ export default function HabitDashboard({ userId }: Props) {
       const withStreak = await Promise.all(allHabits.map(async (habit): Promise<HabitWithStreak> => {
         const completions = await repo.getCompletions(habit.id);
 
-        if (habit.schedule_mode === 'fixed_days' && habit.fixed_days) {
-          const log = buildFixedDaysLog(habit.fixed_days, completions, habit.created_at, today);
-          const { streak } = evaluateFixedDaysStreak(log);
-          return { ...habit, streak, completions };
-        }
-
-        const target = habit.frequency_target ?? 1;
-        const { streak } = evaluateFrequencyStreak([{ completions: completions.length, target, tokenUsed: false }]);
-        return { ...habit, streak, completions };
+        const { streak } = currentHabitStreak(habit, completions, today);
+        const completionRate = calculateHabitCompletionRate(habit, completions, today);
+        return { ...habit, streak, completionRate, completions };
       }));
 
       setHabits(withStreak);
@@ -65,22 +66,22 @@ export default function HabitDashboard({ userId }: Props) {
     load();
   }, [load]);
 
+  // Keep the overview in step with checks, edits and sync while the section stays open.
+  useEffect(() => onLocalChanges(['habits', 'habit_completions'], () => { void load(); }), [load]);
+  useEffect(() => onSyncCompleted(() => { void load(); }), [load]);
+
   if (loading) {
-    return <Skeleton className="h-24 w-full rounded-xl" />;
+    return <Skeleton className="h-24 w-full rounded-lg" />;
   }
 
   if (habits.length === 0) {
-    return (
-      <Card className="animate-fade-slide-up py-8 text-center shadow-none">
-        <p className="text-muted-foreground">No tenés hábitos registrados.</p>
-      </Card>
-    );
+    return <p className="rounded-lg border border-dashed border-border-strong p-4 text-body-md text-muted-foreground">No tenés hábitos registrados.</p>;
   }
 
   const today = new Date();
 
   return (
-    <div className="animate-fade-slide-up space-y-4">
+    <div className="space-y-3">
       <div className="flex items-center justify-end gap-2">
         {RANGE_OPTIONS.map(days => (
           <button
@@ -88,9 +89,10 @@ export default function HabitDashboard({ userId }: Props) {
             type="button"
             aria-pressed={rangeDays === days}
             onClick={() => setRangeDays(days)}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              rangeDays === days ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-            }`}
+            className={cn(
+              'min-h-11 rounded-lg border px-3 font-mono text-label-mono-sm outline-none transition-colors focus-visible:shadow-focus',
+              rangeDays === days ? 'border-border-strong bg-surface-2 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
+            )}
           >
             {days} días
           </button>
@@ -98,7 +100,7 @@ export default function HabitDashboard({ userId }: Props) {
       </div>
 
       {habits.map(habit => {
-        const from = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (rangeDays - 1));
+        const from = addDays(startOfDay(today), -(rangeDays - 1));
         const history = calculateHabitStreakHistory(habit, habit.completions, { from, to: today });
         const chartData = history.map(point => ({
           date: point.date.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit' }),
@@ -106,26 +108,27 @@ export default function HabitDashboard({ userId }: Props) {
         }));
 
         return (
-          <Card key={habit.id} className="shadow-none px-4 py-3 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-foreground">{habit.name}</span>
-              <span className="text-sm text-muted-foreground">Racha: {habit.streak}</span>
+          <div key={habit.id} className="space-y-3 rounded-lg bg-surface-2 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-body-lg font-medium text-foreground">{habit.name}</span>
+              <span className="font-mono text-label-mono-sm text-muted-foreground">Racha: {habit.streak}</span>
             </div>
+            <p className="font-mono text-label-mono-xs text-muted-foreground">{habit.completionRate}% de cumplimiento (últimos 30 días)</p>
             {chartData.length === 0 ? (
-              <p className="text-xs text-muted-foreground">Sin historial suficiente para graficar todavía.</p>
+              <p className="text-body-sm text-muted-foreground">Sin historial suficiente para graficar todavía.</p>
             ) : (
               <div data-testid={`habit-streak-chart-${habit.id}`} className="h-32 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData}>
-                    <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-                    <YAxis domain={[0, 1]} ticks={[0, 1]} tick={{ fontSize: 10 }} allowDecimals={false} />
-                    <Tooltip />
-                    <Line type="stepAfter" dataKey="value" stroke="var(--color-primary, #6366f1)" dot={false} strokeWidth={2} />
+                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: colors.mutedForeground }} axisLine={{ stroke: colors.border }} tickLine={{ stroke: colors.border }} interval="preserveStartEnd" />
+                    <YAxis domain={[0, 1]} ticks={[0, 1]} tick={{ fontSize: 10, fill: colors.mutedForeground }} axisLine={{ stroke: colors.border }} tickLine={{ stroke: colors.border }} allowDecimals={false} />
+                    <Tooltip contentStyle={{ background: colors.card, border: `1px solid ${colors.border}`, borderRadius: 8, color: colors.foreground }} />
+                    <Line type="stepAfter" dataKey="value" stroke={colors.primary} dot={false} strokeWidth={2} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
             )}
-          </Card>
+          </div>
         );
       })}
     </div>

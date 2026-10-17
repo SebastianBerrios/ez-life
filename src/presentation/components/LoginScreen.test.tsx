@@ -83,3 +83,22 @@ describe('LoginScreen', () => {
     expect(await screen.findByText('OAuth provider unavailable')).toBeInTheDocument();
   });
 });
+
+describe('LoginScreen — layout', () => {
+  it('shows the brand as the page heading and both providers inside a labelled panel', () => {
+    render(<LoginScreen />);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('ez·life');
+    const panel = screen.getByRole('region', { name: 'Iniciar sesión' });
+    expect(panel).toContainElement(screen.getByRole('button', { name: /google/i }));
+    expect(panel).toContainElement(screen.getByRole('button', { name: /github/i }));
+  });
+
+  it('announces a sign-in error as an alert', async () => {
+    setNavigatorOnLine(false);
+    const user = userEvent.setup();
+    render(<LoginScreen />);
+    await user.click(screen.getByRole('button', { name: /google/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/se requiere conexión a internet/i);
+    setNavigatorOnLine(true);
+  });
+});

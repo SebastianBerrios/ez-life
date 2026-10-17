@@ -3,8 +3,10 @@
 import React, { useState } from 'react';
 import { getSupabaseBrowserClient } from '../../infrastructure/supabase/client';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { Button } from '@/components/ui/button';
+import { Panel } from '@/components/ui/panel';
 
-// Google brand SVG (official multicolor mark)
+// Google brand SVG (official multicolor mark). Third-party brand colors are the one place hex is allowed.
 function GoogleIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -48,43 +50,38 @@ export default function LoginScreen() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="max-w-sm w-full space-y-8">
-        {/* Brand */}
-        <div className="space-y-4">
-          <h1 className="text-5xl font-medium text-foreground tracking-tight font-heading">ez-life</h1>
-          <p className="text-muted-foreground text-base">Tu finanzas, sin complicaciones.</p>
-        </div>
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
+      <div className="w-full max-w-sm space-y-6">
+        <header className="space-y-2 text-center">
+          <h1 className="text-display-hero-mobile tracking-tight text-foreground">
+            ez<span className="text-primary">·</span>life
+          </h1>
+          <p className="font-mono text-label-mono-sm uppercase text-muted-foreground">Finanzas, hábitos y metas</p>
+          <p className="text-body-lg text-muted-foreground">Tus finanzas, sin complicaciones.</p>
+        </header>
 
-        {/* OAuth buttons */}
-        <div className="border-t border-border pt-6 space-y-3">
-          <p className="text-sm font-medium text-muted-foreground text-center mb-4">Continuar con</p>
+        <Panel aria-label="Iniciar sesión" className="gap-3 p-5">
+          <p className="text-center font-mono text-label-mono-xs uppercase text-muted-foreground">Continuar con</p>
 
-          <button
-            onClick={() => handleLogin('google')}
-            className="w-full h-12 flex items-center justify-center gap-3 px-4 border border-border rounded-xl text-base font-medium text-foreground bg-background hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
+          <Button type="button" variant="outline" size="lg" onClick={() => handleLogin('google')} className="w-full gap-3 text-base">
             <GoogleIcon />
             Google
-          </button>
+          </Button>
 
-          <button
-            onClick={() => handleLogin('github')}
-            className="w-full h-12 flex items-center justify-center gap-3 px-4 border border-border rounded-xl text-base font-medium text-foreground bg-background hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
+          <Button type="button" variant="outline" size="lg" onClick={() => handleLogin('github')} className="w-full gap-3 text-base">
             <GitHubIcon />
             GitHub
-          </button>
+          </Button>
 
           {errorMessage && (
-            <p className="text-sm text-destructive text-center">{errorMessage}</p>
+            <p role="alert" className="text-center text-body-md text-destructive">{errorMessage}</p>
           )}
-        </div>
+        </Panel>
 
-        <p className="text-center text-sm text-muted-foreground">
+        <p className="text-center text-body-sm text-muted-foreground">
           Al continuar, aceptás los términos y la política de privacidad.
         </p>
       </div>
-    </div>
+    </main>
   );
 }

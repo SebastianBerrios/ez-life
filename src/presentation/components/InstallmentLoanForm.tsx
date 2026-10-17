@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { LocalInstallmentLoanRepository } from '../../infrastructure/repositories/local/LocalInstallmentLoanRepository';
 import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
 import { validateMovementAmount } from '../../core/use-cases/validateMovementAmount';
+import { parseMoney } from '../../core/use-cases/parseMoney';
 import { DomainError } from '../../core/domain/errors/DomainError';
 import { DistributionCategory, InstallmentLoan } from '../../core/domain/models/types';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { centsToAmountInput } from '../../core/use-cases/addQuickAmount';
 
 interface Props {
   userId: string;
@@ -30,9 +32,9 @@ interface Props {
 export default function InstallmentLoanForm({ userId, existing, onComplete, onCancel }: Props) {
   const isEditing = Boolean(existing);
   const [lenderName, setLenderName] = useState(existing?.lender_name ?? '');
-  const [amount, setAmount] = useState(existing ? (existing.amount / 100).toFixed(2) : '');
+  const [amount, setAmount] = useState(existing ? centsToAmountInput(existing.amount) : '');
   const [installmentCount, setInstallmentCount] = useState(existing ? String(existing.installment_count) : '');
-  const [installmentAmount, setInstallmentAmount] = useState(existing ? (existing.installment_amount / 100).toFixed(2) : '');
+  const [installmentAmount, setInstallmentAmount] = useState(existing ? centsToAmountInput(existing.installment_amount) : '');
   const [interestRate, setInterestRate] = useState(existing?.interest_rate !== undefined ? String(existing.interest_rate) : '');
   // FR-010/FR-011: every loan needs a real distribution bucket before it can
   // accept a payment, since each payment now generates an expense Movement
@@ -56,11 +58,13 @@ export default function InstallmentLoanForm({ userId, existing, onComplete, onCa
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const amountInCents = Math.round(parseFloat(amount.replace(/,/g, '')) * 100);
-    const installmentAmountInCents = Math.round(parseFloat(installmentAmount.replace(/,/g, '')) * 100);
     const installmentCountValue = parseInt(installmentCount, 10);
+    let amountInCents = 0;
+    let installmentAmountInCents = 0;
 
     try {
+      amountInCents = parseMoney(amount);
+      installmentAmountInCents = parseMoney(installmentAmount);
       validateMovementAmount(amountInCents);
       validateMovementAmount(installmentAmountInCents);
       if (!Number.isInteger(installmentCountValue) || installmentCountValue <= 0) {

@@ -124,4 +124,37 @@ describe('GoalForm', () => {
     });
     expect(mockSave.mock.calls[0][0].description).toBeUndefined();
   });
+  it('adds a milestone with Enter without submitting the form, and removes it with its labelled button', async () => {
+    const user = userEvent.setup();
+    const mockSave = vi.fn().mockResolvedValue({ id: 'g' });
+    vi.mocked(LocalGoalRepository).mockImplementation(function () {
+      return { save: mockSave } as unknown as InstanceType<typeof LocalGoalRepository>;
+    });
+    render(<GoalForm userId="user-1" onComplete={vi.fn()} onCancel={vi.fn()} />);
+
+    await user.type(screen.getByLabelText(/nombre/i), 'Aprender React');
+    await user.click(screen.getByLabelText(/checklist/i));
+    await user.type(screen.getByLabelText(/nuevo hito/i), 'Fundamentos{Enter}');
+
+    expect(screen.getByText('Fundamentos')).toBeInTheDocument();
+    expect(mockSave).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/nuevo hito/i)).toHaveValue('');
+
+    await user.click(screen.getByRole('button', { name: 'Quitar hito Fundamentos' }));
+    expect(screen.queryByText('Fundamentos')).not.toBeInTheDocument();
+  });
+
+  it('kind is a radio group of chips; its own title shows standalone and not when embedded', () => {
+    vi.mocked(LocalGoalRepository).mockImplementation(function () {
+      return { save: vi.fn() } as unknown as InstanceType<typeof LocalGoalRepository>;
+    });
+    const { unmount } = render(<GoalForm userId="user-1" onComplete={vi.fn()} onCancel={vi.fn()} />);
+    expect(screen.getByRole('radiogroup', { name: /tipo/i })).toBeInTheDocument();
+    expect(screen.getByLabelText('Numérica')).toBeChecked();
+    expect(screen.getByRole('heading', { name: 'Nueva Meta' })).toBeInTheDocument();
+    unmount();
+    render(<GoalForm userId="user-1" embedded onComplete={vi.fn()} onCancel={vi.fn()} />);
+    expect(screen.queryByRole('heading', { name: 'Nueva Meta' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Crear meta' })).toBeInTheDocument();
+  });
 });

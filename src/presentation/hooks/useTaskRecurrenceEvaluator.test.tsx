@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useTaskRecurrenceEvaluator } from './useTaskRecurrenceEvaluator';
 import { db } from '../../infrastructure/db/db';
+import { calendarKey } from '../../core/use-cases/calendar';
 
 describe('useTaskRecurrenceEvaluator', () => {
   const userId = 'user-1';
@@ -19,13 +20,13 @@ describe('useTaskRecurrenceEvaluator', () => {
     // Only fake Date so IndexedDB's own internal scheduling (setTimeout/microtasks)
     // keeps running on real timers (same pattern as useRecurrenceEvaluator.test.tsx).
     vi.useFakeTimers({ toFake: ['Date'] });
-    const now = new Date(Date.UTC(2025, 11, 20));
+    const now = new Date(2025, 11, 20, 9);
 
     await db.tasks.put({
       id: 't1',
       user_id: userId,
       title: 'Sacar la basura',
-      due_date: new Date(Date.UTC(2026, 0, 3)), // Saturday
+      due_date: new Date(2026, 0, 3, 12), // Saturday, local noon
       status: 'pending',
       schedule_mode: 'fixed_days',
       fixed_days: ['sat'],
@@ -35,7 +36,7 @@ describe('useTaskRecurrenceEvaluator', () => {
       updated_at: now,
     });
 
-    vi.setSystemTime(new Date(Date.UTC(2026, 0, 11))); // Sunday, after the next Saturday
+    vi.setSystemTime(new Date(2026, 0, 11, 22, 30)); // Sunday evening, after the next Saturday
 
     const { unmount } = renderHook(() => useTaskRecurrenceEvaluator(userId));
 
@@ -49,7 +50,9 @@ describe('useTaskRecurrenceEvaluator', () => {
     expect(generated).toBeDefined();
     expect(generated?.recurrence_series_id).toBe('series-1');
     expect(generated?.status).toBe('pending');
-    expect(new Date(generated!.due_date).toISOString().slice(0, 10)).toBe('2026-01-10');
+    // A local calendar day at local noon (UTC arithmetic produced the previous day west of UTC).
+    expect(calendarKey(new Date(generated!.due_date))).toBe('2026-01-10');
+    expect(new Date(generated!.due_date).getHours()).toBe(12);
 
     unmount();
   });

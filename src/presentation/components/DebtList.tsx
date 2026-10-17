@@ -1,17 +1,25 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { HandCoins } from 'lucide-react';
 import { LocalDebtRepository } from '../../infrastructure/repositories/local/LocalDebtRepository';
 import { Debt } from '../../core/domain/models/types';
 import { DomainError } from '../../core/domain/errors/DomainError';
-import { Card } from '@/components/ui/card';
+import { parseMoney } from '../../core/use-cases/parseMoney';
+import { formatShortDate } from '../../core/use-cases/formatMovementWhen';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Money } from '@/components/ui/money';
+import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { onLocalChanges } from '../../infrastructure/db/localChanges';
 
 interface Props {
   userId: string;
 }
+
+const EYEBROW = 'font-mono text-label-mono-xs uppercase text-muted-foreground';
 
 export default function DebtList({ userId }: Props) {
   const [debts, setDebts] = useState<Debt[]>([]);
@@ -32,6 +40,8 @@ export default function DebtList({ userId }: Props) {
 
   useEffect(() => {
     loadDebts();
+    // A debt changed from another tab or by a sync pull must show up without remounting.
+    return onLocalChanges(['debts'], loadDebts);
   }, [loadDebts]);
 
   const handleDelete = async (id: string) => {
@@ -46,10 +56,8 @@ export default function DebtList({ userId }: Props) {
   };
 
   const handleRegisterPayment = async (debt: Debt) => {
-    const draft = paymentDrafts[debt.id] ?? '';
-    const amountInCents = Math.round(parseFloat(draft.replace(/,/g, '')) * 100);
-
     try {
+      const amountInCents = parseMoney(paymentDrafts[debt.id] ?? '');
       const repo = new LocalDebtRepository();
       // recordSettlement never creates a Movement — it's bookkeeping only
       // (FR-004, Principio X): a devolución nunca es un ingreso/egreso real.
@@ -77,40 +85,46 @@ export default function DebtList({ userId }: Props) {
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-28 w-full rounded-xl" />
-        <Skeleton className="h-28 w-full rounded-xl" />
+      <div className="space-y-3">
+        <Skeleton className="h-28 w-full rounded-lg" />
+        <Skeleton className="h-28 w-full rounded-lg" />
       </div>
     );
   }
 
   if (debts.length === 0) {
     return (
-      <Card className="animate-fade-slide-up py-8 text-center shadow-none">
-        <p className="text-muted-foreground">No tenés préstamos registrados.</p>
-      </Card>
+      <p className="animate-fade-slide-up py-2 text-body-md text-muted-foreground">No tenés préstamos registrados.</p>
     );
   }
 
   return (
-    <div className="animate-fade-slide-up space-y-4">
+    <div className="animate-fade-slide-up flex flex-col gap-3" data-testid="debts">
+      <p className={EYEBROW}>Informales</p>
       {debts.map(debt => {
         const remaining = debt.amount - debt.settled_amount;
         const isSettled = remaining <= 0;
         const directionLabel = debt.direction === 'lent' ? 'Le prestaste a' : 'Te prestó';
+        const settledPercent = debt.amount > 0 ? Math.min(100, Math.round((debt.settled_amount * 100) / debt.amount)) : 0;
 
         return (
-          <Card key={debt.id} className="relative shadow-none">
-            <div className="flex items-start justify-between px-5">
-              <div>
-                <h3 className="font-heading font-bold text-foreground">
-                  {directionLabel} {debt.counterparty_name}
-                </h3>
-                {debt.due_date && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Vence: {new Date(debt.due_date).toLocaleDateString()}
-                  </p>
-                )}
+          <article key={debt.id} className="flex flex-col gap-4 rounded-lg border border-border bg-background p-4" data-testid={`debt-${debt.id}`}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-primary">
+                  <HandCoins className="size-5" />
+                </span>
+                <div className="min-w-0">
+                  <h4 className="flex flex-wrap items-center gap-2 text-headline-sm text-foreground">
+                    {directionLabel} {debt.counterparty_name}
+                    <Badge variant={isSettled ? 'positive' : 'warning'}>{isSettled ? 'Saldado' : 'Pendiente'}</Badge>
+                  </h4>
+                  {debt.due_date && (
+                    <p className="font-mono text-label-mono-xs text-muted-foreground">
+                      Vence: {formatShortDate(new Date(debt.due_date))}
+                    </p>
+                  )}
+                </div>
               </div>
               <Button
                 variant="ghost"
@@ -122,18 +136,24 @@ export default function DebtList({ userId }: Props) {
               </Button>
             </div>
 
-            <div className="mt-4 space-y-1 px-5">
-              <div className="flex justify-between text-sm">
-                <span className="text-primary font-medium">S/ {(remaining / 100).toFixed(2)} pendiente</span>
-                <span className="text-muted-foreground">de S/ {(debt.amount / 100).toFixed(2)}</span>
+            <div className="flex flex-col gap-1.5">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <span className="flex items-baseline gap-2 text-body-md text-primary">
+                  <Money cents={remaining} size="md" className="font-semibold" />
+                  <span>pendiente</span>
+                </span>
+                <span className="text-body-sm text-muted-foreground">de <Money cents={debt.amount} size="sm" className="text-muted-foreground" /></span>
               </div>
+              <Progress value={settledPercent} aria-label={`Devuelto de ${debt.counterparty_name}`} />
             </div>
 
             {!isSettled && (
-              <div className="mt-4 px-5 space-y-2">
+              <div className="flex flex-col gap-2">
                 <div className="flex gap-2">
                   <Input
                     type="text"
+                    inputMode="decimal"
+                    aria-label="Monto de la devolución"
                     placeholder="Monto de la devolución"
                     value={paymentDrafts[debt.id] ?? ''}
                     onChange={(e) => setPaymentDrafts(prev => ({
@@ -141,23 +161,23 @@ export default function DebtList({ userId }: Props) {
                       [debt.id]: e.target.value.replace(/[^0-9.]/g, ''),
                     }))}
                   />
-                  <Button size="sm" onClick={() => handleRegisterPayment(debt)}>
+                  <Button className="shrink-0" onClick={() => handleRegisterPayment(debt)}>
                     Registrar devolución
                   </Button>
                 </div>
                 {paymentErrors[debt.id] && (
-                  <p className="text-sm text-destructive">{paymentErrors[debt.id]}</p>
+                  <p className="text-body-sm text-destructive">{paymentErrors[debt.id]}</p>
                 )}
-                <Button variant="outline" size="sm" className="w-full" onClick={() => handleMarkSettled(debt)}>
+                <Button variant="outline" className="w-full" onClick={() => handleMarkSettled(debt)}>
                   Marcar como saldado
                 </Button>
               </div>
             )}
 
             {isSettled && (
-              <p className="mt-4 px-5 text-sm text-primary font-medium">Saldado ✓</p>
+              <p className="text-body-md font-medium text-success">Saldado ✓</p>
             )}
-          </Card>
+          </article>
         );
       })}
     </div>

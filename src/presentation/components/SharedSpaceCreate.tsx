@@ -42,19 +42,23 @@ export default function SharedSpaceCreate({ onComplete, onCancel }: Props) {
   if (inviteCode) {
     return (
       <div className="w-full space-y-5 text-center">
-        <h2 className="font-heading text-base font-medium">¡Espacio creado!</h2>
-        <p className="text-sm text-muted-foreground">
+        <h2 className="text-headline-md text-foreground">¡Espacio creado!</h2>
+        <p className="text-body-md text-muted-foreground">
           Compartí este código con la persona que querés invitar (vence en 48hs):
         </p>
-        <p className="text-2xl font-bold tracking-widest text-primary">{inviteCode}</p>
-        <Button onClick={onComplete} className="w-full">Listo</Button>
+        <p
+          className="rounded-lg border border-border-strong bg-surface-2 py-4 font-mono text-headline-lg-mobile tracking-widest text-primary"
+        >
+          {inviteCode}
+        </p>
+        <Button onClick={onComplete} size="lg" className="w-full">Listo</Button>
       </div>
     );
   }
 
   return (
     <div className="w-full">
-      <h2 className="mb-4 font-heading text-base leading-none font-medium">Nuevo Espacio Compartido</h2>
+      <h2 className="mb-4 text-headline-md text-foreground">Nuevo Espacio Compartido</h2>
       <form onSubmit={handleSubmit} data-testid="shared-space-create-form" className="space-y-5">
         <div className="space-y-2">
           <Label htmlFor="spaceName">Nombre del espacio</Label>
@@ -68,14 +72,14 @@ export default function SharedSpaceCreate({ onComplete, onCancel }: Props) {
           />
         </div>
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-body-md text-destructive">{error}</p>}
 
         <div className="flex gap-3 pt-2">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting} className="flex-1">
             Cancelar
           </Button>
           <Button type="submit" disabled={isSubmitting} className="flex-1">
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isSubmitting && <Loader2 className="animate-spin" />}
             Crear
           </Button>
         </div>

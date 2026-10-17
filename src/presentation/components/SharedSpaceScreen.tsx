@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { Users } from 'lucide-react';
 import { LocalSharedSpaceRepository } from '../../infrastructure/repositories/local/LocalSharedSpaceRepository';
 import { LocalMembershipRepository } from '../../infrastructure/repositories/local/LocalMembershipRepository';
 import { Membership, SharedSpace } from '../../core/domain/models/types';
 import SharedSpaceBalances from './SharedSpaceBalances';
 import SharedSpaceSettings from './SharedSpaceSettings';
-import { Card } from '@/components/ui/card';
+import { Panel, PanelBody, PanelHeader } from '@/components/ui/panel';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -55,20 +56,23 @@ export default function SharedSpaceScreen({ userId, onCreate, onJoin, onAddMovem
   }, [loadSpaces, refreshKey]);
 
   if (loading) {
-    return <Skeleton className="h-28 w-full rounded-xl" />;
+    return <Skeleton className="h-28 w-full rounded-lg" />;
   }
 
   if (spaces.length === 0 && leftSpaces.length === 0) {
     return (
-      <Card className="animate-fade-slide-up py-8 text-center shadow-none space-y-4">
-        <p className="text-muted-foreground px-5">
+      <Panel className="animate-fade-slide-up items-center gap-4 px-5 py-8 text-center" data-testid="shared-space-empty">
+        <span aria-hidden="true" className="flex size-12 items-center justify-center rounded-lg bg-surface-2 text-primary">
+          <Users className="size-6" />
+        </span>
+        <p className="max-w-md text-body-md text-muted-foreground">
           Todavía no tenés un espacio compartido. Creá uno para tu pareja o familia, o unite a uno existente con un código.
         </p>
-        <div className="flex gap-3 px-5">
+        <div className="flex w-full max-w-md gap-3">
           <Button variant="outline" onClick={onJoin} className="flex-1">Unirme con código</Button>
           <Button onClick={onCreate} className="flex-1">Crear espacio</Button>
         </div>
-      </Card>
+      </Panel>
     );
   }
 
@@ -76,14 +80,18 @@ export default function SharedSpaceScreen({ userId, onCreate, onJoin, onAddMovem
     <div className="animate-fade-slide-up space-y-4">
       {spaces.map(space => (
         <div key={space.id} className="space-y-3">
-          <Card className="shadow-none px-5 py-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-heading font-bold text-foreground">{space.name}</h3>
-              <Button size="sm" onClick={() => onAddMovement(space.id, membersBySpace[space.id] ?? [])}>
-                + Movimiento
-              </Button>
-            </div>
-          </Card>
+          <Panel>
+            <PanelHeader
+              eyebrow="Espacio compartido"
+              title={space.name}
+              action={
+                <Button size="sm" onClick={() => onAddMovement(space.id, membersBySpace[space.id] ?? [])}>
+                  + Movimiento
+                </Button>
+              }
+              className="pb-4"
+            />
+          </Panel>
           <SharedSpaceBalances spaceId={space.id} currentUserId={userId} refreshKey={refreshKey} />
           <SharedSpaceSettings space={space} onChanged={loadSpaces} onLeft={loadSpaces} />
         </div>
@@ -91,13 +99,15 @@ export default function SharedSpaceScreen({ userId, onCreate, onJoin, onAddMovem
 
       {leftSpaces.length > 0 && (
         <div className="space-y-3">
-          <h3 className="font-heading text-sm font-medium text-muted-foreground">Espacios que abandonaste</h3>
+          <h3 className="font-mono text-label-mono-sm uppercase text-muted-foreground">Espacios que abandonaste</h3>
           {leftSpaces.map(space => (
             <div key={space.id} className="space-y-2">
-              <Card className="shadow-none px-5 py-4">
-                <h4 className="font-heading font-bold text-foreground">{space.name}</h4>
-                <p className="text-xs text-muted-foreground">Saldo congelado — ya no sos miembro de este espacio.</p>
-              </Card>
+              <Panel>
+                <PanelBody className="pt-4">
+                  <h4 className="text-headline-sm text-foreground">{space.name}</h4>
+                  <p className="text-body-sm text-muted-foreground">Saldo congelado — ya no sos miembro de este espacio.</p>
+                </PanelBody>
+              </Panel>
               <SharedSpaceBalances spaceId={space.id} currentUserId={userId} refreshKey={refreshKey} />
             </div>
           ))}

@@ -35,7 +35,7 @@ export default function SharedSpaceJoin({ onComplete, onCancel }: Props) {
 
   return (
     <div className="w-full">
-      <h2 className="mb-4 font-heading text-base leading-none font-medium">Unirme a un Espacio</h2>
+      <h2 className="mb-4 text-headline-md text-foreground">Unirme a un Espacio</h2>
       <form onSubmit={handleSubmit} data-testid="shared-space-join-form" className="space-y-5">
         <div className="space-y-2">
           <Label htmlFor="inviteCode">Código de invitación</Label>
@@ -44,6 +44,8 @@ export default function SharedSpaceJoin({ onComplete, onCancel }: Props) {
             id="inviteCode"
             required
             placeholder="Ej. ABC12345"
+            className="font-mono uppercase tracking-widest"
+            autoComplete="off"
             value={code}
             onChange={(e) => {
               setCode(e.target.value);
@@ -52,14 +54,14 @@ export default function SharedSpaceJoin({ onComplete, onCancel }: Props) {
           />
         </div>
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-body-md text-destructive">{error}</p>}
 
         <div className="flex gap-3 pt-2">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting} className="flex-1">
             Cancelar
           </Button>
           <Button type="submit" disabled={isSubmitting} className="flex-1">
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isSubmitting && <Loader2 className="animate-spin" />}
             Unirme
           </Button>
         </div>
