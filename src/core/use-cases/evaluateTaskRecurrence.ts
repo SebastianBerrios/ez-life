@@ -1,13 +1,17 @@
 import { DayOfWeek, Task, UUID } from '../domain/models/types';
+import { addDays, calendarKey } from './calendar';
+import { dayCode } from './habitDay';
 
-const DAY_CODES: DayOfWeek[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+// Calendar-date arithmetic is done on LOCAL days (same rule as habitDay.ts): a due_date is a
+// calendar day stored at local noon (`parseCalendarDate`) and pushed as its local `calendarKey`.
+// UTC arithmetic produced UTC-midnight dates, which in UTC-5 are the PREVIOUS local day (the
+// generated task landed a day early) and, east of UTC, could flip the weekday of a noon date.
+const NOON = 12;
 
-// Calendar-date arithmetic done entirely in UTC, on purpose: a due_date is a
-// calendar day, not an instant, and comparing/iterating it via local-timezone
-// methods silently shifts it by a day for any user west of UTC (same
-// rationale as evaluateHabitStreak.ts's dateOnlyKey/startOfWeekUTC).
-function addDaysUTC(date: Date, days: number): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + days));
+/** `date` moved by whole local days, normalized to local noon (the storage convention of due dates). */
+function addLocalDays(date: Date, days: number): Date {
+  const moved = addDays(date, days);
+  return new Date(moved.getFullYear(), moved.getMonth(), moved.getDate(), NOON);
 }
 
 /**
@@ -17,13 +21,13 @@ function addDaysUTC(date: Date, days: number): Date {
  */
 function nextFixedDayDueDate(fromDueDate: Date, fixedDays: DayOfWeek[]): Date {
   for (let offset = 1; offset <= 7; offset++) {
-    const candidate = addDaysUTC(fromDueDate, offset);
-    if (fixedDays.includes(DAY_CODES[candidate.getUTCDay()])) {
+    const candidate = addLocalDays(fromDueDate, offset);
+    if (fixedDays.includes(dayCode(candidate))) {
       return candidate;
     }
   }
   // Unreachable given a non-empty fixedDays, kept only as a safe fallback.
-  return addDaysUTC(fromDueDate, 7);
+  return addLocalDays(fromDueDate, 7);
 }
 
 /**
@@ -33,13 +37,11 @@ function nextFixedDayDueDate(fromDueDate: Date, fixedDays: DayOfWeek[]): Date {
  */
 function nextFrequencyDueDate(fromDueDate: Date, frequencyTarget: number): Date {
   const intervalDays = Math.max(1, Math.floor(7 / Math.max(1, frequencyTarget)));
-  return addDaysUTC(fromDueDate, intervalDays);
+  return addLocalDays(fromDueDate, intervalDays);
 }
 
 function sameCalendarDay(a: Date, b: Date): boolean {
-  return a.getUTCFullYear() === b.getUTCFullYear()
-    && a.getUTCMonth() === b.getUTCMonth()
-    && a.getUTCDate() === b.getUTCDate();
+  return calendarKey(a) === calendarKey(b);
 }
 
 export type NewTaskOccurrence = Omit<Task, 'id' | 'created_at' | 'updated_at'>;
@@ -82,7 +84,8 @@ export function evaluateTaskRecurrence(tasks: Task[], today: Date): NewTaskOccur
         ? nextFrequencyDueDate(latest.due_date, latest.frequency_target ?? 1)
         : undefined;
 
-    if (!nextDueDate || nextDueDate > today) continue;
+    // Due once its local day has arrived (the day, not the noon instant, decides).
+    if (!nextDueDate || calendarKey(nextDueDate) > calendarKey(today)) continue;
 
     const alreadyExists = occurrences.some(o => sameCalendarDay(o.due_date, nextDueDate));
     if (alreadyExists) continue;
@@ -91,6 +94,8 @@ export function evaluateTaskRecurrence(tasks: Task[], today: Date): NewTaskOccur
       user_id: latest.user_id,
       title: latest.title,
       description: latest.description,
+      priority: latest.priority,
+      tag: latest.tag,
       due_date: nextDueDate,
       status: 'pending',
       done_at: undefined,

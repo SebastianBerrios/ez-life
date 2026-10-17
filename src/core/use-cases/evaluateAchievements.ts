@@ -45,7 +45,7 @@ export function completedHabitWeeks(habit: Habit, completions: HabitCompletion[]
 
 export function evaluateAchievements(data: AchievementData, now = new Date()): AchievementProgress[] {
   const movements = data.movements.filter(m => !m.deleted_at);
-  const dates = new Set(movements.filter(m => !m.is_adjustment && !m.recurrence_rule_id && !m.recurrence_month && !m.installment_payment_id && !m.shared_movement_id && !m.is_linked).map(m => calendarKey(m.date)));
+  const dates = new Set(movements.filter(m => m.type !== 'TRANSFER' && !m.is_adjustment && !m.recurrence_rule_id && !m.recurrence_month && !m.installment_payment_id && !m.shared_movement_id && !m.is_linked).map(m => calendarKey(m.date)));
   const savings = data.savingsGoals.filter(g => !g.deleted_at).map(g => calculateSavingsGoalProgress(g, movements).percentage);
   const values: [AchievementId, number, number][] = [
     ['registration', dates.size, 7],

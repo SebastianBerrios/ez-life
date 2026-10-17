@@ -10,6 +10,7 @@ export function evaluateMonthlyRecurrences(rules: MovementRecurrence[], occurren
       description: rule.description, distribution_category_id: rule.distribution_category_id,
       expense_category_id: rule.expense_category_id, expense_subcategory_id: rule.expense_subcategory_id,
       income_source_id: rule.income_source_id, savings_goal_id: rule.savings_goal_id,
+      account_id: rule.account_id, to_account_id: rule.to_account_id,
       is_recurring: false, is_adjustment: rule.is_adjustment,
       recurrence_rule_id: rule.id, recurrence_month: month,
     })).filter(row => row.date.getDate() <= now.getDate());

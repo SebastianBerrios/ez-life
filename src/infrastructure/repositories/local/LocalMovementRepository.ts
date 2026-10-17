@@ -4,6 +4,7 @@ import { Movement, UUID } from '../../../core/domain/models/types';
 import { uuidv7 } from 'uuidv7';
 import { validateMovementAmount } from '../../../core/use-cases/validateMovementAmount';
 import { validateBalanceAdjustment } from '../../../core/use-cases/validateBalanceAdjustment';
+import { validateTransfer } from '../../../core/use-cases/validateTransfer';
 import { DomainError } from '../../../core/domain/errors/DomainError';
 
 export class LocalMovementRepository implements IMovementRepository {
@@ -32,13 +33,19 @@ export class LocalMovementRepository implements IMovementRepository {
     validateBalanceAdjustment(data);
     if (!Number.isFinite(data.date.getTime())) throw new DomainError('La fecha no es válida.');
     return db.transaction('rw', [db.movements, db.distribution_categories, db.expense_categories,
-      db.expense_subcategories, db.income_sources, db.savings_goals, db.movement_recurrences, db.sync_queue], async () => {
+      db.expense_subcategories, db.income_sources, db.savings_goals, db.payment_accounts, db.movement_recurrences, db.sync_queue], async () => {
     const now = new Date();
     const id = data.id || uuidv7();
     const existing = await db.movements.get(id);
     if (existing && existing.user_id !== data.user_id) throw new DomainError('El movimiento pertenece a otra cuenta.');
     if (existing?.is_linked || existing?.shared_movement_id || existing?.installment_payment_id) throw new DomainError('Editá este movimiento desde su operación de origen.');
     if (existing?.deleted_at) throw new DomainError('El movimiento fue eliminado.');
+    validateTransfer({ ...(existing ?? {}), ...data });
+    for (const accountId of [data.account_id, data.to_account_id]) {
+      if (!accountId) continue;
+      const account = await db.payment_accounts.get(accountId);
+      if (!account || account.deleted_at || account.user_id !== data.user_id) throw new DomainError('La cuenta no es válida.');
+    }
     const bucket = data.distribution_category_id ? await db.distribution_categories.get(data.distribution_category_id) : undefined;
     const category = data.expense_category_id ? await db.expense_categories.get(data.expense_category_id) : undefined;
     const subcategory = data.expense_subcategory_id ? await db.expense_subcategories.get(data.expense_subcategory_id) : undefined;

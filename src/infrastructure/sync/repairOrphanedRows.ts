@@ -5,6 +5,7 @@ const USER_SCOPED_TABLES = [
   'distribution_categories',
   'expense_categories',
   'savings_goals',
+  'payment_accounts',
   'movements',
   'notifications',
   'debts',

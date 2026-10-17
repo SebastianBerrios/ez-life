@@ -120,4 +120,14 @@ describe('repairOrphanedLocalRows', () => {
     const untouched = await db.movements.get('m1');
     expect(untouched?.user_id).toBe('stale-random-uuid');
   });
+
+  it('re-keys payment accounts created under a stale user_id (spec 011)', async () => {
+    await db.payment_accounts.clear();
+    const now = new Date();
+    await db.payment_accounts.put({ id: 'acc-1', user_id: 'stale-random-uuid', name: 'Efectivo', kind: 'cash', opening_balance: 0, created_at: now, updated_at: now });
+
+    await repairOrphanedLocalRows('real-session-id');
+
+    expect((await db.payment_accounts.get('acc-1'))?.user_id).toBe('real-session-id');
+  });
 });

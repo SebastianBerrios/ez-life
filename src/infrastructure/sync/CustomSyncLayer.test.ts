@@ -102,4 +102,31 @@ describe('CustomSyncLayer', () => {
   it('does not sync without a session', async () => {
     mocks.user = null; await new CustomSyncLayer().sync(); expect(mocks.from).not.toHaveBeenCalled();
   });
+  it('pushes payment accounts and account-linked movements, pulling accounts before movements (spec 011)', async () => {
+    await db.payment_accounts.put({ id: 'acc-1', user_id: 'A', name: 'Efectivo', kind: 'cash', opening_balance: 0, created_at: now, updated_at: now });
+    await db.movements.put({ ...row('m1'), account_id: 'acc-1' });
+    const pulled: string[] = [];
+    const base = mocks.from.getMockImplementation()!;
+    mocks.from.mockImplementation((table: string) => { pulled.push(table); return base(table); });
+    await new CustomSyncLayer().sync();
+    expect(pulled.indexOf('payment_accounts')).toBeGreaterThanOrEqual(0);
+    expect(pulled.indexOf('payment_accounts')).toBeLessThan(pulled.indexOf('movement_recurrences'));
+    expect(pulled.indexOf('payment_accounts')).toBeLessThan(pulled.indexOf('movements'));
+    const pushed = mocks.rpc.mock.calls.map(c => c[1] as { table_name: string; payload: Record<string, unknown> });
+    expect(pushed.find(p => p.table_name === 'payment_accounts')?.payload).toMatchObject({ id: 'acc-1', kind: 'cash', opening_balance: 0 });
+    expect(pushed.find(p => p.table_name === 'movements')?.payload).toMatchObject({ id: 'm1', account_id: 'acc-1' });
+    expect(pushed.findIndex(p => p.table_name === 'payment_accounts')).toBeLessThan(pushed.findIndex(p => p.table_name === 'movements'));
+  });
+  it('pulls remote payment accounts into the local table', async () => {
+    remote.payment_accounts = [{ id: 'acc-9', user_id: 'A', name: 'BCP', kind: 'debit', opening_balance: 1500, archived: null, created_at: now.toISOString(), updated_at: now.toISOString(), deleted_at: null }];
+    await new CustomSyncLayer().sync();
+    expect(await db.payment_accounts.get('acc-9')).toMatchObject({ name: 'BCP', opening_balance: 1500, created_at: expect.any(Date) });
+    expect(await db.sync_queue.count()).toBe(0);
+  });
+  it('sends a task due date as its local calendar key, with priority and tag', async () => {
+    await db.tasks.put({ id: 't1', user_id: 'A', title: 'Entrega', due_date: new Date(2026, 9, 16, 19, 0), status: 'pending', priority: 'high', tag: 'Maestría', created_at: now, updated_at: now });
+    await new CustomSyncLayer().sync();
+    const call = mocks.rpc.mock.calls.map(c => c[1]).find(c => c.table_name === 'tasks');
+    expect(call.payload).toMatchObject({ due_date: '2026-10-16', priority: 'high', tag: 'Maestría' });
+  });
 });

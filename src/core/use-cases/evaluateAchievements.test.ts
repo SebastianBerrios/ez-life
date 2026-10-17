@@ -18,6 +18,12 @@ describe('personal achievements', () => {
     expect(evaluateAchievements({ ...empty, movements })[0]).toMatchObject({ current: 6, earned: false });
     expect(evaluateAchievements({ ...empty, movements: [...movements, movement(20, { is_recurring: true })] })[0].earned).toBe(true);
   });
+  it('never counts a TRANSFER as a registration day', () => {
+    const transfers = Array.from({ length: 8 }, (_, i) => movement(i + 1, { type: 'TRANSFER', account_id: 'a', to_account_id: 'b' }));
+    expect(evaluateAchievements({ ...empty, movements: transfers })[0]).toMatchObject({ current: 0, earned: false });
+    const mixed = [...Array.from({ length: 6 }, (_, i) => movement(i + 1)), ...transfers.slice(6)];
+    expect(evaluateAchievements({ ...empty, movements: mixed })[0]).toMatchObject({ current: 6, earned: false });
+  });
   it('uses exact thresholds, current task/goal states and real savings contributions', () => {
     const tasks = Array.from({ length: 10 }, (_, i) => ({ ...base, id: String(i), user_id: 'u', title: 'Tarea', due_date: new Date(), status: 'done' as const }));
     const goals = [{ ...base, id: 'g', user_id: 'u', name: 'Meta', kind: 'numeric' as const, status: 'completed' as const, target_value: 1, current_value: 1 }];
@@ -35,6 +41,15 @@ describe('personal achievements', () => {
     }
     expect(completedHabitWeeks({ ...habit, schedule_mode: 'frequency', frequency_target: 2 }, fourWeeks.flatMap(c => [c, c]), date('2026-10-05'))).toBe(4);
     expect(completedHabitWeeks({ ...habit, created_at: date('2026-09-08') }, fourWeeks, date('2026-10-05'))).toBe(3);
+  });
+  it('credits late-evening completions to their local day (no UTC shift) when counting full weeks', () => {
+    const late = (day: string): HabitCompletion => ({ ...completion(day), date: new Date(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8)), 23, 40) });
+    const evenings = ['07', '09', '14', '16', '21', '23', '28', '30'].map(d => late(`2026-09-${d}`));
+    expect(completedHabitWeeks(habit, evenings, new Date(2026, 9, 5, 8))).toBe(4);
+    // A Sunday 23:40 completion stays in its own week.
+    const sundayHabit: Habit = { ...habit, fixed_days: ['sun'], created_at: date('2026-09-07') };
+    const sundays = ['13', '20', '27'].map(d => late(`2026-09-${d}`)).concat(late('2026-10-04'));
+    expect(completedHabitWeeks(sundayHabit, sundays, new Date(2026, 9, 5, 8))).toBe(4);
   });
   it('recognizes history silently and never celebrates recovery twice', () => {
     const progress = evaluateAchievements({ ...empty, movements: Array.from({ length: 7 }, (_, i) => movement(i + 1)) });

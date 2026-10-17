@@ -9,7 +9,7 @@ export interface SavingsGoalProgress {
  * Sums every EXPENSE movement assigned to a savings goal and returns the raw
  * progress percentage against its target. Unlike a display helper, this does
  * NOT cap the percentage at 100 — callers that only want a visual progress
- * bar (e.g. SavingsGoalList) should apply `Math.min(percentage, 100)`
+ * bar (e.g. the Control savings-goal card) should apply `Math.min(percentage, 100)`
  * themselves, while callers that need to detect the goal being reached or
  * exceeded (e.g. evaluateNotifications) need the real value.
  */

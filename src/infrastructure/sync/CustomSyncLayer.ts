@@ -5,7 +5,7 @@ import { fromRemoteRecord, toRemoteRecord } from './recordAdapter';
 
 const tables = [
   'profiles', 'income_sources', 'distribution_categories', 'expense_categories',
-  'expense_subcategories', 'savings_goals', 'movement_recurrences', 'movements', 'notifications', 'debts',
+  'expense_subcategories', 'savings_goals', 'payment_accounts', 'movement_recurrences', 'movements', 'notifications', 'debts',
   'shared_spaces', 'memberships', 'shared_invites', 'shared_movements', 'habits',
   'achievement_receipts', 'habit_completions', 'goals', 'tasks', 'installment_loans', 'installment_payments',
 ] as const;

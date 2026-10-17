@@ -2,6 +2,20 @@ import { getSupabaseBrowserClient } from '../supabase/client';
 import { LocalOnboardingRepository } from '../repositories/local/LocalOnboardingRepository';
 import { getLocalAccount, rememberLocalAccount, forgetLocalAccount, type LocalAccount } from './localAccount';
 
+type SessionUser = { id: string; email?: string; user_metadata?: { avatar_url?: unknown; full_name?: unknown; name?: unknown } };
+function accountFromUser(user: SessionUser): LocalAccount {
+  const meta = user.user_metadata;
+  const rawName = typeof meta?.full_name === 'string' ? meta.full_name : typeof meta?.name === 'string' ? meta.name : undefined;
+  const name = rawName?.trim() || undefined;
+  const email = user.email?.trim() || undefined;
+  return {
+    id: user.id,
+    avatarUrl: typeof meta?.avatar_url === 'string' ? meta.avatar_url : undefined,
+    ...(name ? { name } : {}),
+    ...(email ? { email } : {}),
+  };
+}
+
 export interface AccountState { account: LocalAccount | null; startStep: 1 | 2 | 3; completed: boolean }
 /** Async setup has an immediate cleanup boundary; callbacks never await under the auth lock. */
 export function observeAccountSession(syncNow: () => Promise<void>, listener: (state: AccountState) => void): () => void {
@@ -31,7 +45,7 @@ export function observeAccountSession(syncNow: () => Promise<void>, listener: (s
     const timer = setTimeout(() => {
       timers.delete(timer);
       if (disposed || eventVersion !== generation) return;
-      void apply(session?.user ? { id: session.user.id, avatarUrl: session.user.user_metadata?.avatar_url } : getLocalAccount(), Boolean(session?.user));
+      void apply(session?.user ? accountFromUser(session.user) : getLocalAccount(), Boolean(session?.user));
     }, 0);
     timers.add(timer);
   });
@@ -40,7 +54,7 @@ export function observeAccountSession(syncNow: () => Promise<void>, listener: (s
     if (!navigator.onLine && getLocalAccount()) { await apply(getLocalAccount(), false); return; }
     const { data: { session } } = await supabase.auth.getSession();
     if (disposed || checkVersion !== generation) return;
-    await apply(session?.user ? { id: session.user.id, avatarUrl: session.user.user_metadata?.avatar_url } : getLocalAccount(), Boolean(session?.user));
+    await apply(session?.user ? accountFromUser(session.user) : getLocalAccount(), Boolean(session?.user));
   };
   void check().catch(error => { console.error('Session check failed:', error); void apply(getLocalAccount(), false); });
   window.addEventListener('online', check);

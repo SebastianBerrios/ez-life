@@ -21,6 +21,7 @@ import type {
   Task,
   InstallmentLoan,
   InstallmentPayment,
+  PaymentAccount,
 } from '../../core/domain/models/types';
 
 export interface SyncQueueItem {
@@ -41,7 +42,7 @@ const SYNCED_TABLES = [
   'profiles', 'income_sources', 'distribution_categories',
   'expense_categories', 'expense_subcategories', 'savings_goals', 'movements',
   'notifications', 'debts', 'habits', 'habit_completions', 'goals', 'tasks',
-  'installment_loans', 'installment_payments', 'movement_recurrences', 'achievement_receipts'
+  'installment_loans', 'installment_payments', 'movement_recurrences', 'achievement_receipts', 'payment_accounts'
 ] as const;
 
 export class EzLifeDB extends Dexie {
@@ -67,6 +68,7 @@ export class EzLifeDB extends Dexie {
     });
   }
   achievement_receipts!: Table<AchievementReceipt, string>;
+  payment_accounts!: Table<PaymentAccount, string>;
   profiles!: Table<Profile, string>;
   income_sources!: Table<IncomeSource, string>;
   distribution_categories!: Table<DistributionCategory, string>;
@@ -368,6 +370,9 @@ export class EzLifeDB extends Dexie {
       movements: 'id, user_id, date, &[recurrence_rule_id+recurrence_month]',
     });
     this.version(17).stores({ achievement_receipts: 'id, user_id, &[user_id+achievement_id]' });
+    // spec 011: payment accounts; Movement.account_id/to_account_id/TRANSFER and
+    // Task.priority/tag are plain optional fields (no new indexes needed).
+    this.version(18).stores({ payment_accounts: 'id, user_id' });
     this.setupSyncQueueTransactionScope();
     this.setupHooks();
   }

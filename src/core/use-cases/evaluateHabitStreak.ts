@@ -1,15 +1,10 @@
 import { DayOfWeek, Habit, HabitCompletion } from '../domain/models/types';
+import { addDays, calendarKey, startOfDay, weekWindow } from './calendar';
+import { dayCode, groupCompletionsByDay, habitHistoryStart, habitStateOnDay } from './habitDay';
 
-const DAY_CODES: DayOfWeek[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-
-// Calendar-date arithmetic done entirely in UTC, on purpose: a date-only
-// value like a HabitCompletion's `date` is a calendar day, not an instant,
-// and comparing/iterating it via local-timezone methods (getDay/setHours)
-// silently shifts it by a day for any user west of UTC once parsed from an
-// ISO string (new Date('2026-09-14') is UTC midnight, not local midnight).
-function dateOnlyKey(d: Date): string {
-  return `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`;
-}
+// All calendar arithmetic is LOCAL (see habitDay.ts): a HabitCompletion's `date` is a calendar day,
+// matched through `calendarKey`, never through UTC getters (those shift the day for users west of
+// UTC late in the evening and for users east of UTC early in the morning).
 
 /**
  * Bridges real calendar dates to the abstract per-scheduled-day log
@@ -22,22 +17,22 @@ export function buildFixedDaysLog(
   fromDate: Date,
   toDate: Date
 ): HabitDayResult[] {
-  const completionByDate = new Map(completions.map(c => [dateOnlyKey(c.date), c]));
+  const byDay = groupCompletionsByDay(completions);
   const results: HabitDayResult[] = [];
 
-  const cursor = new Date(Date.UTC(fromDate.getUTCFullYear(), fromDate.getUTCMonth(), fromDate.getUTCDate()));
-  const end = new Date(Date.UTC(toDate.getUTCFullYear(), toDate.getUTCMonth(), toDate.getUTCDate()));
+  const endKey = calendarKey(toDate);
+  let cursor = startOfDay(fromDate);
 
-  while (cursor <= end) {
-    const code = DAY_CODES[cursor.getUTCDay()];
-    if (fixedDays.includes(code)) {
-      const completion = completionByDate.get(dateOnlyKey(cursor));
+  while (calendarKey(cursor) <= endKey) {
+    if (fixedDays.includes(dayCode(cursor))) {
+      const that = byDay.get(calendarKey(cursor)) ?? [];
+      // A real completion wins over a token one when both exist on the same day.
       results.push({
-        completed: Boolean(completion),
-        tokenUsed: completion?.token_used ?? false,
+        completed: that.length > 0,
+        tokenUsed: that.length > 0 && that.every(c => c.token_used),
       });
     }
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    cursor = addDays(cursor, 1);
   }
 
   return results;
@@ -88,26 +83,15 @@ export function evaluateFixedDaysStreak(days: HabitDayResult[]): StreakResult {
   return { streak, tokensAvailable };
 }
 
-function startOfWeekUTC(d: Date): Date {
-  const daysSinceMonday = (d.getUTCDay() + 6) % 7; // calendar week is Monday-Sunday
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - daysSinceMonday));
-}
-
 /**
  * ControlPage's "hoy" agenda (FR-008): a fixed-days habit is scheduled today
- * when today's day-of-week is in its fixed_days, regardless of whether it was
+ * when today's (local) day-of-week is in its fixed_days, regardless of whether it was
  * already completed today. A frequency habit is scheduled today as long as
- * this calendar week's completions haven't yet reached its target.
+ * this calendar week's completions haven't yet reached its target, or when it was already
+ * completed today (a done habit never disappears from today's list).
  */
 export function isHabitScheduledToday(habit: Habit, completions: HabitCompletion[], today: Date): boolean {
-  if (habit.schedule_mode === 'fixed_days' && habit.fixed_days) {
-    return habit.fixed_days.includes(DAY_CODES[today.getUTCDay()]);
-  }
-
-  const weekStart = startOfWeekUTC(today);
-  const weekEnd = new Date(Date.UTC(weekStart.getUTCFullYear(), weekStart.getUTCMonth(), weekStart.getUTCDate() + 7));
-  const completionsThisWeek = completions.filter(c => c.date >= weekStart && c.date < weekEnd).length;
-  return completionsThisWeek < (habit.frequency_target ?? 1);
+  return habitStateOnDay(habit, completions, today, today).scheduled;
 }
 
 export interface HabitWeekResult {
@@ -132,31 +116,30 @@ export interface HabitStreakHistoryPoint {
  * into a time series instead of a single number (research.md §4). For a
  * fixed-days habit, non-scheduled weekdays are excluded entirely (mirrors
  * buildFixedDaysLog); a frequency habit has no fixed schedule, so every
- * calendar day in the range gets a point.
+ * calendar day in the range gets a point. `date` is the LOCAL midnight of each day.
  */
 export function calculateHabitStreakHistory(
   habit: Habit,
   completions: HabitCompletion[],
   range: { from: Date; to: Date }
 ): HabitStreakHistoryPoint[] {
-  const completionByDate = new Map(completions.map(c => [dateOnlyKey(c.date), c]));
+  const byDay = groupCompletionsByDay(completions);
   const points: HabitStreakHistoryPoint[] = [];
 
-  const cursor = new Date(Date.UTC(range.from.getUTCFullYear(), range.from.getUTCMonth(), range.from.getUTCDate()));
-  const end = new Date(Date.UTC(range.to.getUTCFullYear(), range.to.getUTCMonth(), range.to.getUTCDate()));
+  const endKey = calendarKey(range.to);
+  let cursor = startOfDay(range.from);
 
-  while (cursor <= end) {
+  while (calendarKey(cursor) <= endKey) {
     const isScheduled =
       habit.schedule_mode !== 'fixed_days' ||
       !habit.fixed_days ||
-      habit.fixed_days.includes(DAY_CODES[cursor.getUTCDay()]);
+      habit.fixed_days.includes(dayCode(cursor));
 
     if (isScheduled) {
-      const completion = completionByDate.get(dateOnlyKey(cursor));
-      points.push({ date: new Date(cursor), completed: Boolean(completion) });
+      points.push({ date: new Date(cursor), completed: byDay.has(calendarKey(cursor)) });
     }
 
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    cursor = addDays(cursor, 1);
   }
 
   return points;
@@ -188,4 +171,36 @@ export function evaluateFrequencyStreak(weeks: HabitWeekResult[]): StreakResult 
   }
 
   return { streak, tokensAvailable };
+}
+
+/**
+ * Builds the per-week log evaluateFrequencyStreak expects, from the habit's first day to `today`
+ * (Monday-Sunday local weeks). A week still in progress, and the partial week the habit started
+ * in, are only included once they met their target: an open week must not break the streak, and a
+ * habit created on a Thursday cannot be expected to have a full week.
+ */
+export function buildFrequencyWeeks(habit: Habit, completions: HabitCompletion[], today: Date): HabitWeekResult[] {
+  const target = habit.frequency_target ?? 1;
+  const live = completions.filter(c => !c.deleted_at);
+  const firstWeekStart = weekWindow(habitHistoryStart(habit, live)).start;
+  const firstWeekKey = calendarKey(firstWeekStart);
+  const currentWeekKey = calendarKey(weekWindow(today).start);
+
+  const weeks: HabitWeekResult[] = [];
+  let cursor = firstWeekStart;
+  while (calendarKey(cursor) <= currentWeekKey) {
+    const startKey = calendarKey(cursor);
+    const endKey = calendarKey(addDays(cursor, 7));
+    const inWeek = live.filter(c => {
+      const key = calendarKey(c.date);
+      return key >= startKey && key < endKey;
+    });
+    const real = inWeek.filter(c => !c.token_used).length;
+    const partial = startKey === firstWeekKey || startKey === currentWeekKey;
+    if (real >= target || !partial) {
+      weeks.push({ completions: real, target, tokenUsed: inWeek.some(c => c.token_used) });
+    }
+    cursor = addDays(cursor, 7);
+  }
+  return weeks;
 }

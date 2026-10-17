@@ -63,4 +63,11 @@ describe('calculateSavingsGoalProgress', () => {
     expect(result.currentAmountCents).toBe(0);
     expect(result.percentage).toBe(0);
   });
+
+  it('does not count a TRANSFER toward a goal', () => {
+    const movements: Movement[] = [
+      { ...baseMovement, id: 'm1', type: 'TRANSFER', amount: 5000, savings_goal_id: 'goal-1', account_id: 'a', to_account_id: 'b' },
+    ];
+    expect(calculateSavingsGoalProgress(baseGoal, movements)).toEqual({ currentAmountCents: 0, percentage: 0 });
+  });
 });

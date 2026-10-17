@@ -21,4 +21,11 @@ describe('monthly recurrence rules', () => {
     expect(evaluateMonthlyRecurrences([{ ...rule, activated_month: '2026-06' }], [], new Date(2026, 4, 31))).toHaveLength(0);
     expect(evaluateMonthlyRecurrences([{ ...rule, activated_month: '2026-06' }], [], new Date(2026, 5, 30))).toHaveLength(1);
   });
+  it('copies the payment account into each generated occurrence and keeps it at 12:00', () => {
+    const [occurrence] = evaluateMonthlyRecurrences([{ ...rule, account_id: 'acc-1' }], [], new Date(2026, 1, 28, 18, 45));
+    expect(occurrence.account_id).toBe('acc-1');
+    expect(occurrence.to_account_id).toBeUndefined();
+    expect(occurrence.date.getHours()).toBe(12);
+    expect(occurrence.date.getMinutes()).toBe(0);
+  });
 });

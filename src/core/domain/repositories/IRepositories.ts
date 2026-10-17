@@ -1,4 +1,4 @@
-import { UUID, Profile, IncomeSource, DistributionCategory, ExpenseCategory, ExpenseSubcategory, SavingsGoal, Movement, Notification, Debt, SharedSpace, SharedSpacePermissionMode, SharedInvite, Membership, SharedMovement, SharedMovementSplit, SharedMovementType, SharedMovementSplitMode, Habit, HabitCompletion, Goal, Task, InstallmentLoan, InstallmentPayment } from '../models/types';
+import { UUID, Profile, IncomeSource, DistributionCategory, ExpenseCategory, ExpenseSubcategory, SavingsGoal, Movement, Notification, Debt, SharedSpace, SharedSpacePermissionMode, SharedInvite, Membership, SharedMovement, SharedMovementSplit, SharedMovementType, SharedMovementSplitMode, Habit, HabitCompletion, Goal, Task, InstallmentLoan, InstallmentPayment, PaymentAccount } from '../models/types';
 
 /** The user's own choice from FR-016 — the resulting value is always theirs, never computed (FR-017). */
 export type PrincipalPaymentAdjustment =
@@ -35,6 +35,24 @@ export interface ISavingsGoalRepository {
   getAll(userId: UUID): Promise<SavingsGoal[]>;
   save(goal: Omit<SavingsGoal, 'created_at' | 'updated_at'>): Promise<SavingsGoal>;
   delete(id: UUID): Promise<void>;
+}
+
+export interface IPaymentAccountRepository {
+  /** Non-deleted accounts of the user, archived ones included (flagged `archived`). */
+  getAll(userId: UUID): Promise<PaymentAccount[]>;
+  save(account: Omit<PaymentAccount, 'created_at' | 'updated_at'>): Promise<PaymentAccount>;
+  archive(id: UUID): Promise<void>;
+  /** Throws if any non-deleted movement references the account — archive it instead. */
+  delete(id: UUID): Promise<void>;
+  countMovements(accountId: UUID): Promise<number>;
+  /** Idempotently seeds the user's default "Efectivo" cash account. */
+  ensureDefault(userId: UUID): Promise<void>;
+}
+
+/** Read-only view of what the local-first store has not pushed to the server yet. */
+export interface ISyncStatusRepository {
+  /** Ids of the records of `tableName` that still have a pending entry in the sync queue. */
+  getPendingRecordIds(tableName: string): Promise<Set<UUID>>;
 }
 
 export interface IMovementRepository {

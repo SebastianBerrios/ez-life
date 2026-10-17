@@ -55,4 +55,14 @@ describe('compareMonthlyPeriods', () => {
     expect(result.previous).toEqual({ income: 8000, expense: 2000, balance: 6000 });
     expect(result.delta).toEqual({ income: 2000, expense: 3000, balance: -1000 });
   });
+
+  it('never counts a TRANSFER as income or expense in either period', () => {
+    const transfer = movement({ type: 'TRANSFER', amount: 9999, account_id: 'a', to_account_id: 'b' });
+    const result = compareMonthlyPeriods(
+      [movement({ type: 'INCOME', amount: 5000 }), transfer],
+      [movement({ type: 'EXPENSE', amount: 1000 }), transfer],
+    );
+    expect(result.current).toEqual({ income: 5000, expense: 0, balance: 5000 });
+    expect(result.previous).toEqual({ income: 0, expense: 1000, balance: -1000 });
+  });
 });

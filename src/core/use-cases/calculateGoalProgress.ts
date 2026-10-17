@@ -1,8 +1,8 @@
 import { Goal } from '../domain/models/types';
 
 /**
- * Goal progress as a fraction in [0, 1] (FR-006). Extracted from GoalList's
- * previously-inline formula (research.md §6) so GoalDashboard reuses the
+ * Goal progress as a fraction in [0, 1] (FR-006). Extracted from the goals list's
+ * previously-inline formula (research.md §6) so the goals panel and GoalDashboard share the
  * exact same rule instead of duplicating it (Principio III).
  */
 export function calculateGoalProgress(goal: Goal): number {

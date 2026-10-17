@@ -83,3 +83,18 @@ describe('calculateSpentByBucket', () => {
     expect(result).toEqual({ b1: 0 });
   });
 });
+
+describe('TRANSFER exclusion', () => {
+  const buckets = [{ id: 'b1', name: 'Necesidades', percentage: 50 }] as DistributionCategory[];
+  const transfer = { type: 'TRANSFER', amount: 7777, distribution_category_id: 'b1', expense_category_id: 'c1' } as Partial<Movement> as Movement;
+
+  it('does not count transfers as spent in calculateSpentByBucket, even if a stale bucket is attached', () => {
+    expect(calculateSpentByBucket([transfer], buckets)).toEqual({ b1: 0 });
+  });
+
+  it('does not count transfers in the breakdown tree', () => {
+    const categories = [{ id: 'c1', distribution_category_id: 'b1', name: 'Alimentación' }] as ExpenseCategory[];
+    const result = calculateCategoryBreakdown([transfer], buckets, categories, []);
+    expect(JSON.stringify(result)).not.toContain('7777');
+  });
+});

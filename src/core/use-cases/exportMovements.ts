@@ -1,14 +1,40 @@
 import { Movement } from '../domain/models/types';
+import { timeKey } from './calendar';
 
 const CSV_COLUMN_SEPARATOR = ';';
-const CSV_HEADERS = ['Fecha', 'Tipo', 'Monto', 'Descripcion'];
-const PDF_HEADERS = ['Fecha', 'Tipo', 'Monto', 'Descripción'];
+const CSV_HEADERS = ['Fecha', 'Hora', 'Tipo', 'Cuenta', 'Categoria', 'Monto', 'Descripcion'];
+const PDF_HEADERS = ['Fecha', 'Hora', 'Tipo', 'Cuenta', 'Categoría', 'Monto', 'Descripción'];
+
+/** Optional id -> name lookups so the export can show names instead of ids. */
+export interface ExportLookups {
+  accountNames?: Record<string, string>;
+  categoryNames?: Record<string, string>; // expense categories and income sources
+}
 
 /**
  * Human-readable label for a movement type, in Spanish (UI copy convention).
  */
 export function movementTypeLabel(type: Movement['type']): string {
+  if (type === 'TRANSFER') return 'Transferencia';
   return type === 'INCOME' ? 'Ingreso' : 'Egreso';
+}
+
+/** Local wall-clock time as `HH:mm`. */
+export function formatTimeLatam(date: Date | string): string {
+  return timeKey(date instanceof Date ? date : new Date(date));
+}
+
+function accountLabel(m: Movement, lookups: ExportLookups): string {
+  const names = lookups.accountNames ?? {};
+  const from = m.account_id ? names[m.account_id] ?? '' : '';
+  if (m.type !== 'TRANSFER') return from;
+  const to = m.to_account_id ? names[m.to_account_id] ?? '' : '';
+  return from || to ? `${from} -> ${to}` : '';
+}
+
+function categoryLabel(m: Movement, lookups: ExportLookups): string {
+  const id = m.type === 'EXPENSE' ? m.expense_category_id : m.type === 'INCOME' ? m.income_source_id : undefined;
+  return id ? lookups.categoryNames?.[id] ?? '' : '';
 }
 
 /**
@@ -53,11 +79,14 @@ function toCsvRow(fields: string[]): string {
  * Builds the full CSV content (headers + rows) for a movements export.
  * Always includes the header row, even for an empty movement list.
  */
-export function buildMovementsCsv(movements: Movement[]): string {
+export function buildMovementsCsv(movements: Movement[], lookups: ExportLookups = {}): string {
   const rows = movements.map((m) =>
     toCsvRow([
       formatDateLatam(m.date),
+      formatTimeLatam(m.date),
       movementTypeLabel(m.type),
+      accountLabel(m, lookups),
+      categoryLabel(m, lookups),
       formatAmountLatam(m.amount),
       m.description ?? '',
     ])
@@ -69,13 +98,16 @@ export function buildMovementsCsv(movements: Movement[]): string {
 /**
  * Builds the header row + body rows ready to hand to `jspdf-autotable`.
  */
-export function buildMovementsPdfTable(movements: Movement[]): {
+export function buildMovementsPdfTable(movements: Movement[], lookups: ExportLookups = {}): {
   head: string[][];
   body: string[][];
 } {
   const body = movements.map((m) => [
     formatDateLatam(m.date),
+    formatTimeLatam(m.date),
     movementTypeLabel(m.type),
+    accountLabel(m, lookups) || '-',
+    categoryLabel(m, lookups) || '-',
     formatAmountLatam(m.amount),
     m.description || '-',
   ]);
