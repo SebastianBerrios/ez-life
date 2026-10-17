@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="es"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_stack" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100%;margin:0;padding:0;background-color:#121318;}body{overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}}::-webkit-scrollbar{display:none;}*{-ms-overflow-style:none;scrollbar-width:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "on-background": "#e3e1e9", "secondary-fixed": "#68fcbf", "tertiary-fixed": "#ffdadb", "on-secondary": "#003825", "surface-variant": "#34343a", "surface-tint": "#4edea3", "secondary": "#45dfa4", "error": "#ffb4ab", "tertiary-container": "#ff7886", "inverse-on-surface": "#2f3036", "surface-container-high": "#292a2f", "inverse-surface": "#e3e1e9", "on-tertiary-fixed-variant": "#92002a", "on-primary-container": "#00422b", "primary-container": "#10b981", "on-surface-variant": "#bbcabf", "on-primary-fixed": "#002113", "on-tertiary": "#67001b", "primary-fixed": "#6ffbbe", "on-secondary-fixed-variant": "#005137", "inverse-primary": "#006c49", "outline": "#86948a", "on-error-container": "#ffdad6", "surface-container-low": "#1a1b21", "on-tertiary-container": "#780021", "surface-container-lowest": "#0d0e13", "outline-variant": "#3c4a42", "tertiary": "#ffb2b7", "background": "#121318", "on-surface": "#e3e1e9", "error-container": "#93000a", "tertiary-fixed-dim": "#ffb2b7", "on-secondary-fixed": "#002114", "surface-dim": "#121318", "secondary-container": "#00bd85", "surface-container-highest": "#34343a", "surface-container": "#1e1f25", "surface-bright": "#38393f", "surface": "#121318", "primary-fixed-dim": "#4edea3", "on-primary": "#003824", "on-error": "#690005", "secondary-fixed-dim": "#45dfa4", "primary": "#4edea3", "on-tertiary-fixed": "#40000d", "on-secondary-container": "#00452e", "on-primary-fixed-variant": "#005236" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "gutter-desktop": "1.5rem", "space-md": "0.75rem", "space-xs": "0.25rem", "space-lg": "1rem", "margin-tablet": "1.5rem", "space-3xl": "3rem", "margin-desktop": "2.5rem", "space-2xs": "0.125rem", "space-2xl": "2rem", "margin": "1rem", "space-sm": "0.5rem", "space-xl": "1.5rem", "gutter": "1rem" }, "fontFamily": { "headline-sm": ["Geist", "sans-serif"], "headline-lg-mobile": ["Geist", "sans-serif"], "metric-num-md": ["Geist", "sans-serif"], "headline-md": ["Geist", "sans-serif"], "label-mono-xs": ["JetBrains Mono", "monospace"], "body-md": ["Geist", "sans-serif"], "display-hero": ["Geist", "sans-serif"], "display-hero-mobile": ["Geist", "sans-serif"], "body-lg": ["Geist", "sans-serif"], "label-mono-sm": ["JetBrains Mono", "monospace"], "body-sm": ["Geist", "sans-serif"], "headline-lg": ["Geist", "sans-serif"], "metric-num-lg": ["Geist", "sans-serif"] }, "fontSize": { "headline-sm": ["16px", { "lineHeight": "24px", "letterSpacing": "-0.01em", "fontWeight": "500" }], "headline-lg-mobile": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.015em", "fontWeight": "600" }], "metric-num-md": ["22px", { "lineHeight": "28px", "letterSpacing": "-0.02em", "fontWeight": "500" }], "headline-md": ["20px", { "lineHeight": "28px", "letterSpacing": "-0.015em", "fontWeight": "500" }], "label-mono-xs": ["10px", { "lineHeight": "12px", "letterSpacing": "0.06em", "fontWeight": "400" }], "body-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400" }], "display-hero": ["44px", { "lineHeight": "52px", "letterSpacing": "-0.03em", "fontWeight": "600" }], "display-hero-mobile": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.025em", "fontWeight": "600" }], "body-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "-0.005em", "fontWeight": "400" }], "label-mono-sm": ["11px", { "lineHeight": "14px", "letterSpacing": "0.04em", "fontWeight": "500" }], "body-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.005em", "fontWeight": "400" }], "headline-lg": ["30px", { "lineHeight": "38px", "letterSpacing": "-0.02em", "fontWeight": "600" }], "metric-num-lg": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.03em", "fontWeight": "600" }] } } } };</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface text-on-surface antialiased min-h-screen flex flex-col"><header class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-xl pt-safe shadow-[0_1px_8px_rgba(0,0,0,0.25)]"><div class="h-16 px-margin flex items-center justify-between gap-space-sm"><div class="flex items-center gap-space-sm min-w-0"><button class="w-11 h-11 min-w-[44px] min-h-[44px] -ml-space-xs flex items-center justify-center text-on-surface-variant hover:text-on-surface rounded-lg active:bg-surface-container transition-colors" onclick="history.back()"><span class="material-symbols-outlined text-[20px]">arrow_back_ios_new</span></button><img alt="ez-life logo" class="h-7 w-auto object-contain hidden xs:block" src="https://lh3.googleusercontent.com/aida/AEtjO1WZmDQs8L7wR37P1qYKsdj9xZCF3TBhVyPhYKa0LRMX4Vp5rT-lTVXmacsFM6z_ONBUVcZ_AmknyqzbwTCaM82jpoICz-ZgGZITSAf8G7IulPGphZlbYXZfayBli0z2phaZglDAOCHxpBLTmdxft2tzD1_BGySzO8vkfN7QeAf9xDd11ZF79M_D2gozeGaF0J_csu2zgv3eo37QIGAgngDnj3S-XIa96tVEFVrmbAE"/><h1 class="font-headline-sm text-headline-sm text-on-surface font-semibold truncate leading-none">Nuevo Registro</h1></div><div class="flex items-center gap-space-sm flex-shrink-0"><span class="font-label-mono-xs text-label-mono-xs text-on-surface-variant hidden sm:inline-block">ez·life</span><img alt="Profile" class="w-8 h-8 rounded-full object-cover ring-1 ring-outline/30" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDmKdM8vl-By3BOe25TyH41C3yKA6I9guFSWti_IFqPn9cqItc0hNKY2WdK6L-cyJ10mhrXLVXID887EeOmAjLm1VQk4cYnUDzg0EQBFfjGnmHIOOtnAdZ1gD7s6xDyVTsRbu4Jr--yKWMAtSnkpuNgPux4WWN1Qkqxn8leVgF4yF1UfNGAsojjFIrEmD7zYtaWJS0ftqHOW8dmNOE97r1BD7lkORz0mAe1_CWfRyQ"/></div></div></header><main class="flex-1 flex flex-col relative w-full pt-16 pb-safe bg-surface"><div class="flex flex-col w-full pb-8">
+<!-- Interactive Form Wrapper -->
+<div class="flex flex-col w-full max-w-xl mx-auto px-margin space-y-space-lg">
+<!-- Modal Header & Quick Selector -->
+<div class="flex flex-col space-y-space-md pt-space-xs">
+<!-- Title & Close Action -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-2.5 h-2.5 rounded-full bg-primary animate-pulse"></div>
+<span class="font-headline-sm text-headline-sm text-on-surface font-semibold tracking-tight">Nuevo Registro Rápido</span>
+</div>
+<button class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors active:scale-95" onclick="history.back()" type="button">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+<!-- Segmented Type Switcher -->
+<div class="p-1 rounded-xl bg-surface-container-lowest flex items-center gap-1 shadow-inner" id="record-type-selector">
+<button class="type-btn flex-1 py-2 rounded-lg text-center font-label-mono-sm text-label-mono-sm bg-surface-container-high text-primary font-medium transition-all shadow-sm flex items-center justify-center gap-1.5" onclick="setType('gasto', this)" type="button">
+<span class="material-symbols-outlined text-[15px]">trending_down</span>
+<span>Gasto</span>
+</button>
+<button class="type-btn flex-1 py-2 rounded-lg text-center font-label-mono-sm text-label-mono-sm text-on-surface-variant hover:text-on-surface transition-all flex items-center justify-center gap-1.5" onclick="setType('ingreso', this)" type="button">
+<span class="material-symbols-outlined text-[15px]">trending_up</span>
+<span>Ingreso</span>
+</button>
+<button class="type-btn flex-1 py-2 rounded-lg text-center font-label-mono-sm text-label-mono-sm text-on-surface-variant hover:text-on-surface transition-all flex items-center justify-center gap-1.5" onclick="setType('habito', this)" type="button">
+<span class="material-symbols-outlined text-[15px]">repeat</span>
+<span>Hábito</span>
+</button>
+<button class="type-btn flex-1 py-2 rounded-lg text-center font-label-mono-sm text-label-mono-sm text-on-surface-variant hover:text-on-surface transition-all flex items-center justify-center gap-1.5" onclick="setType('meta', this)" type="button">
+<span class="material-symbols-outlined text-[15px]">flag</span>
+<span>Meta</span>
+</button>
+</div>
+</div>
+<!-- Monetary Display Hero -->
+<div class="relative overflow-hidden rounded-xl bg-surface-container-low p-space-lg flex flex-col items-center justify-center shadow-md" id="monetary-hero">
+<!-- Glow decoration -->
+<div class="absolute -top-12 left-1/2 -translate-x-1/2 w-48 h-20 bg-primary/10 blur-2xl pointer-events-none rounded-full"></div>
+<div class="flex items-center gap-1.5 justify-center mb-1">
+<span class="font-label-mono-xs text-label-mono-xs text-on-surface-variant uppercase tracking-wider">Monto a registrar</span>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-label-mono-xs bg-error-container/40 text-tertiary" id="badge-flow">EGRESO</span>
+</div>
+<!-- Currency Digits Hero -->
+<div class="flex items-baseline justify-center py-space-xs tracking-tight">
+<span class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface-variant/70 mr-1.5 font-medium">S/</span>
+<span class="font-metric-num-lg text-metric-num-lg font-bold text-on-surface tracking-tighter tabular-nums" id="amount-display">0.00</span>
+<span class="inline-block w-0.5 h-8 ml-1 bg-primary animate-pulse align-middle"></span>
+</div>
+<!-- Quick Amount Increments -->
+<div class="grid grid-cols-4 gap-space-xs w-full mt-space-md pt-space-xs">
+<button class="py-1.5 rounded-lg bg-surface-container-high text-on-surface-variant hover:text-primary active:bg-surface-bright font-label-mono-sm text-label-mono-sm text-center transition-transform active:scale-95 shadow-sm" onclick="addAmount(10)" type="button">
+          +S/ 10
+        </button>
+<button class="py-1.5 rounded-lg bg-surface-container-high text-on-surface-variant hover:text-primary active:bg-surface-bright font-label-mono-sm text-label-mono-sm text-center transition-transform active:scale-95 shadow-sm" onclick="addAmount(20)" type="button">
+          +S/ 20
+        </button>
+<button class="py-1.5 rounded-lg bg-surface-container-high text-on-surface-variant hover:text-primary active:bg-surface-bright font-label-mono-sm text-label-mono-sm text-center transition-transform active:scale-95 shadow-sm" onclick="addAmount(50)" type="button">
+          +S/ 50
+        </button>
+<button class="py-1.5 rounded-lg bg-surface-container-high text-on-surface-variant hover:text-primary active:bg-surface-bright font-label-mono-sm text-label-mono-sm text-center transition-transform active:scale-95 shadow-sm" onclick="addAmount(100)" type="button">
+          +S/ 100
+        </button>
+</div>
+<button class="mt-2 text-on-surface-variant hover:text-on-surface text-[11px] font-label-mono-xs underline underline-offset-2 transition-colors" onclick="resetAmount()" type="button">
+        Limpiar monto
+      </button>
+</div>
+<!-- Form Fields Card -->
+<div class="bg-surface-container-low rounded-xl p-space-lg space-y-space-lg shadow-sm">
+<!-- Field 1: Concept / Description -->
+<div class="space-y-1.5">
+<div class="flex items-center justify-between">
+<label class="font-label-mono-xs text-label-mono-xs uppercase text-on-surface-variant tracking-wider flex items-center gap-1.5" for="concept-input">
+<span class="material-symbols-outlined text-[14px]">edit_note</span>
+<span>Concepto / Descripción</span>
+</label>
+<span class="font-label-mono-xs text-label-mono-xs text-on-surface-variant/60">Requerido</span>
+</div>
+<div class="relative">
+<input class="w-full bg-surface-container-high text-on-surface placeholder:text-on-surface-variant/50 px-3.5 py-2.5 rounded-lg font-body-md text-body-md focus:outline-none focus:bg-surface-bright transition-colors shadow-inner" id="concept-input" placeholder="Ej. Almuerzo corporativo, Taxi BCP..." type="text"/>
+</div>
+</div>
+<!-- Field 2: Category & 50/30/20 Rule Selector -->
+<div class="space-y-space-xs">
+<label class="font-label-mono-xs text-label-mono-xs uppercase text-on-surface-variant tracking-wider flex items-center gap-1.5 mb-1.5">
+<span class="material-symbols-outlined text-[14px]">pie_chart</span>
+<span>Categoría &amp; Regla 50/30/20</span>
+</label>
+<div class="grid grid-cols-1 gap-2" id="category-group">
+<!-- Item 1 -->
+<div class="cat-card p-2.5 rounded-lg bg-surface-container-high hover:bg-surface-bright cursor-pointer flex items-center justify-between transition-all shadow-sm active:scale-[0.99] ring-offset-0 bg-surface-bright" onclick="selectCategory(this, 'Alimentación', '50%')">
+<div class="flex items-center gap-2.5 min-w-0">
+<div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[18px]">restaurant</span>
+</div>
+<div class="min-w-0">
+<p class="font-body-md text-body-md text-on-surface font-medium truncate">Alimentación</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Necesidades Básicas (50%)</p>
+</div>
+</div>
+<div class="cat-indicator w-5 h-5 rounded-full bg-primary text-on-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[14px]">check</span>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="cat-card p-2.5 rounded-lg bg-surface-container-high hover:bg-surface-bright cursor-pointer flex items-center justify-between transition-all shadow-sm active:scale-[0.99]" onclick="selectCategory(this, 'Transporte', '50%')">
+<div class="flex items-center gap-2.5 min-w-0">
+<div class="w-8 h-8 rounded-lg bg-surface-container-highest text-on-surface-variant flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[18px]">directions_subway</span>
+</div>
+<div class="min-w-0">
+<p class="font-body-md text-body-md text-on-surface font-medium truncate">Transporte &amp; Combustible</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Necesidades Básicas (50%)</p>
+</div>
+</div>
+<div class="cat-indicator hidden w-5 h-5 rounded-full bg-primary text-on-primary items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[14px]">check</span>
+</div>
+</div>
+<!-- Item 3 -->
+<div class="cat-card p-2.5 rounded-lg bg-surface-container-high hover:bg-surface-bright cursor-pointer flex items-center justify-between transition-all shadow-sm active:scale-[0.99]" onclick="selectCategory(this, 'Entretenimiento', '30%')">
+<div class="flex items-center gap-2.5 min-w-0">
+<div class="w-8 h-8 rounded-lg bg-surface-container-highest text-on-surface-variant flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[18px]">sports_esports</span>
+</div>
+<div class="min-w-0">
+<p class="font-body-md text-body-md text-on-surface font-medium truncate">Entretenimiento &amp; Salidas</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Estilo de Vida y Gustos (30%)</p>
+</div>
+</div>
+<div class="cat-indicator hidden w-5 h-5 rounded-full bg-primary text-on-primary items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[14px]">check</span>
+</div>
+</div>
+<!-- Item 4 -->
+<div class="cat-card p-2.5 rounded-lg bg-surface-container-high hover:bg-surface-bright cursor-pointer flex items-center justify-between transition-all shadow-sm active:scale-[0.99]" onclick="selectCategory(this, 'Inversión', '20%')">
+<div class="flex items-center gap-2.5 min-w-0">
+<div class="w-8 h-8 rounded-lg bg-surface-container-highest text-on-surface-variant flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[18px]">savings</span>
+</div>
+<div class="min-w-0">
+<p class="font-body-md text-body-md text-on-surface font-medium truncate">Inversión &amp; Fondo de Ahorro</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Futuro y Libertad Financiera (20%)</p>
+</div>
+</div>
+<div class="cat-indicator hidden w-5 h-5 rounded-full bg-primary text-on-primary items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[14px]">check</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Field 3: Payment Method & Date -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-space-md pt-space-xs">
+<!-- Date pill -->
+<div class="space-y-1.5">
+<label class="font-label-mono-xs text-label-mono-xs uppercase text-on-surface-variant tracking-wider flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[14px]">calendar_today</span>
+<span>Fecha y Hora</span>
+</label>
+<div class="flex items-center justify-between px-3 py-2 rounded-lg bg-surface-container-high text-on-surface font-body-sm text-body-sm">
+<span class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+              Hoy, 15:30
+            </span>
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant">schedule</span>
+</div>
+</div>
+<!-- Account Pill -->
+<div class="space-y-1.5">
+<label class="font-label-mono-xs text-label-mono-xs uppercase text-on-surface-variant tracking-wider flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[14px]">account_balance_wallet</span>
+<span>Cuenta de Pago</span>
+</label>
+<div class="flex items-center gap-1.5">
+<button class="acc-btn flex-1 py-2 px-2.5 rounded-lg bg-surface-bright text-primary font-label-mono-sm text-label-mono-sm text-center truncate" onclick="selectAccount(this)" type="button">
+              BCP Débito
+            </button>
+<button class="acc-btn flex-1 py-2 px-2.5 rounded-lg bg-surface-container-high text-on-surface-variant hover:text-on-surface font-label-mono-sm text-label-mono-sm text-center truncate" onclick="selectAccount(this)" type="button">
+              Efectivo
+            </button>
+<button class="acc-btn flex-1 py-2 px-2.5 rounded-lg bg-surface-container-high text-on-surface-variant hover:text-on-surface font-label-mono-sm text-label-mono-sm text-center truncate" onclick="selectAccount(this)" type="button">
+              Crédito
+            </button>
+</div>
+</div>
+</div>
+<!-- Field 4: Shared Space Toggle -->
+<div class="pt-space-xs">
+<label class="flex items-start justify-between p-3 rounded-lg bg-surface-container-high cursor-pointer select-none active:bg-surface-bright transition-colors">
+<div class="space-y-0.5 pr-2">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-secondary">group</span>
+<span class="font-body-md text-body-md text-on-surface font-medium">¿Afecta al Espacio Compartido?</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Sincroniza y divide este registro con tu pareja o conviviente.</p>
+</div>
+<div class="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+<input checked="" class="sr-only peer" id="shared-toggle" type="checkbox"/>
+<div class="w-10 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-on-primary after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</div>
+</label>
+</div>
+</div>
+<!-- Habit / Goal Alternate Helper State (Hidden initially) -->
+<div class="hidden rounded-xl bg-surface-container-low p-space-md space-y-2" id="habit-panel-info">
+<div class="flex items-center gap-2 text-secondary">
+<span class="material-symbols-outlined text-[18px]">verified</span>
+<span class="font-headline-sm text-headline-sm font-semibold">Registro de Hábito y Progreso</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Este elemento sumará rachas y puntos de constancia a tu tablero semanal de hábitos.</p>
+</div>
+<!-- Sticky Bottom Execution Drawer -->
+<div class="sticky bottom-4 w-full pt-space-xs space-y-2.5">
+<!-- Primary Save Action Button -->
+<button class="w-full h-12 rounded-xl bg-primary text-on-primary hover:bg-secondary-fixed transition-all active:scale-[0.98] font-body-lg text-body-lg font-semibold flex items-center justify-center gap-2 shadow-lg shadow-primary/20" onclick="handleSubmit()" type="button">
+<span class="material-symbols-outlined text-[20px]">check_circle</span>
+<span>Guardar Registro</span>
+</button>
+<!-- Secondary Sub-Action -->
+<button class="w-full py-2 text-center text-on-surface-variant hover:text-on-surface font-body-sm text-body-sm transition-colors active:scale-95" onclick="handleSaveAndAddAnother()" type="button">
+        Guardar y registrar otro nuevo
+      </button>
+</div>
+</div>
+</div>
+<script>
+  let currentAmount = 0.00;
+  let activeType = 'gasto';
+
+  function formatMoney(amount) {
+    return amount.toFixed(2);
+  }
+
+  function addAmount(val) {
+    currentAmount += val;
+    updateDisplay();
+  }
+
+  function resetAmount() {
+    currentAmount = 0.00;
+    updateDisplay();
+  }
+
+  function updateDisplay() {
+    const el = document.getElementById('amount-display');
+    if (el) {
+      el.textContent = formatMoney(currentAmount);
+    }
+  }
+
+  function setType(type, buttonEl) {
+    activeType = type;
+    const buttons = document.querySelectorAll('.type-btn');
+    buttons.forEach(b => {
+      b.classList.remove('bg-surface-container-high', 'text-primary', 'font-medium', 'shadow-sm');
+      b.classList.add('text-on-surface-variant');
+    });
+
+    buttonEl.classList.add('bg-surface-container-high', 'text-primary', 'font-medium', 'shadow-sm');
+    buttonEl.classList.remove('text-on-surface-variant');
+
+    const badge = document.getElementById('badge-flow');
+    const hero = document.getElementById('monetary-hero');
+    const habitPanel = document.getElementById('habit-panel-info');
+
+    if (type === 'gasto') {
+      badge.textContent = 'EGRESO';
+      badge.className = 'px-1.5 py-0.5 rounded text-[10px] font-label-mono-xs bg-error-container/40 text-tertiary';
+      hero.classList.remove('opacity-40');
+      habitPanel.classList.add('hidden');
+    } else if (type === 'ingreso') {
+      badge.textContent = 'INGRESO';
+      badge.className = 'px-1.5 py-0.5 rounded text-[10px] font-label-mono-xs bg-primary/20 text-primary';
+      hero.classList.remove('opacity-40');
+      habitPanel.classList.add('hidden');
+    } else {
+      badge.textContent = 'NO MONETARIO';
+      badge.className = 'px-1.5 py-0.5 rounded text-[10px] font-label-mono-xs bg-surface-container-highest text-on-surface-variant';
+      habitPanel.classList.remove('hidden');
+    }
+  }
+
+  function selectCategory(element, name, pct) {
+    const cards = document.querySelectorAll('.cat-card');
+    cards.forEach(c => {
+      c.classList.remove('bg-surface-bright');
+      const ind = c.querySelector('.cat-indicator');
+      if (ind) {
+        ind.classList.add('hidden');
+        ind.classList.remove('flex');
+      }
+    });
+
+    element.classList.add('bg-surface-bright');
+    const indicator = element.querySelector('.cat-indicator');
+    if (indicator) {
+      indicator.classList.remove('hidden');
+      indicator.classList.add('flex');
+    }
+  }
+
+  function selectAccount(btn) {
+    const accs = document.querySelectorAll('.acc-btn');
+    accs.forEach(a => {
+      a.classList.remove('bg-surface-bright', 'text-primary');
+      a.classList.add('bg-surface-container-high', 'text-on-surface-variant');
+    });
+    btn.classList.add('bg-surface-bright', 'text-primary');
+    btn.classList.remove('bg-surface-container-high', 'text-on-surface-variant');
+  }
+
+  function handleSubmit() {
+    const input = document.getElementById('concept-input');
+    const value = input.value.trim() || 'Sin descripción';
+    
+    // Quick micro visual feedback
+    const btn = event.currentTarget;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = `<span class="material-symbols-outlined text-[20px] animate-spin">sync</span><span>Guardando...</span>`;
+    setTimeout(() => {
+      btn.innerHTML = `<span class="material-symbols-outlined text-[20px]">check</span><span>¡Registrado con éxito!</span>`;
+      btn.classList.remove('bg-primary');
+      btn.classList.add('bg-secondary-container', 'text-on-secondary');
+      setTimeout(() => {
+        history.back();
+      }, 700);
+    }, 600);
+  }
+
+  function handleSaveAndAddAnother() {
+    resetAmount();
+    const input = document.getElementById('concept-input');
+    input.value = '';
+    input.focus();
+  }
+</script></main></body></html>
