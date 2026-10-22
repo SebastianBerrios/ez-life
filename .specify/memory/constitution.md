@@ -1,24 +1,22 @@
 <!--
 Sync Impact Report
 ===================
-Version change: 1.1.0 → 2.0.0
+Version change: 2.0.0 → 2.1.0
 Modified principles:
-  - X. Deudas y Liquidaciones Son Contables, Nunca Transacciones Simuladas
-    → X. Liquidaciones Informales Son Contables; Pagos de Préstamo Son Gasto Real
-    Incompatible redefinition: the "never generate a Movement" rule no longer covers
-    InstallmentLoan/InstallmentPayment (bank/caja loans, spec 002 US3) — only Debt (informal
-    lent/borrowed between people) keeps the bookkeeping-only guarantee. InstallmentPayment
-    recording (any kind) now MUST generate a corresponding expense Movement. Existing
-    InstallmentPayment code that relies on the old blanket rule
-    (src/core/domain/models/types.ts:226-229, spec 002 FR-027) is now non-compliant and must
-    be updated — tracked as part of feature spec 003-fixes-criticos.
+  - VI. Idioma (title unchanged). Materially expanded guidance: UI copy MUST now be neutral
+    Latin American Spanish with tuteo (tú) and NO voseo rioplatense. Applies app-wide:
+    components, domain error messages, and the strings that tests assert. Everything else in
+    VI (code/types/commits in English, hand-written copy with no i18n library, specs and this
+    constitution in Spanish) is unchanged. MINOR bump: expanded guidance, no principle removed
+    or redefined incompatibly.
 Added principles: none
 Removed sections: none
 Omitted template sections: [SECTION_2_NAME] and [SECTION_3_NAME] remain omitted, same
-  justification as the 1.1.0 report (Principle VII, Simplicidad).
+  justification as previous reports (Principle VII, Simplicidad).
 Templates requiring follow-up:
-  - specs/003-fixes-criticos/spec.md (to be written) must reflect the narrowed Principle X
-    when specifying InstallmentPayment → Movement behavior.
+  - Existing voseo copy (~73 occurrences in ~43 non-test files, ~27 in ~15 test files, incl.
+    domain messages such as validateDistribution.ts and LocalPaymentAccountRepository.ts) is
+    now non-compliant and must be migrated — tracked in feature spec 012.
 Deferred items: none.
 -->
 
@@ -58,6 +56,14 @@ los componentes — v1 NO usa una librería de i18n: agregarla violaría los Pri
 dependencia sin justificación suficiente frente al valor que aporta hoy). Esto se documenta como
 deuda técnica explícita, no como una violación activa de esta constitución. README y documentos de
 proyecto (specs, esta constitución) en español.
+
+El copy de UI DEBE estar en español latinoamericano neutro, con tuteo (tú) y SIN voseo rioplatense
+(nada de "querés", "podés", "tenés", "definí", "agregá", "eliminá", "asegurate", etc.). La regla
+aplica a toda la app: textos de componentes, mensajes de error del dominio (`core/use-cases`,
+repositorios) y las cadenas que verifican los tests. Un texto nuevo con voseo es una violación de
+este principio.
+Rationale: la app apunta a usuarios de Perú (v1 solo PEN) y de Latinoamérica en general; el voseo
+rioplatense suena ajeno y se coló por inercia, no por decisión de producto.
 
 ### VII. Simplicidad
 Si una librería aporta menos de 50 líneas de valor, se escribe a mano. Menos dependencias, menos
@@ -137,4 +143,4 @@ consistentes con este documento y nunca contradecirlo).
 - **Resolución de conflictos**: si esta constitución y una spec existente entran en conflicto, esta
   constitución gana; la spec se corrige.
 
-**Version**: 2.0.0 | **Ratified**: 2026-09-14 | **Last Amended**: 2026-09-22
+**Version**: 2.1.0 | **Ratified**: 2026-09-14 | **Last Amended**: 2026-10-22
