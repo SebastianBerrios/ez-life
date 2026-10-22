@@ -81,7 +81,7 @@ export class LocalCategoryRepository implements ICategoryRepository {
     if (!data.name.trim() || !bucket || bucket.deleted_at || bucket.user_id !== data.user_id) throw new DomainError('La categoría requiere nombre y una categoría de distribución propia.');
     if (existing && existing.user_id !== data.user_id) throw new DomainError('La categoría pertenece a otra cuenta.');
     if (initialSubcategories?.some(name => !name.trim())) throw new DomainError('Las subcategorías requieren un nombre.');
-    if (existing && existing.distribution_category_id !== data.distribution_category_id && await db.movements.filter(row => row.expense_category_id === id && !row.deleted_at).count()) throw new DomainError('No se puede cambiar el bucket de una categoría con movimientos.');
+    if (existing && existing.distribution_category_id !== data.distribution_category_id && await db.movements.filter(row => row.expense_category_id === id && !row.deleted_at).count()) throw new DomainError('No se puede cambiar la categoría de distribución de una categoría con movimientos.');
     const cat = existing ? { ...existing, ...data, id, updated_at: now } : { ...data, id, created_at: nextCreatedAt(), updated_at: now };
     await db.expense_categories.put(cat);
     if (!existing) for (const name of initialSubcategories ?? []) await this.saveSubcategory({ id: stableId(`initial-subcategory:${id}:${name.trim()}`), category_id: id, name: name.trim() });

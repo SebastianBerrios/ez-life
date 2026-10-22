@@ -92,7 +92,7 @@ function UncategorizedLine({ cents, variant }: { cents: number; variant: 'list' 
 function BucketCard({ bucket }: { bucket: RuleBucket }) {
   const Icon = categoryIcon(bucket.name);
   return (
-    <Panel aria-label={`Bucket ${bucket.name}`} data-testid={`rule-bucket-${bucket.id}`}>
+    <Panel aria-label={`Categoría de distribución ${bucket.name}`} data-testid={`rule-bucket-${bucket.id}`}>
       <PanelHeader
         title={
           <span className="flex items-center gap-2">
@@ -107,7 +107,7 @@ function BucketCard({ bucket }: { bucket: RuleBucket }) {
       </PanelHeader>
       <PanelBody className="flex flex-1 flex-col gap-3">
         {bucket.categories.length === 0 && bucket.uncategorized === 0 ? (
-          <p className="text-body-sm text-muted-foreground">Sin categorías de gasto en este bucket.</p>
+          <p className="text-body-sm text-muted-foreground">Sin categorías de gasto en esta categoría de distribución.</p>
         ) : (
           <ul className="flex flex-col gap-1">
             {bucket.categories.map(category => (

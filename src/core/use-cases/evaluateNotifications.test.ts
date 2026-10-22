@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { evaluateNotifications } from './evaluateNotifications';
-import type { BudgetedCategory } from './calculateBudgets';
+import { calculateBudgets, type BudgetedCategory } from './calculateBudgets';
 import type { Debt, Goal, Notification, SavingsGoal, SharedMovement, Task } from '../domain/models/types';
 import type { HabitPendingToday } from './evaluateNotifications';
 
@@ -152,6 +152,20 @@ describe('evaluateNotifications', () => {
       const result = evaluateNotifications(baseParams({
         budgetedCategories: [bucket],
         spentByBucketId: { 'bucket-1': 500 },
+      }));
+      expect(result).toHaveLength(0);
+    });
+
+    it('never alerts for a 0% savings bucket built by calculateBudgets, even with money filed in it', () => {
+      const budgeted = calculateBudgets(300000, [
+        { ...baseBucket, id: 'needs', name: 'Necesidades', percentage: 100, is_savings: false },
+        { ...baseBucket, id: 'save', name: 'Ahorro', percentage: 0, is_savings: true },
+      ]);
+      expect(budgeted.find(b => b.id === 'save')?.budget).toBe(0);
+
+      const result = evaluateNotifications(baseParams({
+        budgetedCategories: budgeted,
+        spentByBucketId: { needs: 1000, save: 5000 },
       }));
       expect(result).toHaveLength(0);
     });

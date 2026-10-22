@@ -88,3 +88,24 @@ Comprobado en el navegador:
    (0% solo en ahorro) con `LocalCategoryRepository.saveDistributionCategory`.
 6. **Mensaje del repositorio** `saveStartingPoint` para saldo inválido: "El saldo actual debe ser un monto en
    céntimos mayor o igual a 0." (no estaba fijado en el contrato).
+
+## Convergencia (Fase 9) — 2026-10-22
+
+- **T050**: pruebas de regresión con ahorro al 0% en `calculateBudgets`, `buildRuleView`, `buildFinancesKpis` y `evaluateNotifications` (+4 pruebas). `pnpm test`: 1313 pruebas pasan; `pnpm lint` limpio. `pnpm build` **no** se volvió a ejecutar tras estos cambios (solo tocan pruebas y dos textos de error).
+- **T052**: «bucket» eliminado de los mensajes de `LocalCategoryRepository.ts` y `LocalMovementRepository.ts`; ninguna prueba verificaba esos textos.
+- **T051 — PARCIAL** (navegador aislado, cuenta local ficticia, DB `ezlife-db`). Comprobado: sueldo 3000 + saldo 800 → "Capital disponible" S/ 800.00 y presupuesto 50% = S/ 1,500.00; Ajustes → Cuentas lista "Efectivo" una sola vez con S/ 800.00; con una categoría vacía sembrada directamente en IndexedDB, "Registrar Movimiento" no la ofrece; con el ahorro heredado sembrado en "Gustos y Deseos", el paso 2 muestra "Ahorro · fija" solo en esa fila y sin botón de eliminar.
+- **T051 — NO ejecutado**: prueba **sin conexión**; que la subcategoría "General" heredada (categoría "Legado", sembrada) se conserve sin cambios en Ajustes → "Gestionar categorías de gasto"; sincronización real. Los datos sembrados se escribieron a mano en IndexedDB, no por la UI.
+
+### T051 — completado (segunda pasada, 2026-10-22)
+
+Contexto aislado nuevo (`pnpm dev`, cuenta local ficticia), onboarding repetido con sueldo 3000 y saldo 800, y luego:
+
+- **Usuario existente**: se sembró en IndexedDB una categoría antigua "Legado" con "General" y "Extra". En Ajustes → Gestionar categorías de gasto aparece primero (la más antigua), con "General" y "Extra" en su orden y sin modificaciones.
+- **Sin conexión** (`Offline` emulado, `navigator.onLine === false`): se creó una categoría nueva (nace vacía, con "Agrega al menos una subcategoría." y "Finalizar configuración" deshabilitado) y se le agregó una subcategoría ("Finalizar" se habilita). Todo funciona offline.
+- **`pnpm build`**: compilación correcta tras los cambios de la Fase 9 (32 assets en la caché offline).
+
+Límites que siguen vigentes: la sincronización real con Supabase no se probó (cuenta ficticia, sin sesión) y los datos "existentes" se sembraron a mano en IndexedDB, no con un usuario real.
+
+### T053 — jerga «bucket» en textos visibles (2026-10-22)
+
+Cambiados: `RuleSection.tsx` (texto de categoría vacía y `aria-label` «Bucket …» → «Categoría de distribución …»), `buildPaletteIndex.ts` (subtítulo de la paleta) y la cadena que verifica `RuleSection.test.tsx`. `pnpm vitest run`: 168 archivos, 1313 pruebas pasan; `pnpm lint` limpio. `pnpm build` **no** se volvió a ejecutar (solo cambian textos).

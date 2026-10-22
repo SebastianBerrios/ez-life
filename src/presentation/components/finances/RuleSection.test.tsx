@@ -53,7 +53,7 @@ describe('RuleSection (desktop)', () => {
     expect(within(column).getByText('Usado')).toBeInTheDocument();
     expect(within(column).getByText('S/ 1,600.00 / S/ 1,500.00')).toBeInTheDocument();
     expect(within(column).getByText('Excedido por S/ 100.00')).toBeInTheDocument();
-    expect(within(screen.getByTestId('rule-bucket-wants')).getByText('Sin categorías de gasto en este bucket.')).toBeInTheDocument();
+    expect(within(screen.getByTestId('rule-bucket-wants')).getByText('Sin categorías de gasto en esta categoría de distribución.')).toBeInTheDocument();
   });
 
   it('expands a category with subcategories using a real disclosure button', async () => {
