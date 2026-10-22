@@ -15,7 +15,7 @@ export type QuickTaskResult =
  */
 export function buildQuickTask(title: string, userId: string, today: Date): QuickTaskResult {
   const trimmed = title.trim();
-  if (trimmed.length === 0) return { ok: false, error: 'Escribí un título para la tarea.' };
+  if (trimmed.length === 0) return { ok: false, error: 'Escribe un título para la tarea.' };
   return {
     ok: true,
     task: {

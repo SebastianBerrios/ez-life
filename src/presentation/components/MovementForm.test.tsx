@@ -33,6 +33,29 @@ describe('MovementForm', () => {
     await user.click(screen.getByRole('button', { name: /^Guardar$/ }));
     await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: 'original', amount: 1525, income_source_id: 'salary', date: new Date(2026, 8, 6, 0, 0) })));
   });
+  it('only offers expense categories that already have at least one subcategory (FR-018)', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (LocalMovementRepository as any).mockImplementation(function() { return { save: vi.fn() }; });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (LocalCategoryRepository as any).mockImplementation(function() {
+      return {
+        getDistributionCategories: vi.fn().mockResolvedValue([{ id: 'cat-id', name: 'Necesidades', percentage: 100, is_default: true, is_savings: false }]),
+        getExpenseCategories: vi.fn().mockResolvedValue([
+          { id: 'full', distribution_category_id: 'cat-id', name: 'Alimentación' },
+          { id: 'empty', distribution_category_id: 'cat-id', name: 'Categoría nueva vacía' },
+        ]),
+        getSubcategories: vi.fn(async (categoryId: string) => categoryId === 'full' ? [{ id: 'sub-id', category_id: 'full', name: 'Desayuno' }] : []),
+      };
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (LocalSavingsGoalRepository as any).mockImplementation(function() { return { getAll: vi.fn().mockResolvedValue([]) }; });
+
+    render(<MovementForm userId="fake-user-id" onComplete={vi.fn()} onCancel={vi.fn()} />);
+
+    expect(await screen.findByRole('radio', { name: /Alimentación/i })).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: /Categoría nueva vacía/i })).not.toBeInTheDocument();
+  });
+
   it('should transform amount to cents and save movement', async () => {
     const user = userEvent.setup();
     const mockSave = vi.fn();
@@ -358,10 +381,10 @@ describe('MovementForm', () => {
       const save = mockRepositories(vi.fn(), { noCategories: true });
       const user = userEvent.setup();
       renderForm({ type: 'EXPENSE' });
-      await screen.findByText(/Todavía no tenés categorías de gasto/);
+      await screen.findByText(/Todavía no tienes categorías de gasto/);
       await user.type(screen.getByLabelText('Monto'), '9');
       fireEvent.submit(screen.getByTestId('movement-form'));
-      expect(await screen.findByText('Seleccioná una categoría de gasto.')).toBeInTheDocument();
+      expect(await screen.findByText('Selecciona una categoría de gasto.')).toBeInTheDocument();
       expect(save).not.toHaveBeenCalled();
     });
 
@@ -448,7 +471,7 @@ describe('MovementForm', () => {
         const { unmount } = renderForm({ type: 'EXPENSE', onSavedAndNew: vi.fn() });
         await screen.findByRole('radio', { name: /Alimentación/ });
         await user.click(screen.getByRole('button', { name: 'Guardar y registrar otro' }));
-        expect(await screen.findByText(/Ingresá un monto/)).toBeInTheDocument();
+        expect(await screen.findByText(/Ingresa un monto/)).toBeInTheDocument();
         expect(save).not.toHaveBeenCalled();
         unmount();
         renderForm({ type: 'EXPENSE' });

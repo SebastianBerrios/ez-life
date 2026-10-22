@@ -33,7 +33,7 @@ export default function SharedSpaceSettings({ space, onChanged, onLeft }: Props)
   };
 
   const handleLeave = async () => {
-    if (!window.confirm('¿Seguro que querés abandonar este espacio? Las deudas pendientes quedan visibles en tu historial.')) return;
+    if (!window.confirm('¿Seguro que quieres abandonar este espacio? Las deudas pendientes quedan visibles en tu historial.')) return;
     setIsSubmitting(true);
     setError(null);
     try {

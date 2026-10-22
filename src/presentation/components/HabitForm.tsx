@@ -40,7 +40,7 @@ export default function HabitForm({ userId, existing, embedded, onComplete, onCa
     setError(null);
 
     if (scheduleMode === 'fixed_days' && fixedDays.length === 0) {
-      setError('Elegí al menos un día de la semana.');
+      setError('Elige al menos un día de la semana.');
       return;
     }
     if (scheduleMode === 'frequency' && (!frequencyTarget || Number(frequencyTarget) < 1)) {

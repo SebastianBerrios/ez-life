@@ -34,7 +34,7 @@ export default function LoansCard({ view, desktop, onOpenLoans }: Props) {
       </div>
       <PanelBody className="flex flex-col gap-3">
         {empty ? (
-          <p className="text-body-md text-muted-foreground">No tenés deudas activas.</p>
+          <p className="text-body-md text-muted-foreground">No tienes deudas activas.</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {activeLoans.map(({ loan, next }) => (

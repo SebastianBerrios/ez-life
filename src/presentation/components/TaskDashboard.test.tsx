@@ -42,7 +42,7 @@ describe('TaskDashboard', () => {
 
     render(<TaskDashboard userId="u1" />);
 
-    expect(await screen.findByText(/no ten[eé]s tareas registradas/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no tienes tareas registradas/i)).toBeInTheDocument();
   });
 
   it('renders the on-time vs overdue completion chart (FR-005)', async () => {

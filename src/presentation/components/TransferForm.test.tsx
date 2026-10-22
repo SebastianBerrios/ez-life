@@ -76,7 +76,7 @@ describe('TransferForm', () => {
     render(<TransferForm userId="A" onComplete={onComplete} />);
     await screen.findByRole('radiogroup', { name: 'Cuenta de origen' });
     await user.click(screen.getByRole('button', { name: 'Guardar transferencia' }));
-    expect(await screen.findByText(/Ingresá un monto/)).toBeInTheDocument();
+    expect(await screen.findByText(/Ingresa un monto/)).toBeInTheDocument();
     await user.type(screen.getByLabelText('Monto'), '0');
     await user.click(screen.getByRole('button', { name: 'Guardar transferencia' }));
     expect(await screen.findByText('El monto debe ser mayor a 0.')).toBeInTheDocument();
@@ -121,7 +121,7 @@ describe('TransferForm', () => {
     it('explains why and offers to create an account', async () => {
       repos.accounts = [account(cashId, 'Efectivo', { kind: 'cash' })];
       render(<TransferForm userId="A" onComplete={vi.fn()} />);
-      expect(await screen.findByText('Necesitás al menos dos cuentas')).toBeInTheDocument();
+      expect(await screen.findByText('Necesitas al menos dos cuentas')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Crear cuenta' })).toBeInTheDocument();
       expect(screen.queryByTestId('transfer-form')).not.toBeInTheDocument();
     });
@@ -129,7 +129,7 @@ describe('TransferForm', () => {
     it('does not count archived accounts', async () => {
       repos.accounts = [account(cashId, 'Efectivo', { kind: 'cash' }), account('old', 'Vieja', { archived: true })];
       render(<TransferForm userId="A" onComplete={vi.fn()} />);
-      expect(await screen.findByText('Necesitás al menos dos cuentas')).toBeInTheDocument();
+      expect(await screen.findByText('Necesitas al menos dos cuentas')).toBeInTheDocument();
     });
 
     it('creates the missing account inline and then shows the transfer form', async () => {
@@ -157,7 +157,7 @@ describe('TransferForm', () => {
       render(<TransferForm userId="A" onComplete={vi.fn()} />);
       await user.click(await screen.findByRole('button', { name: 'Crear cuenta' }));
       await user.click(screen.getByRole('button', { name: 'Cancelar' }));
-      expect(await screen.findByText('Necesitás al menos dos cuentas')).toBeInTheDocument();
+      expect(await screen.findByText('Necesitas al menos dos cuentas')).toBeInTheDocument();
       expect(repos.saveAccount).not.toHaveBeenCalled();
     });
   });

@@ -24,7 +24,7 @@ export default function IncomeSourceSettings({ userId }: { userId: string }) {
   async function reload() { setSources(await new LocalIncomeSourceRepository().getAll(userId)); }
   return <div className="space-y-4">
     {sources.length === 0
-      ? <p className="text-body-md text-muted-foreground">Todavía no tenés fuentes de ingreso.</p>
+      ? <p className="text-body-md text-muted-foreground">Todavía no tienes fuentes de ingreso.</p>
       : <ul className="divide-y divide-border rounded-lg border border-border">{sources.map(source => <li key={source.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
         <span className="min-w-0 basis-full break-words text-body-md font-medium text-foreground sm:basis-0 sm:flex-1">{source.name}</span>
         <Money cents={source.amount} size="sm" className="mr-auto sm:mr-0" aria-label={`Ingreso mensual de ${source.name}`} />

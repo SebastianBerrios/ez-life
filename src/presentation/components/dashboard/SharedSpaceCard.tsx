@@ -28,7 +28,7 @@ export default function SharedSpaceCard({ view, onOpen }: Props) {
                 <span className="shrink-0 font-mono text-label-mono-xs text-muted-foreground">Sin saldos pendientes</span>
               ) : (
                 <span className="flex shrink-0 items-baseline gap-1.5 font-mono text-label-mono-xs text-muted-foreground">
-                  {space.netCents > 0 ? 'Te deben' : 'Debés'}
+                  {space.netCents > 0 ? 'Te deben' : 'Debes'}
                   <Money cents={Math.abs(space.netCents)} sign="never" size="sm" tone={space.netCents > 0 ? 'income' : 'expense'} className="font-semibold" />
                 </span>
               )}

@@ -210,7 +210,7 @@ describe('Dashboard', () => {
 
     render(<Dashboard userId="user-1" />);
 
-    expect(await screen.findByText(/no ten[eé]s deudas activas/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no tienes deudas activas/i)).toBeInTheDocument();
     expect(screen.queryByText(/ana/i)).toBeNull();
     expect(screen.queryByRole('button', { name: /ver préstamos/i })).toBeNull();
   });
@@ -611,7 +611,7 @@ describe('Dashboard — Préstamos activos', () => {
     expect(row).toHaveTextContent('Cuota 04/24');
     expect(row).toHaveTextContent(/S\/\s*520\.00/);
     expect(screen.queryByText('Pagado')).toBeNull();
-    expect(screen.queryByText(/no ten[eé]s deudas activas/i)).toBeNull();
+    expect(screen.queryByText(/no tienes deudas activas/i)).toBeNull();
 
     await user.click(screen.getByRole('button', { name: /ver préstamos/i }));
     expect(onNavigate).toHaveBeenCalledWith('finances', { financesTab: 'loans' });

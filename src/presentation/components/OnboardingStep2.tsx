@@ -5,6 +5,7 @@ import { LocalCategoryRepository } from '../../infrastructure/repositories/local
 import { LocalMovementRepository } from '../../infrastructure/repositories/local/LocalMovementRepository';
 import { validateDeletion } from '../../core/use-cases/validateDeletion';
 import { DomainError } from '../../core/domain/errors/DomainError';
+import { useTransientMessages } from '../hooks/useTransientMessages';
 import { uuidv7 } from 'uuidv7';
 import { stableId } from '../../core/use-cases/stableId';
 import { Info, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
@@ -37,7 +38,9 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(true);
-  const [deleteErrors, setDeleteErrors] = useState<Record<string, string>>({});
+  // Blocked-delete notices fade on their own; the total status and the save error are form-level and persist.
+  const { messages: deleteErrors, show: showDeleteError, clearAll: clearNotices } = useTransientMessages();
+  const [saveError, setSaveError] = useState('');
 
   const catRepo = new LocalCategoryRepository();
   const movementRepo = new LocalMovementRepository();
@@ -79,23 +82,19 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
   const isValid = total === 100 && buckets.length > 0;
 
   const updateBucket = (id: string, patch: Partial<BucketDraft>) => {
+    clearNotices();
     setBuckets(prev => prev.map(b => (b.id === id ? { ...b, ...patch } : b)));
   };
 
   const handleAddBucket = () => {
+    clearNotices();
     setBuckets(prev => [...prev, { id: uuidv7(), name: '', percentage: 0, is_default: false, is_savings: false }]);
   };
 
-  // Mutually-exclusive, radio-like semantics: marking one bucket as the
-  // savings bucket unmarks every other one, so exactly one is always true.
-  // There is no "unmark" action — the invariant is enforced by construction.
-  const handleSetSavingsBucket = (id: string) => {
-    setBuckets(prev => prev.map(b => ({ ...b, is_savings: b.id === id })));
-  };
-
   const handleDeleteBucket = async (id: string) => {
+    clearNotices();
     if (buckets.length <= 1) {
-      setDeleteErrors(prev => ({ ...prev, [id]: 'Necesitás al menos una categoría de distribución.' }));
+      showDeleteError(id, 'Necesitas al menos una categoría de distribución.');
       return;
     }
 
@@ -107,7 +106,7 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
       );
     } catch (err) {
       if (err instanceof DomainError) {
-        setDeleteErrors(prev => ({ ...prev, [id]: err.message }));
+        showDeleteError(id, err.message);
       }
       return;
     }
@@ -120,19 +119,20 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
       );
     } catch (err) {
       if (err instanceof DomainError) {
-        setDeleteErrors(prev => ({ ...prev, [id]: err.message }));
+        showDeleteError(id, err.message);
       }
       return;
     }
 
-    setDeleteErrors(prev => { const next = { ...prev }; delete next[id]; return next; });
     setBuckets(prev => prev.filter(b => b.id !== id));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isValid) return;
+    clearNotices();
     setIsSubmitting(true);
+    setSaveError('');
 
     try {
       await catRepo.saveDistributionSet(profileId,
@@ -148,6 +148,7 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
       onComplete();
     } catch (err) {
       console.error(err);
+      setSaveError(err instanceof DomainError ? `No se pudo guardar la distribución. ${err.message}` : 'No se pudo guardar la distribución.');
     } finally {
       setIsSubmitting(false);
     }
@@ -162,7 +163,7 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
       <Panel className="overflow-hidden">
         <PanelHeader eyebrow="Paso 2 de 3" title="Tu distribución de ingresos" titleAs="h2">
           <p className="mt-1 text-body-md text-muted-foreground">
-            Definí en qué categorías querés distribuir lo que ganás cada mes. Podés agregar, renombrar o eliminar las que necesites.
+            Define en qué categorías quieres distribuir lo que ganas cada mes. Puedes agregar, renombrar o eliminar las que necesites.
           </p>
         </PanelHeader>
 
@@ -196,7 +197,7 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
                 <TutorialItem label="20% — Ahorro" description="Fondo de emergencia, inversiones, metas." />
               </div>
               <p className="text-body-md text-muted-foreground">
-                Es solo un punto de partida — agregá, renombrá o eliminá categorías según tu realidad. Solo asegurate de que sumen 100%.
+                Es solo un punto de partida — agrega, renombra o elimina categorías según tu realidad. Solo asegúrate de que sumen 100%.
               </p>
             </div>
           )}
@@ -230,27 +231,23 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
                         />
                         <span className="font-mono text-body-md text-muted-foreground">%</span>
                       </div>
-                      <label className="flex shrink-0 cursor-pointer items-center gap-1.5 font-mono text-label-mono-sm uppercase text-muted-foreground">
-                        <input
-                          type="radio"
-                          name="savingsBucket"
-                          aria-label={`Marcar categoría ${idx + 1} como ahorro`}
-                          checked={bucket.is_savings}
-                          onChange={() => handleSetSavingsBucket(bucket.id)}
-                          className="size-4 accent-primary"
-                        />
-                        Ahorro
-                      </label>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteBucket(bucket.id)}
-                        aria-label={`Eliminar categoría ${bucket.name || idx + 1}`}
-                        className="ml-auto shrink-0 text-destructive hover:text-destructive"
-                      >
-                        <Trash2 />
-                      </Button>
+                      {/* The savings category is implied and fixed: no selector, and nothing to delete. */}
+                      {bucket.is_savings ? (
+                        <span className="ml-auto shrink-0 font-mono text-label-mono-sm uppercase text-muted-foreground">
+                          Ahorro · fija
+                        </span>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteBucket(bucket.id)}
+                          aria-label={`Eliminar categoría ${bucket.name || idx + 1}`}
+                          className="ml-auto shrink-0 text-destructive hover:text-destructive"
+                        >
+                          <Trash2 />
+                        </Button>
+                      )}
                     </div>
                   </div>
                   {deleteErrors[bucket.id] && (
@@ -278,6 +275,8 @@ export default function OnboardingStep2({ profileId, onComplete }: Props) {
             >
               Total: {total}% {isValid ? '✓ Perfecto' : '— Debe sumar exactamente 100%'}
             </div>
+
+            {saveError && <p role="alert" className="text-body-md text-destructive">{saveError}</p>}
 
             <Button type="submit" size="lg" disabled={!isValid || isSubmitting} className="w-full">
               {isSubmitting ? 'Guardando...' : 'Guardar distribución'}

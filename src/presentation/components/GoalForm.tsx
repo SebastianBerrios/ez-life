@@ -49,7 +49,7 @@ export default function GoalForm({ userId, existing, embedded, onComplete, onCan
       return;
     }
     if (kind === 'checklist' && milestones.length === 0) {
-      setError('Agregá al menos un hito.');
+      setError('Agrega al menos un hito.');
       return;
     }
 

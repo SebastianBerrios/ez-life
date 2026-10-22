@@ -14,7 +14,7 @@ afterEach(() => vi.restoreAllMocks());
 describe('IncomeSourceSettings', () => {
   it('shows an empty state and lists real sources with their amount', async () => {
     const { unmount } = render(<IncomeSourceSettings userId={U} />);
-    expect(await screen.findByText('Todavía no tenés fuentes de ingreso.')).toBeInTheDocument();
+    expect(await screen.findByText('Todavía no tienes fuentes de ingreso.')).toBeInTheDocument();
     unmount();
 
     await new LocalIncomeSourceRepository().save({ id: '', user_id: U, name: 'Sueldo', amount: 300050 });
@@ -26,7 +26,7 @@ describe('IncomeSourceSettings', () => {
   it('adds a source, parsing the amount into integer cents', async () => {
     const user = userEvent.setup();
     render(<IncomeSourceSettings userId={U} />);
-    await screen.findByText('Todavía no tenés fuentes de ingreso.');
+    await screen.findByText('Todavía no tienes fuentes de ingreso.');
 
     await user.type(screen.getByLabelText('Nombre de la fuente'), 'Freelance');
     await user.type(screen.getByLabelText('Ingreso mensual esperado'), '1,250.75');
@@ -44,7 +44,7 @@ describe('IncomeSourceSettings', () => {
     await user.type(screen.getByLabelText('Ingreso mensual esperado'), '10.123');
     await user.click(screen.getByRole('button', { name: 'Agregar fuente' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Ingresá un monto con hasta dos decimales.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ingresa un monto con hasta dos decimales.');
     expect(await new LocalIncomeSourceRepository().getAll(U)).toEqual([]);
   });
 

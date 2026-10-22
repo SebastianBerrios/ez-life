@@ -235,7 +235,7 @@ export default function SettingsScreen({
 
           <Section title="Categorías y Distribución" eyebrow="Presupuesto">
             <p className="text-body-md text-muted-foreground">
-              Ajustá tus categorías de distribución (%) y gestioná las categorías y subcategorías de gasto.
+              Ajusta tus categorías de distribución (%) y gestiona las categorías y subcategorías de gasto.
             </p>
             <div className="space-y-2">
               <Button variant="outline" onClick={onEditDistribution} className="w-full">
@@ -310,7 +310,7 @@ export default function SettingsScreen({
 
           <Section title="Exportar Datos" eyebrow="Datos">
             <p className="text-body-md text-muted-foreground">
-              Descargá todo tu historial de movimientos en CSV (Excel) o PDF.
+              Descarga todo tu historial de movimientos en CSV (Excel) o PDF.
             </p>
             <div className="flex gap-3">
               <Button variant="default" onClick={handleExportCSV} disabled={exporting} className="flex-1">

@@ -112,7 +112,7 @@ export default function PaymentAccountForm({ userId, existing, onSaved, onCancel
               onChange={event => setOpeningBalance(event.target.value.replace(/[^0-9.,-]/g, ''))}
             />
           </div>
-          {kind === 'credit' && <p className="text-body-sm text-muted-foreground">Si ya debés algo en esta tarjeta, escribilo en negativo (ej. -300.00).</p>}
+          {kind === 'credit' && <p className="text-body-sm text-muted-foreground">Si ya debes algo en esta tarjeta, escríbelo en negativo (ej. -300.00).</p>}
         </div>
 
         {error && <p role="alert" className="text-body-md text-destructive">{error}</p>}

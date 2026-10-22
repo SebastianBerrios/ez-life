@@ -45,7 +45,7 @@ export default function LoginScreen() {
         setErrorMessage(error.message);
       }
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : 'No se pudo iniciar sesión. Intentá de nuevo.');
+      setErrorMessage(err instanceof Error ? err.message : 'No se pudo iniciar sesión. Intenta de nuevo.');
     }
   };
 
@@ -79,7 +79,7 @@ export default function LoginScreen() {
         </Panel>
 
         <p className="text-center text-body-sm text-muted-foreground">
-          Al continuar, aceptás los términos y la política de privacidad.
+          Al continuar, aceptas los términos y la política de privacidad.
         </p>
       </div>
     </main>

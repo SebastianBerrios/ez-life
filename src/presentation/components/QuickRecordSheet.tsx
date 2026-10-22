@@ -113,7 +113,7 @@ function QuickRecordBody({
           <SheetTitle className="text-headline-sm font-semibold">Nuevo Registro</SheetTitle>
         </div>
         <SheetDescription className="sr-only">
-          Registrá un gasto, un ingreso, un movimiento entre cuentas, un hábito, una tarea o una meta.
+          Registra un gasto, un ingreso, un movimiento entre cuentas, un hábito, una tarea o una meta.
         </SheetDescription>
       </SheetHeader>
 
@@ -165,7 +165,7 @@ function QuickRecordBody({
 
           {tab === 'habit' && (
             <>
-              <Segmented ariaLabel="Qué querés crear" size="sm" value={habitKind} onValueChange={value => setHabitKind(value as 'habit' | 'task')} options={HABIT_OPTIONS} />
+              <Segmented ariaLabel="Qué quieres crear" size="sm" value={habitKind} onValueChange={value => setHabitKind(value as 'habit' | 'task')} options={HABIT_OPTIONS} />
               {habitKind === 'habit'
                 ? <HabitForm userId={userId} embedded onComplete={() => saved('habit')} onCancel={onClose} />
                 : <TaskForm userId={userId} embedded onComplete={() => saved('task')} onCancel={onClose} />}

@@ -220,7 +220,7 @@ describe('SharedMovementForm — money is parsed into integer cents with parseMo
     const create = setup();
     await user.type(screen.getByLabelText(/monto total/i), amount);
     submit();
-    expect(await screen.findByRole('alert')).toHaveTextContent('Ingresá un monto con hasta dos decimales.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ingresa un monto con hasta dos decimales.');
     expect(create).not.toHaveBeenCalled();
   });
 
@@ -264,7 +264,7 @@ describe('SharedMovementForm — money is parsed into integer cents with parseMo
     await user.clear(second);
     await user.type(second, '59.877');
     submit();
-    expect(await screen.findByRole('alert')).toHaveTextContent('Ingresá un monto con hasta dos decimales.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ingresa un monto con hasta dos decimales.');
     expect(create).not.toHaveBeenCalled();
   });
 

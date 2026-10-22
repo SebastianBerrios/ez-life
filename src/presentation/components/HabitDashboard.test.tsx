@@ -46,7 +46,7 @@ describe('HabitDashboard', () => {
 
     render(<HabitDashboard userId="u1" />);
 
-    expect(await screen.findByText(/no ten[eé]s h[aá]bitos registrados/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no tienes hábitos registrados/i)).toBeInTheDocument();
   });
 
   it('renders the streak evolution chart with a 30-day default range (FR-004, FR-010)', async () => {

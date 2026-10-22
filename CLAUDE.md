@@ -80,7 +80,9 @@ Path alias: `@/*` → `src/*` (both `tsconfig.json` and `vitest.config.ts`).
 ## Conventions from AGENTS.md / constitution.md
 
 - Code (vars, functions, types, components, commits) in English; UI copy in
-  Spanish, meant to go through i18n rather than being hardcoded.
+  neutral Latin American Spanish (tuteo, never voseo — e.g. "tienes", not
+  "tenés"), hardcoded by hand in the components: v1 has no i18n library
+  (constitution Principle VI). `src/voseoGuard.test.ts` enforces the rule.
 - No business logic inside React components — it belongs in `core/use-cases`
   or a hook, not the component body.
 - Money is always an integer number of cents — never a float. v1 is PEN-only.

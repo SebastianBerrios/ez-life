@@ -53,7 +53,7 @@ describe('GoalDashboard', () => {
 
     render(<GoalDashboard userId="u1" />);
 
-    expect(await screen.findByText(/no ten[eé]s metas registradas/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no tienes metas registradas/i)).toBeInTheDocument();
   });
 
   it('shows the numeric progress percentage derived from calculateGoalProgress (FR-006)', async () => {

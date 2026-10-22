@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { uuidv7 } from 'uuidv7';
 import { db } from '../../db/db';
 import { LocalPaymentAccountRepository } from './LocalPaymentAccountRepository';
+import { LocalOnboardingRepository } from './LocalOnboardingRepository';
 import { defaultCashAccountId } from '../../../core/use-cases/defaultPaymentAccount';
 
 const newAccount = (userId: string, name = 'Visa') => ({
@@ -67,7 +68,7 @@ describe('LocalPaymentAccountRepository', () => {
     expect(await repo.countMovements(from.id)).toBe(1); // deleted movements do not count
     expect(await repo.countMovements(to.id)).toBe(1);
     await expect(repo.delete(from.id)).rejects.toThrow(/movimientos/i);
-    await expect(repo.delete(to.id)).rejects.toThrow(/archiv/i);
+    await expect(repo.delete(to.id)).rejects.toThrow(/archívala/i);
     await repo.delete(free.id);
     expect((await repo.getAll('A')).map(x => x.id).sort()).toEqual([from.id, to.id].sort());
   });
@@ -92,6 +93,15 @@ describe('LocalPaymentAccountRepository', () => {
       await repo.ensureDefault('A');
       expect(await db.payment_accounts.count()).toBe(1);
       expect(await repo.getAll('A')).toEqual([]);
+    });
+
+    it('is a no-op after the onboarding already created the account with a current balance', async () => {
+      await new LocalOnboardingRepository().saveStartingPoint('A', { income: 300000, openingBalance: 80000 });
+      const repo = new LocalPaymentAccountRepository();
+      await repo.ensureDefault('A');
+      const accounts = await repo.getAll('A');
+      expect(accounts).toHaveLength(1);
+      expect(accounts[0]).toMatchObject({ id: defaultCashAccountId('A'), opening_balance: 80000 });
     });
 
     it('keeps users independent', async () => {

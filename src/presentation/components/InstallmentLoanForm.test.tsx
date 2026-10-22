@@ -77,7 +77,7 @@ describe('InstallmentLoanForm', () => {
 
     fireEvent.submit(screen.getByTestId('installment-loan-form'));
 
-    expect(await screen.findByText(/eleg[ií].*categor[ií]a/i)).toBeInTheDocument();
+    expect(await screen.findByText(/elige.*categoría/i)).toBeInTheDocument();
     expect(mockCreate).not.toHaveBeenCalled();
   });
 

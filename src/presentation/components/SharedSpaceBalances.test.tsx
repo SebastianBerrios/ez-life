@@ -38,13 +38,13 @@ describe('SharedSpaceBalances', () => {
 
     const list = await screen.findByRole('list');
     const row = within(list).getByRole('listitem');
-    expect(row).toHaveTextContent('bob le debe a vos');
+    expect(row).toHaveTextContent('bob te debe');
     expect(row).toHaveTextContent(/S\/\s?50\.00/);
     expect(row.querySelector('[data-slot="money"]')).toHaveAttribute('data-tone', 'income');
 
     // Same data seen by Bob: he owes.
     rerender(<SharedSpaceBalances spaceId="space-1" currentUserId="bob" refreshKey={1} />);
-    expect(await screen.findByText('Vos le debe a ana')).toBeInTheDocument();
+    expect(await screen.findByText('Tú le debes a ana')).toBeInTheDocument();
     expect(screen.getByRole('listitem').querySelector('[data-slot="money"]')).toHaveAttribute('data-tone', 'expense');
   });
 

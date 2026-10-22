@@ -84,6 +84,13 @@ describe('OnboardingWizard — progress indicator', () => {
   it('shows the product name as the page heading', async () => {
     render(<OnboardingWizard profileId="user-1" startStep={1} onComplete={() => {}} />);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('ez·life');
-    expect(await screen.findByRole('heading', { name: /configuración básica/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Tu punto de partida' })).toBeInTheDocument();
+  });
+
+  it('names the first step "Inicio" in the progress indicator', () => {
+    render(<OnboardingWizard profileId="user-1" startStep={1} onComplete={() => {}} />);
+    const items = within(screen.getByRole('list', { name: 'Progreso de la configuración' })).getAllByRole('listitem');
+    expect(items[0]).toHaveTextContent('Inicio');
+    expect(items[0]).not.toHaveTextContent('Ingresos');
   });
 });

@@ -14,7 +14,7 @@ App de finanzas personales y familiares. Offline-first con sincronización a Sup
 
 - TypeScript strict mode. No `any` salvo justificación en comentario.
 - Nombres en inglés: variables, funciones, tipos, componentes, commits.
-- UI copy en español, centralizado a mano en los componentes. Sin librería de i18n en v1 (ver `.specify/memory/constitution.md`, Principio VI).
+- UI copy en español latinoamericano neutro, con tuteo y sin voseo (nada de "querés", "podés", "tenés"…), centralizado a mano en los componentes. Sin librería de i18n en v1 (ver `.specify/memory/constitution.md`, Principio VI). `src/voseoGuard.test.ts` hace cumplir la regla.
 - Commits: conventional commits en inglés (`feat:`, `fix:`, `docs:`, etc.).
 - Componentes: PascalCase. Hooks: `use` prefix. Utilities: camelCase.
 

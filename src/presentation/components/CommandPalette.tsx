@@ -130,7 +130,7 @@ function PaletteBody({ onOpenChange, userId, gamificationVisible = true, onNavig
     <>
       <DialogTitle className="sr-only">Paleta de comandos</DialogTitle>
       <DialogDescription className="sr-only">
-        Buscá movimientos, tareas, hábitos, metas y acciones. Usá las flechas para moverte y Enter para abrir.
+        Busca movimientos, tareas, hábitos, metas y acciones. Usa las flechas para moverte y Enter para abrir.
       </DialogDescription>
 
       <div className="flex h-14 items-center gap-3 border-b border-border px-4 focus-within:border-primary">

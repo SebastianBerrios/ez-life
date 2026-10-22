@@ -26,8 +26,8 @@ export function validateTransfer(input: TransferInput): void {
     if (input.to_account_id) throw new DomainError('Solo una transferencia puede tener cuenta destino.');
     return;
   }
-  if (!input.account_id) throw new DomainError('Seleccioná la cuenta de origen.');
-  if (!input.to_account_id) throw new DomainError('Seleccioná la cuenta de destino.');
+  if (!input.account_id) throw new DomainError('Selecciona la cuenta de origen.');
+  if (!input.to_account_id) throw new DomainError('Selecciona la cuenta de destino.');
   if (input.account_id === input.to_account_id) throw new DomainError('Las cuentas de origen y destino deben ser distintas.');
   if (
     input.distribution_category_id || input.expense_category_id || input.expense_subcategory_id ||

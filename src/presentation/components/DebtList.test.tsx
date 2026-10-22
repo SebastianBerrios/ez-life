@@ -75,7 +75,7 @@ describe('DebtList', () => {
   it('shows the empty message when there are no debts', async () => {
     mockRepo([]);
     render(<DebtList userId="u1" />);
-    expect(await screen.findByText('No tenés préstamos registrados.')).toBeInTheDocument();
+    expect(await screen.findByText('No tienes préstamos registrados.')).toBeInTheDocument();
   });
 
   it('registers a repayment parsed to integer cents (parseMoney) and clears the input', async () => {

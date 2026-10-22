@@ -150,7 +150,7 @@ export default function ControlPage({ userId, onOpenQuickRecord, onOpenProgress,
             <>
               <SheetHeader>
                 <SheetTitle className="text-headline-sm font-semibold">{EDIT_TITLE[editing.kind]}</SheetTitle>
-                <SheetDescription className="sr-only">Modificá los datos y guardá los cambios.</SheetDescription>
+                <SheetDescription className="sr-only">Modifica los datos y guarda los cambios.</SheetDescription>
               </SheetHeader>
               {editing.kind === 'habit' && <HabitForm userId={userId} existing={editing.item} embedded onComplete={closeEditor} onCancel={closeEditor} />}
               {editing.kind === 'task' && <TaskForm userId={userId} existing={editing.item} embedded onComplete={closeEditor} onCancel={closeEditor} />}

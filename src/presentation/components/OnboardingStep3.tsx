@@ -8,6 +8,7 @@ import { validateDeletion } from '../../core/use-cases/validateDeletion';
 import { DomainError } from '../../core/domain/errors/DomainError';
 import { DistributionCategory, ExpenseCategory, ExpenseSubcategory } from '../../core/domain/models/types';
 import { uuidv7 } from 'uuidv7';
+import { useTransientMessages } from '../hooks/useTransientMessages';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -43,8 +44,10 @@ export default function OnboardingStep3({ profileId, onComplete }: Props) {
   const [newSubName, setNewSubName] = useState<Record<string, string>>({});
   const [addingSubFor, setAddingSubFor] = useState<string | null>(null);
 
-  // Inline error messages
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  // Blocked-delete notices fade on their own (keyed by the category/subcategory that caused them);
+  // a seeding failure is not transient, so it stays in its own state.
+  const { messages: errors, show: showError, clearAll: clearNotices } = useTransientMessages();
+  const [seedError, setSeedError] = useState('');
 
   const catRepo = new LocalCategoryRepository();
   const movRepo = new LocalMovementRepository();
@@ -78,21 +81,23 @@ export default function OnboardingStep3({ profileId, onComplete }: Props) {
       await catRepo.seedDefaults(profileId);
       await loadAll();
     };
-    init().catch(error => { setErrors(previous => ({ ...previous, seed: error instanceof Error ? error.message : 'No se pudieron preparar las categorías.' })); setLoading(false); });
+    init().catch(error => { setSeedError(error instanceof Error ? error.message : 'No se pudieron preparar las categorías.'); setLoading(false); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleAddCategory = async (bucketId: string) => {
+    clearNotices();
     const name = (newCatName[bucketId] || '').trim();
     if (!name) return;
     const catId = uuidv7();
-    await catRepo.saveExpenseCategory({ id: catId, user_id: profileId, distribution_category_id: bucketId, name }, ['General']);
+    await catRepo.saveExpenseCategory({ id: catId, user_id: profileId, distribution_category_id: bucketId, name });
     setNewCatName(prev => ({ ...prev, [bucketId]: '' }));
     setAddingCatFor(null);
     await loadAll();
   };
 
   const handleDeleteCategory = async (categoryId: string) => {
+    clearNotices();
     const count = await movRepo.countByExpenseCategory(categoryId);
     try {
       validateDeletion(
@@ -100,15 +105,15 @@ export default function OnboardingStep3({ profileId, onComplete }: Props) {
         `No se puede eliminar: tiene ${count} movimiento${count > 1 ? 's' : ''} asociado${count > 1 ? 's' : ''}.`
       );
     } catch (err) {
-      if (err instanceof DomainError) setErrors(prev => ({ ...prev, [categoryId]: err.message }));
+      if (err instanceof DomainError) showError(categoryId, err.message);
       return;
     }
-    setErrors(prev => { const next = { ...prev }; delete next[categoryId]; return next; });
     await catRepo.deleteExpenseCategory(categoryId);
     await loadAll();
   };
 
   const handleAddSubcategory = async (categoryId: string) => {
+    clearNotices();
     const name = (newSubName[categoryId] || '').trim();
     if (!name) return;
     await catRepo.saveSubcategory({ id: uuidv7(), category_id: categoryId, name });
@@ -118,9 +123,10 @@ export default function OnboardingStep3({ profileId, onComplete }: Props) {
   };
 
   const handleDeleteSubcategory = async (subcategoryId: string, categoryId: string) => {
+    clearNotices();
     const categoryItem = items.find(i => i.category.id === categoryId);
     if (categoryItem && categoryItem.subcategories.length <= 1) {
-      setErrors(prev => ({ ...prev, [subcategoryId]: 'No se puede eliminar: la categoría necesita al menos una subcategoría.' }));
+      showError(subcategoryId, 'No se puede eliminar: la categoría necesita al menos una subcategoría.');
       return;
     }
 
@@ -131,11 +137,10 @@ export default function OnboardingStep3({ profileId, onComplete }: Props) {
         `No se puede eliminar: tiene ${count} movimiento${count > 1 ? 's' : ''} asociado${count > 1 ? 's' : ''}.`
       );
     } catch (err) {
-      if (err instanceof DomainError) setErrors(prev => ({ ...prev, [subcategoryId]: err.message }));
+      if (err instanceof DomainError) showError(subcategoryId, err.message);
       return;
     }
 
-    setErrors(prev => { const next = { ...prev }; delete next[subcategoryId]; return next; });
     await catRepo.deleteSubcategory(subcategoryId);
     // Reload just this category's subs
     const updatedSubs = await catRepo.getSubcategories(categoryId);
@@ -158,11 +163,11 @@ export default function OnboardingStep3({ profileId, onComplete }: Props) {
       <Panel>
         <PanelHeader eyebrow="Paso 3 de 3" title="Categorías de gasto" titleAs="h2">
           <p className="mt-1 text-body-md text-muted-foreground">
-            Organizá tus gastos en categorías y subcategorías, agrupadas por cada categoría de distribución.
+            Organiza tus gastos en categorías y subcategorías, agrupadas por cada categoría de distribución.
           </p>
         </PanelHeader>
         <PanelBody className="space-y-6">
-          {errors.seed && <p role="alert" className="text-body-md text-destructive">{errors.seed}</p>}
+          {seedError && <p role="alert" className="text-body-md text-destructive">{seedError}</p>}
 
           {/* One section per distribution bucket */}
           {[...buckets].sort((a, b) => b.percentage - a.percentage).map(bucket => {
@@ -195,6 +200,10 @@ export default function OnboardingStep3({ profileId, onComplete }: Props) {
 
                       {errors[category.id] && (
                         <p role="alert" className="text-body-md text-destructive">{errors[category.id]}</p>
+                      )}
+
+                      {subcategories.length === 0 && (
+                        <p role="status" className="text-body-md text-muted-foreground">Agrega al menos una subcategoría.</p>
                       )}
 
                       {/* Subcategory list */}
@@ -307,7 +316,7 @@ export default function OnboardingStep3({ profileId, onComplete }: Props) {
 
             {!canFinish && (
               <p className="text-center text-body-md text-muted-foreground">
-                Necesitás al menos una categoría con una subcategoría para continuar.
+                Necesitas al menos una categoría con una subcategoría para continuar.
               </p>
             )}
           </div>

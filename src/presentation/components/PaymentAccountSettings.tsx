@@ -82,7 +82,7 @@ export default function PaymentAccountSettings({ userId }: { userId: string }) {
       </p>
 
       {visible.length === 0 ? (
-        <p className="text-body-md text-muted-foreground">Todavía no tenés cuentas.</p>
+        <p className="text-body-md text-muted-foreground">Todavía no tienes cuentas.</p>
       ) : (
         <ul className="divide-y divide-border rounded-lg border border-border">
           {visible.map(account => {
@@ -117,7 +117,7 @@ export default function PaymentAccountSettings({ userId }: { userId: string }) {
                       variant="outline"
                       aria-label={`Archivar ${account.name}`}
                       disabled={!archivable}
-                      title={archivable ? undefined : 'Necesitás al menos una cuenta activa.'}
+                      title={archivable ? undefined : 'Necesitas al menos una cuenta activa.'}
                       onClick={() => setConfirmingId(account.id)}
                     >
                       <Archive />

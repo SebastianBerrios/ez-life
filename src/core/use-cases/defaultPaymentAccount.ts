@@ -6,13 +6,13 @@ export function defaultCashAccountId(userId: UUID): UUID {
   return stableId(`seed-account:${userId}:efectivo`);
 }
 
-export function buildDefaultCashAccount(userId: UUID, now: Date): PaymentAccount {
+export function buildDefaultCashAccount(userId: UUID, now: Date, openingBalance = 0): PaymentAccount {
   return {
     id: defaultCashAccountId(userId),
     user_id: userId,
     name: 'Efectivo',
     kind: 'cash',
-    opening_balance: 0,
+    opening_balance: openingBalance,
     created_at: now,
     updated_at: now,
   };

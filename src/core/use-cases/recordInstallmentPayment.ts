@@ -32,7 +32,7 @@ export function recordInstallmentPayment(
   }
 
   if (installmentsPaid > loan.remaining_installments) {
-    throw new DomainError('No podés pagar más cuotas de las que quedan pendientes.');
+    throw new DomainError('No puedes pagar más cuotas de las que quedan pendientes.');
   }
 
   const remaining_installments = loan.remaining_installments - installmentsPaid;

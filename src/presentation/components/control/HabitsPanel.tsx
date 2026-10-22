@@ -110,7 +110,7 @@ export default function HabitsPanel({ cards, adherence, onComplete, onNew, onEdi
       <PanelBody className="flex flex-col gap-3">
         {cards.length === 0 ? (
           <EmptyState action={<Button onClick={onNew}><Plus />Crear tu primer hábito</Button>}>
-            Todavía no tenés hábitos. Un hábito te ayuda a sostener una rutina día a día.
+            Todavía no tienes hábitos. Un hábito te ayuda a sostener una rutina día a día.
           </EmptyState>
         ) : (
           <ul className="flex flex-col gap-2">

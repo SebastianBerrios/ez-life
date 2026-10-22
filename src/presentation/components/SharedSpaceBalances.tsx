@@ -68,14 +68,17 @@ export default function SharedSpaceBalances({ spaceId, currentUserId, refreshKey
       <PanelBody>
         <ul className="divide-y divide-border">
           {balances.map((b, i) => {
-            const fromLabel = b.fromUserId === currentUserId ? 'Vos' : b.fromUserId;
-            const toLabel = b.toUserId === currentUserId ? 'vos' : b.toUserId;
+            const sentence = b.fromUserId === currentUserId
+              ? `Tú le debes a ${b.toUserId}`
+              : b.toUserId === currentUserId
+                ? `${b.fromUserId} te debe`
+                : `${b.fromUserId} le debe a ${b.toUserId}`;
             // What the signed-in user owes reads as an expense; what they are owed reads as income.
             const tone = b.fromUserId === currentUserId ? 'expense' : b.toUserId === currentUserId ? 'income' : 'neutral';
             return (
               <li key={i} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-2.5">
                 <span className="min-w-0 break-words text-body-md text-muted-foreground">
-                  {fromLabel} le debe a {toLabel}
+                  {sentence}
                 </span>
                 <Money cents={b.amount} sign="never" tone={tone} size="md" className="font-semibold" />
               </li>

@@ -58,7 +58,7 @@ describe('useControlData', () => {
     const { result } = await loaded();
     let rejected: Awaited<ReturnType<typeof result.current.addQuickTask>> | undefined;
     await act(async () => { rejected = await result.current.addQuickTask('   '); });
-    expect(rejected).toEqual({ ok: false, error: 'Escribí un título para la tarea.' });
+    expect(rejected).toEqual({ ok: false, error: 'Escribe un título para la tarea.' });
     expect(await db.tasks.count()).toBe(0);
 
     await act(async () => { await result.current.addQuickTask(' Llamar al banco '); });

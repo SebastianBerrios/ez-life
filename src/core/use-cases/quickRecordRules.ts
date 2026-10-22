@@ -45,9 +45,9 @@ export interface MovementSelectionInput {
 export function validateMovementSelection(input: MovementSelectionInput): void {
   if (input.isAdjustment) return;
   if (input.type === 'EXPENSE' && !input.expenseCategoryId) {
-    throw new DomainError('Seleccioná una categoría de gasto.');
+    throw new DomainError('Selecciona una categoría de gasto.');
   }
   if (input.type === 'INCOME' && !input.incomeSourceId) {
-    throw new DomainError('Seleccioná una fuente de ingreso.');
+    throw new DomainError('Selecciona una fuente de ingreso.');
   }
 }
