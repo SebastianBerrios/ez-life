@@ -1,6 +1,8 @@
 import { db } from '../../db/db';
 import { stableId } from '../../../core/use-cases/stableId';
 import { validateMovementAmount } from '../../../core/use-cases/validateMovementAmount';
+import { validatePaymentAccount } from '../../../core/use-cases/validatePaymentAccount';
+import { buildDefaultCashAccount, defaultCashAccountId } from '../../../core/use-cases/defaultPaymentAccount';
 import { DomainError } from '../../../core/domain/errors/DomainError';
 import { LocalProfileRepository } from './LocalProfileRepository';
 export class LocalOnboardingRepository {
@@ -21,15 +23,27 @@ export class LocalOnboardingRepository {
     await new LocalProfileRepository().save({ id: userId, onboarding_step: step });
     return step;
   }
-  async saveIncome(userId: string, amount: number): Promise<void> {
-    validateMovementAmount(amount);
-    await db.transaction('rw', [db.profiles, db.income_sources, db.sync_queue], async () => {
+  /**
+   * Step 1: monthly income plus the money the user holds today. The current balance becomes the opening
+   * balance of the default "Efectivo" account, created here so it is atomic with the income. An existing
+   * account (even archived or deleted) is never touched: the balance is only set on first creation.
+   */
+  async saveStartingPoint(userId: string, input: { income: number; openingBalance: number }): Promise<void> {
+    const { income, openingBalance } = input;
+    validateMovementAmount(income);
+    if (openingBalance < 0 || !Number.isSafeInteger(openingBalance)) throw new DomainError('El saldo actual debe ser un monto en céntimos mayor o igual a 0.');
+    await db.transaction('rw', [db.profiles, db.income_sources, db.payment_accounts, db.sync_queue], async () => {
       const profile = await db.profiles.get(userId);
       const id = profile?.onboarding_income_source_id ?? stableId(`initial-income:${userId}`);
       const existing = await db.income_sources.get(id);
       if (existing && existing.user_id !== userId) throw new DomainError('La fuente pertenece a otra cuenta.');
       const now = new Date();
-      await db.income_sources.put({ id, user_id: userId, name: 'Sueldo Base', amount, created_at: existing?.created_at ?? now, updated_at: now });
+      await db.income_sources.put({ id, user_id: userId, name: 'Sueldo Base', amount: income, created_at: existing?.created_at ?? now, updated_at: now });
+      if (!await db.payment_accounts.get(defaultCashAccountId(userId))) {
+        const account = buildDefaultCashAccount(userId, now, openingBalance);
+        validatePaymentAccount(account);
+        await db.payment_accounts.put(account);
+      }
       await new LocalProfileRepository().save({ id: userId, onboarding_step: 1, onboarding_income_source_id: id });
     });
   }

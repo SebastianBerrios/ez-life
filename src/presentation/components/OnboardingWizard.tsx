@@ -16,7 +16,7 @@ interface Props {
 }
 
 const STEPS = [
-  { number: 1, label: 'Ingresos' },
+  { number: 1, label: 'Inicio' },
   { number: 2, label: 'Distribución' },
   { number: 3, label: 'Categorías' },
 ] as const;
