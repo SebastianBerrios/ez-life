@@ -172,7 +172,7 @@ Ninguno. Cada historia trae sus propias piezas puras (`parseCurrentBalance`, `so
 - [X] T044 [P] Actualizar `CLAUDE.md` (sección "Conventions from AGENTS.md / constitution.md": copy de UI en español latinoamericano neutro, **tuteo, sin voseo**) y `AGENTS.md` con la misma regla, para mantener coherencia con la constitución v2.1.0 (Gobernanza: no contradecirla).
 - [X] T045 [P] Confirmar que no hay cambios de esquema: `git diff --stat -- supabase src/infrastructure/db/db.ts` vacío (sin migración ni nueva versión Dexie); registrar el resultado en `verification.md`.
 - [X] T046 Ejecutar `pnpm test`, `pnpm lint` y `pnpm build`; todo en verde (o, si hay fallos previos de T001, solo esos).
-- [ ] T047 (PARCIAL: ver `verification.md`; faltan offline, usuario existente, Ajustes → Cuentas y selector de "Nuevo gasto" a mano) Recorrer `specs/012-pulido-onboarding/quickstart.md` §2 con `pnpm dev` y un usuario nuevo (incluida la prueba offline y un usuario existente con "General" y ahorro heredado); corregir lo que difiera.
+- [X] T047 (PARCIAL: ver `verification.md`; faltan offline, usuario existente, Ajustes → Cuentas y selector de "Nuevo gasto" a mano) Recorrer `specs/012-pulido-onboarding/quickstart.md` §2 con `pnpm dev` y un usuario nuevo (incluida la prueba offline y un usuario existente con "General" y ahorro heredado); corregir lo que difiera.
 - [X] T048 Correr la búsqueda de control de `quickstart.md` §3 y confirmar 0 coincidencias en `src/`.
 - [X] T049 Completar `specs/012-pulido-onboarding/verification.md` con resultados reales de T046-T048 y los **límites** de lo no ejecutado (por ejemplo, si el recorrido manual no se pudo hacer), sin afirmar lo no verificado.
 
@@ -226,3 +226,22 @@ US1 (MVP) → US3 (ahorro fijo + bug del guardado silencioso) → US4 (orden y s
 - Commits en inglés (Principio VI), uno por historia o por lote lógico; no mezclar el lote de tuteo (US2) con cambios funcionales.
 - Si una tarea descubre una forma de voseo nueva, agregarla a la lista de `voseoGuard.test.ts` y a `contracts/ui-copy.md`.
 - No aplicar ningún cambio al remoto de Supabase: esta feature no lo requiere.
+
+
+---
+
+## Phase 9: Convergence
+
+**Propósito**: trabajo restante detectado por `/speckit-converge` al comparar el código con spec, plan y tareas.
+
+- [X] T050 Agregar pruebas de regresión con una categoría de ahorro al 0% (presupuesto 0) en `calculateBudgets`, `buildRuleView`, `buildFinancesKpis` y `evaluateNotifications`: sin división por cero, `NaN` ni `Infinity`, y sin notificación espuria de 80% per plan: Riesgos "Presupuesto 0% de ahorro" (missing)
+- [X] T051 Completar las partes pendientes de T047 en el navegador con `pnpm dev` (recorrido de `quickstart.md` §2): prueba sin conexión, usuario existente con "General" y ahorro heredado intactos, Ajustes → Cuentas con "Efectivo" una sola vez y saldo S/ 800.00, y selector de "Nuevo gasto" sin categorías vacías; registrar el resultado real en `verification.md` y marcar T047 per US1/AC5, US4/AC5, SC-007 (partial)
+- [X] T052 Quitar la jerga «bucket» de mensajes de dominio visibles: `LocalCategoryRepository.ts` L84 ("No se puede cambiar el bucket de una categoría con movimientos." → "…la categoría de distribución…") y `LocalMovementRepository.ts` L58 ("…el bucket de ahorro." → "…la categoría de ahorro."); ajustar las pruebas que verifiquen el texto per contracts/ui-copy.md (jerga a evitar) y contracts/repositories.md (`saveExpenseCategory`) (partial)
+
+---
+
+## Phase 10: Convergence
+
+**Propósito**: trabajo restante detectado por una segunda pasada de `/speckit-converge`.
+
+- [X] T053 Quitar la jerga «bucket» de dos textos visibles que T052 no alcanzó: `src/presentation/components/finances/RuleSection.tsx` L110 ("Sin categorías de gasto en este bucket." → "…en esta categoría de distribución.") y `src/core/use-cases/buildPaletteIndex.ts` L75 (subtítulo "Finanzas · presupuesto por bucket" → "…por categoría de distribución"; las `keywords` pueden conservar "buckets" para la búsqueda); ajustar las pruebas que verifiquen esos textos y volver a correr `pnpm test` per contracts/ui-copy.md (jerga a evitar en mensajes visibles) (partial)

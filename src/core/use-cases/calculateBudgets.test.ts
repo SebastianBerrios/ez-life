@@ -59,4 +59,19 @@ describe('calculateBudgets', () => {
     expect(result.find(c => c.id === 'a-category')?.budget).toBe(51);
     expect(result.find(c => c.id === 'z-category')?.budget).toBe(50);
   });
+
+  it('gives a 0% savings category a 0 budget and still distributes the whole income', () => {
+    const baseCategory = { user_id: 'user-1', is_default: true, created_at: new Date(), updated_at: new Date() };
+    const categories: DistributionCategory[] = [
+      { ...baseCategory, id: 'needs', name: 'Necesidades', percentage: 60, is_savings: false },
+      { ...baseCategory, id: 'wants', name: 'Gustos', percentage: 40, is_savings: false },
+      { ...baseCategory, id: 'save', name: 'Ahorro', percentage: 0, is_savings: true },
+    ];
+
+    const result = calculateBudgets(10001, categories);
+
+    expect(result.find(c => c.id === 'save')?.budget).toBe(0);
+    expect(result.find(c => c.id === 'needs')?.budget).toBe(6001);
+    expect(result.reduce((acc, curr) => acc + curr.budget, 0)).toBe(10001);
+  });
 });

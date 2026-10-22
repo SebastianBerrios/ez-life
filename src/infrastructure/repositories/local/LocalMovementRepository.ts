@@ -55,7 +55,7 @@ export class LocalMovementRepository implements IMovementRepository {
     if (data.expense_category_id && (!category || category.deleted_at || category.user_id !== data.user_id || category.distribution_category_id !== bucket?.id)) throw new DomainError('La categoría no pertenece a esta distribución.');
     if (data.expense_subcategory_id && (!subcategory || subcategory.deleted_at || subcategory.category_id !== category?.id)) throw new DomainError('La subcategoría no pertenece a esta categoría.');
     if (data.income_source_id && (!source || source.deleted_at || source.user_id !== data.user_id)) throw new DomainError('La fuente de ingreso no es válida.');
-    if (data.savings_goal_id && (!goal || goal.deleted_at || goal.user_id !== data.user_id || !bucket?.is_savings || data.type !== 'EXPENSE' || data.is_adjustment)) throw new DomainError('El aporte requiere una meta propia y el bucket de ahorro.');
+    if (data.savings_goal_id && (!goal || goal.deleted_at || goal.user_id !== data.user_id || !bucket?.is_savings || data.type !== 'EXPENSE' || data.is_adjustment)) throw new DomainError('El aporte requiere una meta propia y la categoría de ahorro.');
     if (data.type === 'INCOME' && !data.is_adjustment && !source) throw new DomainError('Selecciona una fuente de ingreso.');
     if (data.type === 'EXPENSE' && !data.is_adjustment && !bucket) throw new DomainError('Selecciona una distribución.');
     if (data.type === 'EXPENSE' && !data.is_adjustment && !category) throw new DomainError('Selecciona una categoría de gasto.');

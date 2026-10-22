@@ -72,7 +72,7 @@ interface RouteDef { route: string; financesTab?: PaletteFinancesTab; title: str
 const ROUTES: RouteDef[] = [
   { route: 'dashboard', title: 'Inicio', subtitle: 'Resumen del ciclo', keywords: ['resumen', 'dashboard', 'balance'] },
   { route: 'finances', financesTab: 'movements', title: 'Finanzas', subtitle: 'Movimientos del mes', keywords: ['movimientos', 'gastos', 'ingresos', 'historial'] },
-  { route: 'finances', financesTab: 'budget', title: 'Regla 50/30/20', subtitle: 'Finanzas · presupuesto por bucket', keywords: ['presupuesto', 'finanzas', 'buckets', 'necesidades'] },
+  { route: 'finances', financesTab: 'budget', title: 'Regla 50/30/20', subtitle: 'Finanzas · presupuesto por categoría de distribución', keywords: ['presupuesto', 'finanzas', 'buckets', 'necesidades'] },
   { route: 'finances', financesTab: 'loans', title: 'Préstamos', subtitle: 'Finanzas · cuotas y deudas', keywords: ['deudas', 'cuotas', 'finanzas', 'prestamo'] },
   { route: 'control', title: 'Control & Hábitos', subtitle: 'Hábitos, tareas y metas', keywords: ['control', 'habitos', 'tareas', 'metas'] },
   { route: 'shared-space', title: 'Espacio Compartido', subtitle: 'Gastos compartidos', keywords: ['compartido', 'grupo', 'espacio', 'saldos'] },

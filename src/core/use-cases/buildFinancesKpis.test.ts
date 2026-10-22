@@ -29,6 +29,14 @@ describe('buildFinancesKpis', () => {
     expect(deleted.savingsTargetPercent).toBeNull();
   });
 
+  it('treats a 0% savings bucket as a 0 target: met unless the user spends more than they earn', () => {
+    const buckets = [bucket('needs', 100), bucket('save', 0, true)];
+    expect(buildFinancesKpis({ ...base, income: 300000, expense: 270000, distributionCategories: buckets }))
+      .toMatchObject({ savingsTargetPercent: 0, savingsRate: 10, savingsStatus: 'met' });
+    expect(buildFinancesKpis({ ...base, income: 300000, expense: 450000, distributionCategories: buckets }))
+      .toMatchObject({ savingsTargetPercent: 0, savingsStatus: 'below' });
+  });
+
   it('leaves the rate and income-based percentages undefined without income', () => {
     const kpis = buildFinancesKpis({ ...base, income: 0, expense: 5000, distributionCategories: [] });
     expect(kpis).toMatchObject({ savingsRate: null, spentPercentOfIncome: null, savingsStatus: 'unknown', netBalance: -5000 });

@@ -80,4 +80,17 @@ describe('buildRuleView', () => {
     const view = buildRuleView([], [], [], [], 100000);
     expect(view).toMatchObject({ hasBuckets: false, buckets: [], totalBudget: 0, totalSpent: 0, spentPercentOfBase: null });
   });
+
+  it('keeps a 0% savings bucket at a 0 budget without NaN or Infinity, even if money was filed in it', () => {
+    const zeroSavings = [bucket('needs', 'Necesidades', 60), bucket('wants', 'Deseos', 40), bucket('save', 'Ahorro', 0, true)];
+    const view = buildRuleView([
+      expense('1', 5000, { distribution_category_id: 'save' }),
+    ], zeroSavings, categories, subs, 300000);
+
+    const save = view.buckets.find(b => b.id === 'save');
+    expect(save).toMatchObject({ budget: 0, spent: 5000, progress: 0, usedPercent: 0, status: 'ok', remaining: -5000 });
+    expect(Number.isFinite(save?.progress)).toBe(true);
+    expect(view).toMatchObject({ totalBudget: 300000, hasBuckets: true });
+    expect(Number.isFinite(view.spentPercentOfBase ?? 0)).toBe(true);
+  });
 });
