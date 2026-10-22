@@ -66,7 +66,7 @@ export default function SharedSpaceScreen({ userId, onCreate, onJoin, onAddMovem
           <Users className="size-6" />
         </span>
         <p className="max-w-md text-body-md text-muted-foreground">
-          Todavía no tenés un espacio compartido. Creá uno para tu pareja o familia, o unite a uno existente con un código.
+          Todavía no tienes un espacio compartido. Crea uno para tu pareja o familia, o únete a uno existente con un código.
         </p>
         <div className="flex w-full max-w-md gap-3">
           <Button variant="outline" onClick={onJoin} className="flex-1">Unirme con código</Button>
@@ -105,7 +105,7 @@ export default function SharedSpaceScreen({ userId, onCreate, onJoin, onAddMovem
               <Panel>
                 <PanelBody className="pt-4">
                   <h4 className="text-headline-sm text-foreground">{space.name}</h4>
-                  <p className="text-body-sm text-muted-foreground">Saldo congelado — ya no sos miembro de este espacio.</p>
+                  <p className="text-body-sm text-muted-foreground">Saldo congelado — ya no eres miembro de este espacio.</p>
                 </PanelBody>
               </Panel>
               <SharedSpaceBalances spaceId={space.id} currentUserId={userId} refreshKey={refreshKey} />

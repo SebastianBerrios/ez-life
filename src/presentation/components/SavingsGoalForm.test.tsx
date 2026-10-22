@@ -69,7 +69,7 @@ describe('SavingsGoalForm', () => {
     for (const amount of ['10.123', '1.2.3']) {
       fireEvent.change(screen.getByLabelText(/monto objetivo/i), { target: { value: amount } });
       fireEvent.submit(screen.getByTestId('goal-form'));
-      expect(await screen.findByRole('alert')).toHaveTextContent('Ingresá un monto con hasta dos decimales.');
+      expect(await screen.findByRole('alert')).toHaveTextContent('Ingresa un monto con hasta dos decimales.');
     }
     expect(mockSave).not.toHaveBeenCalled();
   });

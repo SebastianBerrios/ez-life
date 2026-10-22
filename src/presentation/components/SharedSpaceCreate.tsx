@@ -44,7 +44,7 @@ export default function SharedSpaceCreate({ onComplete, onCancel }: Props) {
       <div className="w-full space-y-5 text-center">
         <h2 className="text-headline-md text-foreground">¡Espacio creado!</h2>
         <p className="text-body-md text-muted-foreground">
-          Compartí este código con la persona que querés invitar (vence en 48hs):
+          Comparte este código con la persona que quieres invitar (vence en 48hs):
         </p>
         <p
           className="rounded-lg border border-border-strong bg-surface-2 py-4 font-mono text-headline-lg-mobile tracking-widest text-primary"

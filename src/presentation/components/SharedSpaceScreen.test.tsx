@@ -76,7 +76,7 @@ describe('SharedSpaceScreen', () => {
       />
     );
 
-    expect(await screen.findByText(/todavía no tenés un espacio compartido/i)).toBeInTheDocument();
+    expect(await screen.findByText(/todavía no tienes un espacio compartido/i)).toBeInTheDocument();
     expect(screen.getByTestId('shared-space-empty')).toBeInTheDocument();
   });
 

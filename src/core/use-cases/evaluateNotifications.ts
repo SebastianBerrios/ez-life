@@ -147,7 +147,7 @@ export function evaluateNotifications(params: EvaluateNotificationsParams): NewN
     const dayKey = cycleDayKey(now);
     if (hasEquivalent(existingNotifications, 'loan_due_soon', debt.id, dayKey)) continue;
 
-    const directionLabel = debt.direction === 'lent' ? 'te debe' : 'le debés';
+    const directionLabel = debt.direction === 'lent' ? 'te debe' : 'le debes';
     notifications.push({
       user_id: userId,
       type: 'loan_due_soon',

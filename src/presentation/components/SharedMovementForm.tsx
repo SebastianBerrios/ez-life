@@ -174,7 +174,7 @@ export default function SharedMovementForm({ spaceId, currentUserId, members, in
           {members.map(m => (
             <div key={m.user_id} className="space-y-1">
               <Label htmlFor={`share-${m.user_id}`}>
-                Parte de {m.user_id === currentUserId ? 'vos' : m.user_id} {splitMode === 'percentage' ? '(%)' : '(S/)'}
+                {m.user_id === currentUserId ? 'Parte de ti' : `Parte de ${m.user_id}`} {splitMode === 'percentage' ? '(%)' : '(S/)'}
               </Label>
               <Input
                 type="text"

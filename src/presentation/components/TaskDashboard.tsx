@@ -51,7 +51,7 @@ export default function TaskDashboard({ userId }: Props) {
   }
 
   if (tasks.length === 0) {
-    return <p className="rounded-lg border border-dashed border-border-strong p-4 text-body-md text-muted-foreground">No tenés tareas registradas.</p>;
+    return <p className="rounded-lg border border-dashed border-border-strong p-4 text-body-md text-muted-foreground">No tienes tareas registradas.</p>;
   }
 
   const stats = calculateTaskCompletionStats(tasks, new Date());

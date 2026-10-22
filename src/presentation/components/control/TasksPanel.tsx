@@ -192,7 +192,7 @@ export default function TasksPanel({ windows, today, urgentCount, onAdd, onDone,
         <div role="tabpanel" id={`control-tasks-panel-${tab}`} aria-labelledby={`control-tasks-tab-${tab}`} className="flex flex-col gap-2">
           {tab === 'today' && (
             windows.today.length === 0
-              ? <EmptyState>No tenés tareas para hoy. Añadí una abajo.</EmptyState>
+              ? <EmptyState>No tienes tareas para hoy. Añade una abajo.</EmptyState>
               : <ul className="flex flex-col gap-2">{rows(windows.today)}</ul>
           )}
           {tab === 'week' && (

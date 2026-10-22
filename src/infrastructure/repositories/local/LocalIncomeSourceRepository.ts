@@ -12,7 +12,7 @@ export class LocalIncomeSourceRepository implements IIncomeSourceRepository {
 
   async save(sourceData: Omit<IncomeSource, 'created_at' | 'updated_at'>): Promise<IncomeSource> {
     validateMovementAmount(sourceData.amount);
-    if (!sourceData.name.trim()) throw new DomainError('Ingresá el nombre de la fuente.');
+    if (!sourceData.name.trim()) throw new DomainError('Ingresa el nombre de la fuente.');
     const now = new Date();
     const id = sourceData.id || uuidv7();
     const existing = await db.income_sources.get(id);

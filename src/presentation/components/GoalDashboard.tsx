@@ -46,7 +46,7 @@ export default function GoalDashboard({ userId }: Props) {
   }
 
   if (goals.length === 0) {
-    return <p className="rounded-lg border border-dashed border-border-strong p-4 text-body-md text-muted-foreground">No tenés metas registradas.</p>;
+    return <p className="rounded-lg border border-dashed border-border-strong p-4 text-body-md text-muted-foreground">No tienes metas registradas.</p>;
   }
 
   return (

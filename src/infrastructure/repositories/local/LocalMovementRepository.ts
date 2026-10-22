@@ -38,7 +38,7 @@ export class LocalMovementRepository implements IMovementRepository {
     const id = data.id || uuidv7();
     const existing = await db.movements.get(id);
     if (existing && existing.user_id !== data.user_id) throw new DomainError('El movimiento pertenece a otra cuenta.');
-    if (existing?.is_linked || existing?.shared_movement_id || existing?.installment_payment_id) throw new DomainError('Editá este movimiento desde su operación de origen.');
+    if (existing?.is_linked || existing?.shared_movement_id || existing?.installment_payment_id) throw new DomainError('Edita este movimiento desde su operación de origen.');
     if (existing?.deleted_at) throw new DomainError('El movimiento fue eliminado.');
     validateTransfer({ ...(existing ?? {}), ...data });
     for (const accountId of [data.account_id, data.to_account_id]) {
@@ -56,9 +56,9 @@ export class LocalMovementRepository implements IMovementRepository {
     if (data.expense_subcategory_id && (!subcategory || subcategory.deleted_at || subcategory.category_id !== category?.id)) throw new DomainError('La subcategoría no pertenece a esta categoría.');
     if (data.income_source_id && (!source || source.deleted_at || source.user_id !== data.user_id)) throw new DomainError('La fuente de ingreso no es válida.');
     if (data.savings_goal_id && (!goal || goal.deleted_at || goal.user_id !== data.user_id || !bucket?.is_savings || data.type !== 'EXPENSE' || data.is_adjustment)) throw new DomainError('El aporte requiere una meta propia y el bucket de ahorro.');
-    if (data.type === 'INCOME' && !data.is_adjustment && !source) throw new DomainError('Seleccioná una fuente de ingreso.');
-    if (data.type === 'EXPENSE' && !data.is_adjustment && !bucket) throw new DomainError('Seleccioná una distribución.');
-    if (data.type === 'EXPENSE' && !data.is_adjustment && !category) throw new DomainError('Seleccioná una categoría de gasto.');
+    if (data.type === 'INCOME' && !data.is_adjustment && !source) throw new DomainError('Selecciona una fuente de ingreso.');
+    if (data.type === 'EXPENSE' && !data.is_adjustment && !bucket) throw new DomainError('Selecciona una distribución.');
+    if (data.type === 'EXPENSE' && !data.is_adjustment && !category) throw new DomainError('Selecciona una categoría de gasto.');
     
     const movement: Movement = existing 
       ? { ...existing, ...data, id, updated_at: now }
@@ -89,7 +89,7 @@ export class LocalMovementRepository implements IMovementRepository {
     const existing = await db.movements.get(id);
     if (existing) {
       if (userId && existing.user_id !== userId) throw new DomainError('El movimiento pertenece a otra cuenta.');
-      if (existing.is_linked || existing.shared_movement_id || existing.installment_payment_id) throw new DomainError('Eliminá este movimiento desde su operación de origen.');
+      if (existing.is_linked || existing.shared_movement_id || existing.installment_payment_id) throw new DomainError('Elimina este movimiento desde su operación de origen.');
       await db.movements.put({ ...existing, deleted_at: new Date(), updated_at: new Date() });
     }
   }

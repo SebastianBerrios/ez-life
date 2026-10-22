@@ -25,7 +25,7 @@ describe('buildQuickTask', () => {
 
   it('rejects empty and whitespace-only titles', () => {
     for (const title of ['', '   ', '\n\t ']) {
-      expect(buildQuickTask(title, 'u', evening)).toEqual({ ok: false, error: 'Escribí un título para la tarea.' });
+      expect(buildQuickTask(title, 'u', evening)).toEqual({ ok: false, error: 'Escribe un título para la tarea.' });
     }
   });
 

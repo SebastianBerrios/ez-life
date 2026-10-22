@@ -93,7 +93,7 @@ export default function InstallmentLoanList({ userId }: Props) {
     const adjustmentType = adjustmentTypeDrafts[loan.id];
 
     if (!adjustmentType) {
-      setPrincipalErrors(prev => ({ ...prev, [loan.id]: 'Elegí si el abono reduce el plazo o la cuota.' }));
+      setPrincipalErrors(prev => ({ ...prev, [loan.id]: 'Elige si el abono reduce el plazo o la cuota.' }));
       return;
     }
 
@@ -240,7 +240,7 @@ export default function InstallmentLoanList({ userId }: Props) {
 
             {!isSettled && !loan.distribution_category_id && (
               <p className="text-body-sm text-muted-foreground">
-                Asigná una categoría de distribución (50/30/20) desde &quot;Corregir términos&quot; antes de registrar un pago — la necesita para poder generar el movimiento de gasto correspondiente.
+                Asigna una categoría de distribución (50/30/20) desde &quot;Corregir términos&quot; antes de registrar un pago — la necesita para poder generar el movimiento de gasto correspondiente.
               </p>
             )}
 

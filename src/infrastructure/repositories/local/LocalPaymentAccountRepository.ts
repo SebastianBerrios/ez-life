@@ -40,7 +40,7 @@ export class LocalPaymentAccountRepository implements IPaymentAccountRepository 
       if (!existing || existing.deleted_at) return;
       const used = await this.countMovements(id)
         + await db.movement_recurrences.filter(r => !r.deleted_at && r.active && (r.account_id === id || r.to_account_id === id)).count();
-      if (used > 0) throw new DomainError('La cuenta tiene movimientos asociados: archivala en lugar de eliminarla.');
+      if (used > 0) throw new DomainError('La cuenta tiene movimientos asociados: archívala en lugar de eliminarla.');
       const now = new Date();
       await db.payment_accounts.put({ ...existing, deleted_at: now, updated_at: now });
     });

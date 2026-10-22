@@ -373,7 +373,7 @@ export default function MovementForm({
                 <SelectTrigger id="income-source" className="w-full"><SelectValue placeholder="Seleccionar fuente" /></SelectTrigger>
                 <SelectContent>{incomeSources.map(source => <SelectItem key={source.id} value={source.id}>{source.name}</SelectItem>)}</SelectContent>
               </Select>
-              {dataLoaded && incomeSources.length === 0 && <p className="mt-1 text-body-md text-muted-foreground">Agregá una fuente de ingreso desde Ajustes.</p>}
+              {dataLoaded && incomeSources.length === 0 && <p className="mt-1 text-body-md text-muted-foreground">Agrega una fuente de ingreso desde Ajustes.</p>}
             </div>
           )}
 
@@ -384,7 +384,7 @@ export default function MovementForm({
               {dataLoaded ? (
                 allExpenseCategories.length === 0 ? (
                   <p className="text-body-md text-muted-foreground">
-                    Todavía no tenés categorías de gasto con subcategorías. Agregalas desde Ajustes.
+                    Todavía no tienes categorías de gasto con subcategorías. Agrégalas desde Ajustes.
                   </p>
                 ) : (
                   <div

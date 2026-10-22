@@ -57,7 +57,7 @@ describe('InstallmentLoanList', () => {
     render(<InstallmentLoanList userId="fake-user-id" />);
 
     expect(await screen.findByText(/BCP/i)).toBeInTheDocument();
-    expect(screen.getByText(/asigná una categoría/i)).toBeInTheDocument();
+    expect(screen.getByText(/asigna una categoría/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /pagar cuota/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /abono a capital/i })).not.toBeInTheDocument();
   });
@@ -128,7 +128,7 @@ describe('InstallmentLoanList', () => {
 
   it('shows an error and does not apply the change when paying more installments than remain (FR-021)', async () => {
     const user = userEvent.setup();
-    const mockRecordInstallmentPayment = vi.fn().mockRejectedValue(new DomainError('No podés pagar más cuotas de las que quedan pendientes.'));
+    const mockRecordInstallmentPayment = vi.fn().mockRejectedValue(new DomainError('No puedes pagar más cuotas de las que quedan pendientes.'));
     mockRepo({ recordInstallmentPayment: mockRecordInstallmentPayment } as never);
 
     render(<InstallmentLoanList userId="fake-user-id" />);
@@ -137,7 +137,7 @@ describe('InstallmentLoanList', () => {
     await user.type(screen.getByLabelText(/cuotas a pagar/i), '99');
     await user.click(screen.getByRole('button', { name: /pagar cuota/i }));
 
-    expect(await screen.findByText(/no podés pagar más cuotas/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no puedes pagar más cuotas/i)).toBeInTheDocument();
   });
 
   it('parses the principal payment amount and the new installment amount to integer cents with parseMoney', async () => {

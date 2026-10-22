@@ -17,12 +17,12 @@ beforeEach(async () => { await db.delete(); await db.open(); });
 describe('NotificationHistory', () => {
   it('shows an honest empty state', async () => {
     render(<NotificationHistory userId={U} onClose={vi.fn()} />);
-    expect(await screen.findByText('No tenés notificaciones todavía.')).toBeInTheDocument();
+    expect(await screen.findByText('No tienes notificaciones todavía.')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Notificaciones' })).toBeInTheDocument();
   });
 
   it('lists notifications with unread ones marked and a deterministic date', async () => {
-    await notify({ id: 'n1', title: 'Registrá tus movimientos', body: 'No olvides anotar tus gastos de hoy.' });
+    await notify({ id: 'n1', title: 'Registra tus movimientos', body: 'No olvides anotar tus gastos de hoy.' });
     await notify({ id: 'n2', title: 'Ya leída', body: 'Esta ya se vio.', read_at: new Date() });
     render(<NotificationHistory userId={U} onClose={vi.fn()} />);
 
@@ -39,7 +39,7 @@ describe('NotificationHistory', () => {
 
   it('marks a notification as read', async () => {
     const user = userEvent.setup();
-    await notify({ id: 'n1', title: 'Registrá tus movimientos', body: 'Hoy.' });
+    await notify({ id: 'n1', title: 'Registra tus movimientos', body: 'Hoy.' });
     render(<NotificationHistory userId={U} onClose={vi.fn()} />);
 
     await user.click(await screen.findByRole('button', { name: 'Marcar leída' }));

@@ -316,7 +316,7 @@ describe('ControlPage: Dashboard de tareas', () => {
     await renderControl();
     const input = screen.getByLabelText('Añadir tarea rápida');
     await user.type(input, '{Enter}');
-    expect(await screen.findByRole('alert')).toHaveTextContent('Escribí un título para la tarea.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Escribe un título para la tarea.');
     await user.type(input, '   {Enter}');
     expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(await db.tasks.count()).toBe(0);
@@ -364,7 +364,7 @@ describe('ControlPage: Dashboard de tareas', () => {
   it('empty windows explain themselves; "Nueva tarea" opens the full task form', async () => {
     const user = userEvent.setup();
     const { onOpenQuickRecord } = await renderControl();
-    expect(screen.getByText(/no tenés tareas para hoy/i)).toBeInTheDocument();
+    expect(screen.getByText(/no tienes tareas para hoy/i)).toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: /esta semana/i }));
     expect(screen.getByText(/no hay tareas para el resto de la semana/i)).toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: /hechas/i }));

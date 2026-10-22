@@ -75,7 +75,7 @@ export default function HabitDashboard({ userId }: Props) {
   }
 
   if (habits.length === 0) {
-    return <p className="rounded-lg border border-dashed border-border-strong p-4 text-body-md text-muted-foreground">No tenés hábitos registrados.</p>;
+    return <p className="rounded-lg border border-dashed border-border-strong p-4 text-body-md text-muted-foreground">No tienes hábitos registrados.</p>;
   }
 
   const today = new Date();

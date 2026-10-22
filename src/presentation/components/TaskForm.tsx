@@ -54,7 +54,7 @@ export default function TaskForm({ userId, existing, embedded, onComplete, onCan
     setError(null);
 
     if (isRecurring && scheduleMode === 'fixed_days' && fixedDays.length === 0) {
-      setError('Elegí al menos un día de la semana.');
+      setError('Elige al menos un día de la semana.');
       return;
     }
     if (isRecurring && scheduleMode === 'frequency' && (!frequencyTarget || Number(frequencyTarget) < 1)) {

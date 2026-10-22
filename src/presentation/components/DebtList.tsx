@@ -95,7 +95,7 @@ export default function DebtList({ userId }: Props) {
 
   if (debts.length === 0) {
     return (
-      <p className="animate-fade-slide-up py-2 text-body-md text-muted-foreground">No tenés préstamos registrados.</p>
+      <p className="animate-fade-slide-up py-2 text-body-md text-muted-foreground">No tienes préstamos registrados.</p>
     );
   }
 

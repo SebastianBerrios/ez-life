@@ -82,7 +82,7 @@ export default function NotificationHistory({ userId, onClose }: Props) {
         {!loading && notifications.length === 0 && (
           <div className="space-y-2 py-8 text-center">
             <BellOff aria-hidden="true" className="mx-auto size-8 text-muted-foreground" />
-            <p className="text-body-md text-muted-foreground">No tenés notificaciones todavía.</p>
+            <p className="text-body-md text-muted-foreground">No tienes notificaciones todavía.</p>
           </div>
         )}
 

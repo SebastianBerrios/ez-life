@@ -166,7 +166,7 @@ export default function GoalsPanel(props: Props) {
       <PanelBody className="flex flex-col gap-3">
         {isEmpty ? (
           <EmptyState action={<Button onClick={onNew}><Plus />Crear tu primera meta</Button>}>
-            Todavía no tenés metas. Definí un objetivo numérico, una lista de hitos o una meta de ahorro.
+            Todavía no tienes metas. Define un objetivo numérico, una lista de hitos o una meta de ahorro.
           </EmptyState>
         ) : (
           <ul className="flex flex-col gap-3">

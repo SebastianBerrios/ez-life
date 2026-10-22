@@ -71,7 +71,7 @@ export default function InstallmentLoanForm({ userId, existing, onComplete, onCa
         throw new DomainError('El número de cuotas debe ser un entero mayor a 0.');
       }
       if (!distCategoryId) {
-        throw new DomainError('Elegí una categoría de distribución (50/30/20) para este préstamo.');
+        throw new DomainError('Elige una categoría de distribución (50/30/20) para este préstamo.');
       }
     } catch (err) {
       if (err instanceof DomainError) setError(err.message);

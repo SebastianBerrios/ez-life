@@ -84,9 +84,9 @@ export default function TransferForm({ userId, onComplete, autoFocusAmount = fal
         <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-lg bg-surface-3 text-muted-foreground">
           <ArrowDownUp className="size-5" aria-hidden="true" />
         </div>
-        <h3 className="text-headline-sm text-foreground">Necesitás al menos dos cuentas</h3>
+        <h3 className="text-headline-sm text-foreground">Necesitas al menos dos cuentas</h3>
         <p className="mx-auto mt-1 max-w-xs text-body-md text-muted-foreground">
-          Para mover dinero entre cuentas propias tenés que tener un origen y un destino distintos.
+          Para mover dinero entre cuentas propias tienes que tener un origen y un destino distintos.
         </p>
         <Button className="mt-4" onClick={() => setCreatingAccount(true)}>Crear cuenta</Button>
       </div>
