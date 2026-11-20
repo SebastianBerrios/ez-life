@@ -39,7 +39,7 @@ describe('TransferForm', () => {
     const to = screen.getByRole('radiogroup', { name: 'Cuenta de destino' });
     expect(from.querySelector('input:checked')?.closest('label')).toHaveTextContent('Efectivo');
     expect(to.querySelector('input:checked')?.closest('label')).toHaveTextContent('BCP');
-    expect(screen.getByText('TRANSFERENCIA')).toBeInTheDocument();
+    expect(screen.getByText('Transferencia')).toBeInTheDocument();
   });
 
   it('saves a TRANSFER movement with integer cents, both accounts and no categories', async () => {
@@ -49,6 +49,7 @@ describe('TransferForm', () => {
     await screen.findByRole('radiogroup', { name: 'Cuenta de origen' });
     await user.type(screen.getByLabelText('Monto'), '25.5');
     await user.click(screen.getByRole('button', { name: 'Sumar S/ 10' }));
+    await user.click(screen.getByRole('button', { name: /Más opciones/i }));
     await user.type(screen.getByLabelText(/descripción/i), 'Retiro');
     fireEvent.change(screen.getByLabelText('Fecha'), { target: { value: '2026-10-16' } });
     fireEvent.change(screen.getByLabelText('Hora'), { target: { value: '18:20' } });
@@ -142,6 +143,7 @@ describe('TransferForm', () => {
       render(<TransferForm userId="A" onComplete={vi.fn()} />);
       await user.click(await screen.findByRole('button', { name: 'Crear cuenta' }));
       await user.type(screen.getByLabelText('Nombre de la cuenta'), 'BCP');
+      await user.click(screen.getByRole('button', { name: /Más opciones/i }));
       await user.type(screen.getByLabelText('Saldo inicial'), '100.50');
       await user.click(screen.getByRole('button', { name: 'Crear cuenta' }));
 
@@ -160,5 +162,47 @@ describe('TransferForm', () => {
       expect(await screen.findByText('Necesitas al menos dos cuentas')).toBeInTheDocument();
       expect(repos.saveAccount).not.toHaveBeenCalled();
     });
+  });
+
+  it('prefills origin, destination, amount and description from initialValues (card payment)', async () => {
+    repos.accounts = [
+      account(cashId, 'Efectivo', { kind: 'cash' }),
+      account('bank', 'BCP', { kind: 'debit' }),
+      account('card', 'Visa', { kind: 'credit' }),
+    ];
+    const user = userEvent.setup();
+    const onComplete = vi.fn();
+    render(
+      <TransferForm
+        userId="A"
+        onComplete={onComplete}
+        initialValues={{
+          amountCents: 80000,
+          fromAccountId: 'bank',
+          toAccountId: 'card',
+          description: 'Pagar tarjeta Visa',
+        }}
+      />,
+    );
+
+    const from = await screen.findByRole('radiogroup', { name: 'Cuenta de origen' });
+    const to = screen.getByRole('radiogroup', { name: 'Cuenta de destino' });
+    expect(from.querySelector('input:checked')?.closest('label')).toHaveTextContent('BCP');
+    expect(to.querySelector('input:checked')?.closest('label')).toHaveTextContent('Visa');
+    expect(screen.getByLabelText('Monto')).toHaveValue('800.00');
+    const moreBtn = screen.getByRole('button', { name: /Más opciones · 1 activa/i });
+    expect(moreBtn).toHaveAttribute('aria-expanded', 'false');
+    await user.click(moreBtn);
+    expect(screen.getByLabelText(/descripción/i)).toHaveValue('Pagar tarjeta Visa');
+
+    await user.click(screen.getByRole('button', { name: 'Guardar transferencia' }));
+    await waitFor(() => expect(repos.saveMovement).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'TRANSFER',
+      account_id: 'bank',
+      to_account_id: 'card',
+      amount: 80000,
+      description: 'Pagar tarjeta Visa',
+    })));
+    expect(onComplete).toHaveBeenCalledTimes(1);
   });
 });

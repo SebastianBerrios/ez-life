@@ -17,9 +17,9 @@ export interface SegmentedProps {
   options: SegmentedOption[]
   /** Accessible name of the tablist (required). */
   ariaLabel: string
-  /** `md` keeps the 44px touch target; `sm` is the dense desktop variant. */
+  /** `md` keeps the 44px touch target; `sm` is the compact variant. */
   size?: "sm" | "md"
-  /** Mono uppercase labels (design: tabs of the quick-record sheet). */
+  /** Deprecated compatibility prop (no longer changes typography). */
   mono?: boolean
   /** Stretch the options to fill the container. */
   fullWidth?: boolean
@@ -38,7 +38,6 @@ function Segmented({
   options,
   ariaLabel,
   size = "md",
-  mono = false,
   fullWidth = false,
   idPrefix,
   className,
@@ -86,7 +85,7 @@ function Segmented({
       aria-label={ariaLabel}
       data-slot="segmented"
       className={cn(
-        "inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-border bg-background p-1",
+        "inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-full bg-surface-2 p-1",
         fullWidth && "flex w-full",
         className
       )}
@@ -113,21 +112,18 @@ function Segmented({
             onClick={() => onValueChange(option.value)}
             onKeyDown={(event) => handleKeyDown(event, option)}
             className={cn(
-              "inline-flex items-center justify-center gap-1.5 rounded-md border border-transparent px-3 whitespace-nowrap transition-colors outline-none focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
+              "inline-flex items-center justify-center gap-1.5 rounded-full border border-transparent px-3.5 text-body-md font-medium whitespace-nowrap transition-colors outline-none focus-visible:shadow-focus disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
               size === "sm" ? "h-9 min-h-9" : "h-11",
-              mono
-                ? "font-mono text-label-mono-sm uppercase"
-                : "text-body-md font-medium",
               fullWidth ? "flex-1" : "shrink-0",
               selected
-                ? "border-border-strong bg-surface-2 text-foreground"
+                ? "bg-card text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
             {option.icon}
             <span>{option.label}</span>
             {option.count !== undefined && (
-              <span className="font-mono text-label-mono-xs tabular-nums text-muted-foreground">
+              <span className="text-xs tabular-nums text-muted-foreground">
                 {option.count}
               </span>
             )}

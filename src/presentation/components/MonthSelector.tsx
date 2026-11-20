@@ -22,7 +22,7 @@ export default function MonthSelector({ refDate, onPrevious, onNext, className }
       <button type="button" onClick={onPrevious} aria-label="Mes anterior" className={CHEVRON_CLASS}>
         <ChevronLeft className="size-4" />
       </button>
-      <span className="min-w-[6.5rem] text-center font-mono text-label-mono-sm tabular-nums text-foreground" aria-live="polite">
+      <span className="min-w-[6.5rem] text-center font-fredoka text-label-sm tabular-nums text-foreground" aria-live="polite">
         {formatCycleLabel(refDate)}
       </span>
       <button type="button" onClick={onNext} aria-label="Mes siguiente" className={CHEVRON_CLASS}>

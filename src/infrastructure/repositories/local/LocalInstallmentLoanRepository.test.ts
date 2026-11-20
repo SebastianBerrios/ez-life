@@ -186,4 +186,58 @@ describe('LocalInstallmentLoanRepository', () => {
     const queued = (await db.sync_queue.toArray()).filter(q => q.table_name === 'installment_loans');
     expect(queued.length).toBeGreaterThan(0);
   });
+
+  describe('spec 013: alreadyPaid, payment_day and origin accountId (FR-020, FR-025)', () => {
+    it('initializes remaining_installments = installment_count - alreadyPaid without creating payments or movements', async () => {
+      const repo = new LocalInstallmentLoanRepository();
+      const userId = uuidv7();
+
+      await repo.create({ ...baseLoan(userId), payment_day: 5 }, 6);
+
+      const [loan] = await repo.getAll(userId);
+      expect(loan.remaining_installments).toBe(6);
+      expect(loan.status).toBe('active');
+      expect(loan.payment_day).toBe(5);
+      expect(await repo.getPayments(loan.id)).toHaveLength(0);
+      expect(await db.movements.count()).toBe(0);
+    });
+
+    it('marks a loan as settled immediately when alreadyPaid === installment_count', async () => {
+      const repo = new LocalInstallmentLoanRepository();
+      const userId = uuidv7();
+
+      await repo.create(baseLoan(userId), 12);
+
+      const [loan] = await repo.getAll(userId);
+      expect(loan.remaining_installments).toBe(0);
+      expect(loan.status).toBe('settled');
+      expect(await db.movements.count()).toBe(0);
+    });
+
+    it('rejects alreadyPaid > installment_count', async () => {
+      const repo = new LocalInstallmentLoanRepository();
+      await expect(repo.create(baseLoan(uuidv7()), 13)).rejects.toThrow('Las cuotas pagadas no pueden superar las cuotas totales.');
+    });
+
+    it('stores account_id on the generated EXPENSE movement for both installment and principal payments', async () => {
+      const repo = new LocalInstallmentLoanRepository();
+      const userId = uuidv7();
+      await repo.create(baseLoan(userId));
+      const [loan] = await repo.getAll(userId);
+
+      await repo.recordInstallmentPayment(loan.id, 1, new Date(2026, 10, 5), 'acc-bcp');
+      await repo.recordPrincipalPayment(
+        loan.id,
+        50000,
+        new Date(2026, 10, 6),
+        { type: 'reduce_installment_amount', newInstallmentAmountCents: 18000 },
+        'acc-interbank',
+      );
+
+      const movements = (await db.movements.toArray()).sort((a, b) => a.date.getTime() - b.date.getTime());
+      expect(movements).toHaveLength(2);
+      expect(movements[0]).toMatchObject({ type: 'EXPENSE', amount: 20000, account_id: 'acc-bcp' });
+      expect(movements[1]).toMatchObject({ type: 'EXPENSE', amount: 50000, account_id: 'acc-interbank' });
+    });
+  });
 });

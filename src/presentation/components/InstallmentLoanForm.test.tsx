@@ -35,6 +35,7 @@ describe('InstallmentLoanForm', () => {
     await user.type(screen.getByLabelText(/^monto$/i), '2000.00');
     await user.type(screen.getByLabelText(/n° de cuotas/i), '12');
     await user.type(screen.getByLabelText(/monto de cuota/i), '200.00');
+    await user.click(screen.getByRole('button', { name: /Más opciones/i }));
     await user.type(screen.getByLabelText(/interés/i), '15');
 
     const catSelect = await screen.findByLabelText(/categoría/i);
@@ -209,5 +210,54 @@ describe('InstallmentLoanForm', () => {
     await waitFor(() => {
       expect(mockUpdateTerms).toHaveBeenCalledWith('loan-1', expect.objectContaining({ distributionCategoryId: 'bucket-1' }));
     });
+  });
+
+  it('saves optional payment_day and validates 1..31', async () => {
+    const user = userEvent.setup();
+    const mockCreate = vi.fn();
+    mockCategories();
+    vi.mocked(LocalInstallmentLoanRepository).mockImplementation(function () {
+      return { create: mockCreate } as unknown as InstanceType<typeof LocalInstallmentLoanRepository>;
+    });
+
+    render(<InstallmentLoanForm userId="fake-user-id" onComplete={vi.fn()} onCancel={vi.fn()} />);
+
+    await user.type(screen.getByLabelText(/entidad/i), 'BCP');
+    await user.type(screen.getByLabelText(/^monto$/i), '1000.00');
+    await user.type(screen.getByLabelText(/n° de cuotas/i), '10');
+    await user.type(screen.getByLabelText(/monto de cuota/i), '100.00');
+    await user.click(screen.getByRole('button', { name: /Más opciones/i }));
+    await user.type(screen.getByLabelText(/día de pago/i), '5');
+    await user.click(await screen.findByLabelText(/categoría/i));
+    await user.click(await screen.findByRole('option', { name: /necesidades/i }));
+    fireEvent.submit(screen.getByTestId('installment-loan-form'));
+
+    await waitFor(() => {
+      expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ payment_day: 5 }));
+    });
+  });
+
+  it('auto-expands Más opciones when an invalid payment_day is submitted while collapsed (FR-023)', async () => {
+    const user = userEvent.setup();
+    mockCategories();
+    render(<InstallmentLoanForm userId="fake-user-id" onComplete={vi.fn()} onCancel={vi.fn()} />);
+
+    await user.type(screen.getByLabelText(/entidad/i), 'BCP');
+    await user.type(screen.getByLabelText(/^monto$/i), '1000.00');
+    await user.type(screen.getByLabelText(/n° de cuotas/i), '10');
+    await user.type(screen.getByLabelText(/monto de cuota/i), '100.00');
+    await user.click(await screen.findByLabelText(/categoría/i));
+    await user.click(await screen.findByRole('option', { name: /necesidades/i }));
+
+    const moreBtn = screen.getByRole('button', { name: /Más opciones/i });
+    await user.click(moreBtn);
+    await user.type(screen.getByLabelText(/día de pago/i), '99');
+    await user.click(moreBtn); // collapse again
+    expect(moreBtn).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.submit(screen.getByTestId('installment-loan-form'));
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(moreBtn).toHaveAttribute('aria-expanded', 'true');
   });
 });

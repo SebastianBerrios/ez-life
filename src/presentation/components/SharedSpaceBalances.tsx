@@ -2,24 +2,29 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { LocalSharedMovementRepository } from '../../infrastructure/repositories/local/LocalSharedMovementRepository';
+import type { SharedMovement } from '../../core/domain/models/types';
 import { calculateSharedBalance, PairBalance } from '../../core/use-cases/calculateSharedBalance';
+import { buildSharedSpaceSummary, formatSharedMovementSplit } from '../../core/use-cases/formatSharedSpacePhrases';
+import { formatShortDate } from '../../core/use-cases/formatMovementWhen';
 import { useSharedSpaceRealtime } from '../hooks/useSharedSpaceRealtime';
-import { Panel, PanelBody, PanelHeader } from '@/components/ui/panel';
+import { Panel } from '@/components/ui/panel';
 import { Money } from '@/components/ui/money';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 interface Props {
   spaceId: string;
   currentUserId: string;
   refreshKey: number;
+  memberNames?: Record<string, string>;
 }
 
 /**
- * "Quién le debe a quién" (FR-010, SC-004) — recalculated on every load, not
- * a persisted balance (research.md #3). useSharedSpaceRealtime keeps it
- * current within seconds while both members are online (SC-003).
+ * Shared-space net balance hero, natural per-member phrases, and readable shared movements list
+ * (no tables or hard dividers), preserving best-effort realtime over local offline-first data.
  */
-export default function SharedSpaceBalances({ spaceId, currentUserId, refreshKey }: Props) {
+export default function SharedSpaceBalances({ spaceId, currentUserId, refreshKey, memberNames }: Props) {
+  const [movements, setMovements] = useState<SharedMovement[]>([]);
   const [balances, setBalances] = useState<PairBalance[]>([]);
   const [loading, setLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
@@ -27,8 +32,10 @@ export default function SharedSpaceBalances({ spaceId, currentUserId, refreshKey
   const load = useCallback(async () => {
     try {
       const repo = new LocalSharedMovementRepository();
-      const movements = await repo.getAllForSpace(spaceId);
-      setBalances(calculateSharedBalance(movements));
+      const loaded = await repo.getAllForSpace(spaceId);
+      const sorted = [...loaded].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setMovements(sorted);
+      setBalances(calculateSharedBalance(loaded));
     } catch (err) {
       console.error(err);
     } finally {
@@ -42,50 +49,92 @@ export default function SharedSpaceBalances({ spaceId, currentUserId, refreshKey
 
   useSharedSpaceRealtime(spaceId);
   useEffect(() => {
-    // Realtime triggers a sync in the background; poll locally right after
-    // so this view picks it up without waiting for the next mount.
     const interval = setInterval(() => setReloadKey(k => k + 1), 5000);
     return () => clearInterval(interval);
   }, []);
 
   if (loading) {
-    return <Skeleton className="h-20 w-full rounded-lg" />;
+    return <Skeleton className="h-24 w-full rounded-card" />;
   }
 
-  if (balances.length === 0) {
-    return (
-      <Panel data-testid="shared-balances-empty">
-        <PanelBody className="py-6 text-center">
-          <p className="text-body-md text-muted-foreground">No hay saldos pendientes en este espacio.</p>
-        </PanelBody>
-      </Panel>
-    );
-  }
+  const summary = buildSharedSpaceSummary(balances, currentUserId, memberNames);
 
   return (
-    <Panel aria-label="Saldos" data-testid="shared-balances">
-      <PanelHeader eyebrow="Quién le debe a quién" title="Saldos" titleAs="h3" />
-      <PanelBody>
-        <ul className="divide-y divide-border">
-          {balances.map((b, i) => {
-            const sentence = b.fromUserId === currentUserId
-              ? `Tú le debes a ${b.toUserId}`
-              : b.toUserId === currentUserId
-                ? `${b.fromUserId} te debe`
-                : `${b.fromUserId} le debe a ${b.toUserId}`;
-            // What the signed-in user owes reads as an expense; what they are owed reads as income.
-            const tone = b.fromUserId === currentUserId ? 'expense' : b.toUserId === currentUserId ? 'income' : 'neutral';
-            return (
-              <li key={i} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-2.5">
-                <span className="min-w-0 break-words text-body-md text-muted-foreground">
-                  {sentence}
+    <div className="flex flex-col gap-3">
+      <Panel
+        aria-label="Saldos"
+        data-testid={summary.pairPhrases.length === 0 ? 'shared-balances-empty' : 'shared-balances'}
+        className="gap-3 p-5"
+      >
+        <div className="space-y-1" data-testid="shared-balances-hero">
+          <p className="text-sm font-medium text-muted-foreground">Tu saldo en este espacio</p>
+          <p
+            className={cn(
+              'font-fredoka text-headline-lg-mobile md:text-headline-lg',
+              summary.tone === 'positive'
+                ? 'text-success'
+                : summary.tone === 'negative'
+                  ? 'text-expense'
+                  : 'text-foreground',
+            )}
+          >
+            {summary.heroPhrase}
+          </p>
+        </div>
+
+        {summary.pairPhrases.length > 0 && (
+          <ul className="flex flex-col gap-2">
+            {summary.pairPhrases.map((pair, idx) => (
+              <li
+                key={`${pair.fromUserId}-${pair.toUserId}-${idx}`}
+                className="flex items-center justify-between gap-3 rounded-2xl bg-surface-2/60 px-4 py-3"
+              >
+                <span className="min-w-0 break-words text-sm font-medium text-foreground">
+                  {pair.phrase}
                 </span>
-                <Money cents={b.amount} sign="never" tone={tone} size="md" className="font-semibold" />
+                <Money
+                  cents={pair.amountCents}
+                  sign="never"
+                  tone={pair.tone === 'positive' ? 'income' : pair.tone === 'negative' ? 'expense' : 'neutral'}
+                  size="sm"
+                  className="shrink-0 font-semibold"
+                />
               </li>
-            );
-          })}
-        </ul>
-      </PanelBody>
-    </Panel>
+            ))}
+          </ul>
+        )}
+      </Panel>
+
+      {movements.length > 0 && (
+        <Panel aria-label="Movimientos compartidos" data-testid="shared-movements-list" className="gap-3 p-5">
+          <h3 className="font-fredoka text-headline-sm text-foreground">Movimientos compartidos</h3>
+          <ul className="flex flex-col gap-2">
+            {movements.map((m) => (
+              <li
+                key={m.id}
+                data-testid={`shared-movement-${m.id}`}
+                className="flex items-center justify-between gap-3 rounded-2xl bg-surface-2/60 px-4 py-3"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground">
+                    {formatSharedMovementSplit(m, currentUserId, memberNames)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {m.type === 'income' ? 'Ingreso' : 'Gasto'} · {formatShortDate(new Date(m.date))}
+                  </p>
+                </div>
+                <Money
+                  cents={m.total_amount_cents}
+                  sign="never"
+                  tone={m.type === 'income' ? 'income' : 'expense'}
+                  size="sm"
+                  className="shrink-0 font-semibold"
+                />
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
+    </div>
   );
 }

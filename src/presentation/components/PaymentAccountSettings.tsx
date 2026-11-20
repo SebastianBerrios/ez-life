@@ -17,11 +17,20 @@ import PaymentAccountForm, { ACCOUNT_KIND_LABELS } from './PaymentAccountForm';
 
 type FormState = { open: boolean; existing?: PaymentAccount };
 
+interface Props {
+  userId: string;
+  /** Optional account ID to open immediately in the edit sheet (e.g. "Agregar línea de crédito" from Resumen). */
+  editAccountId?: string;
+  /** Changes each time the caller re-requests editing the same account. */
+  editNonce?: number;
+  onEditHandled?: () => void;
+}
+
 /**
  * Settings → "Cuentas de pago": list, create, rename / edit the opening balance and archive.
  * Accounts are never deleted from here: one with movements would orphan them, so it is archived.
  */
-export default function PaymentAccountSettings({ userId }: { userId: string }) {
+export default function PaymentAccountSettings({ userId, editAccountId, editNonce, onEditHandled }: Props) {
   const [accounts, setAccounts] = useState<PaymentAccount[] | null>(null);
   const [movements, setMovements] = useState<Movement[]>([]);
   const [form, setForm] = useState<FormState>({ open: false });
@@ -46,6 +55,15 @@ export default function PaymentAccountSettings({ userId }: { userId: string }) {
     void load();
     return onLocalChanges(['payment_accounts', 'movements'], () => { void load(); });
   }, [load]);
+
+  useEffect(() => {
+    if (!editAccountId || accounts === null) return;
+    const match = accounts.find(account => account.id === editAccountId && !account.archived && !account.deleted_at);
+    if (match) {
+      setForm({ open: true, existing: match });
+    }
+    onEditHandled?.();
+  }, [editAccountId, editNonce, accounts, onEditHandled]);
 
   const balances = useMemo(() => calculateAccountBalances(accounts ?? [], movements), [accounts, movements]);
   const movementCounts = useMemo(() => {
@@ -84,12 +102,12 @@ export default function PaymentAccountSettings({ userId }: { userId: string }) {
       {visible.length === 0 ? (
         <p className="text-body-md text-muted-foreground">Todavía no tienes cuentas.</p>
       ) : (
-        <ul className="divide-y divide-border rounded-lg border border-border">
+        <ul className="space-y-2.5">
           {visible.map(account => {
             const count = movementCounts[account.id] ?? 0;
             const archivable = canArchiveAccount(accounts, account.id);
             return (
-              <li key={account.id} data-testid={`account-${account.id}`} className="space-y-2 px-3 py-3">
+              <li key={account.id} data-testid={`account-${account.id}`} className="space-y-2 rounded-2xl bg-surface-2/60 px-4 py-3">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span className="min-w-0 flex-1 truncate text-body-md font-medium text-foreground">{account.name}</span>
                   <Badge>{ACCOUNT_KIND_LABELS[account.kind]}</Badge>

@@ -113,7 +113,7 @@ export default function HabitForm({ userId, existing, embedded, onComplete, onCa
       )}
 
       <details open={Boolean(existing?.icon)} className="border-t border-border pt-3">
-        <summary className="flex min-h-11 cursor-pointer items-center font-mono text-label-mono-xs uppercase text-muted-foreground">Opciones adicionales</summary>
+        <summary className="flex min-h-11 cursor-pointer items-center text-label-xs text-muted-foreground">Opciones adicionales</summary>
         <div className="pt-2">
           <FieldLabel icon={Smile} htmlFor="habitIcon" hint="Opcional">Ícono</FieldLabel>
           <Input

@@ -11,7 +11,7 @@ function Card({
       data-slot="card"
       data-size={size}
       className={cn(
-        "group/card flex flex-col gap-[var(--card-spacing)] overflow-hidden rounded-lg border border-border bg-card py-[var(--card-spacing)] text-sm text-card-foreground [--card-spacing:1.25rem] has-[[data-slot=card-footer]]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:0.75rem] data-[size=sm]:has-[[data-slot=card-footer]]:pb-0 *:[img:first-child]:rounded-t-lg *:[img:last-child]:rounded-b-lg",
+        "group/card flex flex-col gap-[var(--card-spacing)] overflow-hidden rounded-card bg-card py-[var(--card-spacing)] text-sm text-card-foreground shadow-card [--card-spacing:1.25rem] has-[[data-slot=card-footer]]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:0.75rem] data-[size=sm]:has-[[data-slot=card-footer]]:pb-0 *:[img:first-child]:rounded-t-card *:[img:last-child]:rounded-b-card",
         className
       )}
       {...props}
@@ -37,7 +37,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-title"
       className={cn(
-        "text-base leading-snug font-medium tracking-[-0.01em] group-data-[size=sm]/card:text-sm",
+        "font-fredoka text-base leading-snug font-semibold tracking-[-0.01em] group-data-[size=sm]/card:text-sm",
         className
       )}
       {...props}

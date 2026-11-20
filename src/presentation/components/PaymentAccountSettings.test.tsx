@@ -68,6 +68,7 @@ describe('PaymentAccountSettings', () => {
     render(<PaymentAccountSettings userId="A" />);
     await user.click(await screen.findByRole('button', { name: 'Nueva cuenta' }));
     await user.type(screen.getByLabelText('Nombre de la cuenta'), 'Interbank');
+    await user.click(screen.getByRole('button', { name: /Más opciones/i }));
     await user.type(screen.getByLabelText('Saldo inicial'), '1,250.75');
     await user.click(screen.getByRole('button', { name: 'Crear cuenta' }));
     await waitFor(() => expect(repos.save).toHaveBeenCalledWith(expect.objectContaining({
@@ -83,6 +84,7 @@ describe('PaymentAccountSettings', () => {
     await user.click(screen.getByRole('button', { name: 'Crear cuenta' }));
     expect(await screen.findByText('El nombre de la cuenta es obligatorio.')).toBeInTheDocument();
     await user.type(screen.getByLabelText('Nombre de la cuenta'), 'X');
+    await user.click(screen.getByRole('button', { name: /Más opciones/i }));
     await user.type(screen.getByLabelText('Saldo inicial'), '1.234');
     await user.click(screen.getByRole('button', { name: 'Crear cuenta' }));
     expect(await screen.findByText(/hasta dos decimales/)).toBeInTheDocument();
@@ -94,6 +96,7 @@ describe('PaymentAccountSettings', () => {
     render(<PaymentAccountSettings userId="A" />);
     await user.click(await screen.findByRole('button', { name: 'Nueva cuenta' }));
     await user.type(screen.getByLabelText('Nombre de la cuenta'), 'Visa');
+    await user.click(screen.getByRole('button', { name: /Más opciones/i }));
     await user.type(screen.getByLabelText('Saldo inicial'), '-300');
     await user.click(screen.getByRole('button', { name: 'Crear cuenta' }));
     expect(await screen.findByText(/Solo una cuenta de crédito/)).toBeInTheDocument();
@@ -101,8 +104,70 @@ describe('PaymentAccountSettings', () => {
 
     await user.click(screen.getByRole('combobox', { name: 'Tipo' }));
     await user.click(await screen.findByRole('option', { name: 'Crédito' }));
+    await user.type(screen.getByLabelText('Línea de crédito'), '5000');
     await user.click(screen.getByRole('button', { name: 'Crear cuenta' }));
-    await waitFor(() => expect(repos.save).toHaveBeenCalledWith(expect.objectContaining({ name: 'Visa', kind: 'credit', opening_balance: -30000 })));
+    await waitFor(() => expect(repos.save).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'Visa', kind: 'credit', opening_balance: -30000, credit_limit: 500000,
+    })));
+  });
+
+  it('hides credit card fields for non-credit accounts, requires credit limit on create, and allows adding credit limit to a legacy card', async () => {
+    const user = userEvent.setup();
+    repos.accounts = [
+      account('cash', 'Efectivo', { kind: 'cash', opening_balance: 5000 }),
+      account('legacy-cc', 'Visa Antigua', { kind: 'credit', opening_balance: -80000 }),
+    ];
+    render(<PaymentAccountSettings userId="A" />);
+
+    // 1. Fields hidden for debit/cash/savings on create
+    await user.click(await screen.findByRole('button', { name: 'Nueva cuenta' }));
+    expect(screen.queryByLabelText('Línea de crédito')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Día de cierre')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Día de pago')).not.toBeInTheDocument();
+
+    // 2. Switch to credit -> credit limit appears as essential; closing/payment days inside Más opciones
+    await user.type(screen.getByLabelText('Nombre de la cuenta'), 'BBVA');
+    await user.click(screen.getByRole('combobox', { name: 'Tipo' }));
+    await user.click(await screen.findByRole('option', { name: 'Crédito' }));
+    expect(screen.getByLabelText('Línea de crédito')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Más opciones/i }));
+    expect(screen.getByLabelText('Día de cierre')).toBeInTheDocument();
+    expect(screen.getByLabelText('Día de pago')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Crear cuenta' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('La línea de crédito es obligatoria.');
+    expect(repos.save).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }));
+
+    // 3. Edit legacy credit card and add credit_limit + closing_day + payment_day inside Más opciones
+    await user.click(screen.getByRole('button', { name: 'Editar Visa Antigua' }));
+    await user.click(screen.getByRole('button', { name: /Más opciones/i }));
+    await user.type(screen.getByLabelText('Línea de crédito'), '5000');
+    await user.type(screen.getByLabelText('Día de cierre'), '25');
+    await user.type(screen.getByLabelText('Día de pago'), '15');
+    await user.click(screen.getByRole('button', { name: 'Guardar cuenta' }));
+    await waitFor(() => expect(repos.save).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'legacy-cc',
+      name: 'Visa Antigua',
+      kind: 'credit',
+      opening_balance: -80000,
+      credit_limit: 500000,
+      closing_day: 25,
+      payment_day: 15,
+    })));
+  });
+
+  it('opens the edit sheet automatically when editAccountId is provided (from Resumen "Agregar línea de crédito")', async () => {
+    const onEditHandled = vi.fn();
+    repos.accounts = [
+      account('cash', 'Efectivo', { kind: 'cash', opening_balance: 5000 }),
+      account('legacy-cc', 'Visa Antigua', { kind: 'credit', opening_balance: -80000 }),
+    ];
+    render(<PaymentAccountSettings userId="A" editAccountId="legacy-cc" editNonce={1} onEditHandled={onEditHandled} />);
+    expect(await screen.findByLabelText('Nombre de la cuenta')).toHaveValue('Visa Antigua');
+    expect(screen.getByRole('button', { name: /Más opciones · 1 activa/i })).toHaveAttribute('aria-expanded', 'false');
+    expect(onEditHandled).toHaveBeenCalledTimes(1);
   });
 
   it('renames an account and edits its opening balance, keeping id and kind', async () => {
@@ -110,8 +175,11 @@ describe('PaymentAccountSettings', () => {
     render(<PaymentAccountSettings userId="A" />);
     await user.click(await screen.findByRole('button', { name: 'Editar BCP' }));
     const name = screen.getByLabelText('Nombre de la cuenta');
-    const balance = screen.getByLabelText('Saldo inicial');
     expect(name).toHaveValue('BCP');
+    const moreBtn = screen.getByRole('button', { name: /Más opciones · 1 activa/i });
+    expect(moreBtn).toHaveAttribute('aria-expanded', 'false');
+    await user.click(moreBtn);
+    const balance = screen.getByLabelText('Saldo inicial');
     expect(balance).toHaveValue('100.00');
     await user.clear(name);
     await user.type(name, 'BCP Sueldo');

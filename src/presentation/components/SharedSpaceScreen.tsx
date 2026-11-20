@@ -8,6 +8,7 @@ import { Membership, SharedSpace } from '../../core/domain/models/types';
 import SharedSpaceBalances from './SharedSpaceBalances';
 import SharedSpaceSettings from './SharedSpaceSettings';
 import { Panel, PanelBody, PanelHeader } from '@/components/ui/panel';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -19,11 +20,6 @@ interface Props {
   refreshKey: number;
 }
 
-/**
- * First-time-per-section onboarding for the shared space (FR-024) plus, once
- * a space exists, the balances/settings view (User Story 3). Spaces the user
- * left keep their frozen balance visible, read-only (FR-016).
- */
 export default function SharedSpaceScreen({ userId, onCreate, onJoin, onAddMovement, refreshKey }: Props) {
   const [spaces, setSpaces] = useState<SharedSpace[]>([]);
   const [leftSpaces, setLeftSpaces] = useState<SharedSpace[]>([]);
@@ -56,28 +52,26 @@ export default function SharedSpaceScreen({ userId, onCreate, onJoin, onAddMovem
   }, [loadSpaces, refreshKey]);
 
   if (loading) {
-    return <Skeleton className="h-28 w-full rounded-lg" />;
+    return <Skeleton className="h-28 w-full rounded-card" />;
   }
 
   if (spaces.length === 0 && leftSpaces.length === 0) {
     return (
-      <Panel className="animate-fade-slide-up items-center gap-4 px-5 py-8 text-center" data-testid="shared-space-empty">
-        <span aria-hidden="true" className="flex size-12 items-center justify-center rounded-lg bg-surface-2 text-primary">
-          <Users className="size-6" />
-        </span>
-        <p className="max-w-md text-body-md text-muted-foreground">
-          Todavía no tienes un espacio compartido. Crea uno para tu pareja o familia, o únete a uno existente con un código.
-        </p>
-        <div className="flex w-full max-w-md gap-3">
-          <Button variant="outline" onClick={onJoin} className="flex-1">Unirme con código</Button>
-          <Button onClick={onCreate} className="flex-1">Crear espacio</Button>
-        </div>
-      </Panel>
+      <EmptyState
+        testId="shared-space-empty"
+        icon={<Users className="size-6" />}
+        title="Aún no tienes un espacio compartido"
+        description="Crea uno para dividir gastos con tu pareja o familia, o únete con un código de invitación."
+        actionLabel="Crear espacio"
+        onAction={onCreate}
+        secondaryActionLabel="Unirme con código"
+        onSecondaryAction={onJoin}
+      />
     );
   }
 
   return (
-    <div className="animate-fade-slide-up space-y-4">
+    <div className="space-y-4">
       {spaces.map(space => (
         <div key={space.id} className="space-y-3">
           <Panel>
@@ -99,12 +93,12 @@ export default function SharedSpaceScreen({ userId, onCreate, onJoin, onAddMovem
 
       {leftSpaces.length > 0 && (
         <div className="space-y-3">
-          <h3 className="font-mono text-label-mono-sm uppercase text-muted-foreground">Espacios que abandonaste</h3>
+          <h3 className="px-1 text-xs font-medium text-muted-foreground">Espacios que abandonaste</h3>
           {leftSpaces.map(space => (
             <div key={space.id} className="space-y-2">
               <Panel>
                 <PanelBody className="pt-4">
-                  <h4 className="text-headline-sm text-foreground">{space.name}</h4>
+                  <h4 className="font-fredoka text-headline-sm text-foreground">{space.name}</h4>
                   <p className="text-body-sm text-muted-foreground">Saldo congelado — ya no eres miembro de este espacio.</p>
                 </PanelBody>
               </Panel>

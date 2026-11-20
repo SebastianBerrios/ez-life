@@ -77,3 +77,46 @@ it('rejects a destination account on a non-transfer movement', async () => {
   const { from, to } = await twoAccounts();
   await expect(new LocalMovementRepository().save({ ...base, account_id: from.id, to_account_id: to.id })).rejects.toThrow(/destino/i);
 });
+
+it('saving an occurrence with recurrence_rule_id + recurrence_month keeps the rule active and blocks duplicates for the same month (spec 013 T056)', async () => {
+  const repo = new LocalMovementRepository();
+  await db.movement_recurrences.put({
+    id: 'rule-gym',
+    user_id: 'A',
+    type: 'EXPENSE',
+    amount: 8000,
+    date: now,
+    description: 'Gimnasio',
+    distribution_category_id: 'bucket',
+    expense_category_id: 'category',
+    is_recurring: true,
+    active: true,
+    day_of_month: 5,
+    activated_month: '2026-10',
+    created_at: now,
+    updated_at: now,
+  });
+
+  const saved = await repo.save({
+    ...base,
+    amount: 8000,
+    description: 'Gimnasio',
+    recurrence_rule_id: 'rule-gym',
+    recurrence_month: '2026-10',
+    is_recurring: false,
+  });
+
+  expect(saved.recurrence_rule_id).toBe('rule-gym');
+  expect(saved.recurrence_month).toBe('2026-10');
+  expect((await db.movement_recurrences.get('rule-gym'))?.active).toBe(true);
+
+  // Attempting to register a second occurrence for the same rule and month fails on the unique index
+  await expect(repo.save({
+    ...base,
+    amount: 8000,
+    description: 'Gimnasio',
+    recurrence_rule_id: 'rule-gym',
+    recurrence_month: '2026-10',
+    is_recurring: false,
+  })).rejects.toThrow();
+});

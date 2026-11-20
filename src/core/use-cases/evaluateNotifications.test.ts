@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { evaluateNotifications } from './evaluateNotifications';
+import { buildPendingRegistrations } from './buildPendingRegistrations';
 import { calculateBudgets, type BudgetedCategory } from './calculateBudgets';
-import type { Debt, Goal, Notification, SavingsGoal, SharedMovement, Task } from '../domain/models/types';
+import type { Debt, Goal, MovementRecurrence, Notification, PendingRegistration, SavingsGoal, SharedMovement, Task } from '../domain/models/types';
 import type { HabitPendingToday } from './evaluateNotifications';
 
 describe('evaluateNotifications', () => {
@@ -553,5 +554,102 @@ describe('evaluateNotifications', () => {
 
     expect(result).toHaveLength(3);
     expect(result.map(n => n.type).sort()).toEqual(['budget_over_80', 'daily_reminder', 'goal_completed']);
+  });
+
+  describe('register_due (spec 013 FR-017, SC-004)', () => {
+    it('emits one register_due per pending item with exact copy, never duplicates on refresh, and re-emits next month', () => {
+      const item: PendingRegistration = {
+        key: 'recurrence:r1:2024-06',
+        kind: 'recurrence',
+        refId: 'r1',
+        title: 'Gimnasio',
+        amount: 8000,
+        day: 5,
+        overdue: true,
+      };
+
+      const first = evaluateNotifications(baseParams({ pendingRegistrations: [item] }));
+      expect(first).toHaveLength(1);
+      expect(first[0]).toMatchObject({
+        type: 'register_due',
+        title: 'Toca registrar: Gimnasio',
+        body: 'Gimnasio · S/ 80.00 · día 5',
+        related_id: 'recurrence:r1:2024-06',
+        cycle_key: '2024-06',
+      });
+
+      const persisted: Notification = { ...first[0], id: 'n-reg-1', created_at: now, updated_at: now };
+      const second = evaluateNotifications(baseParams({
+        pendingRegistrations: [item],
+        existingNotifications: [persisted],
+      }));
+      expect(second).toHaveLength(0);
+
+      // Next month produces a fresh notification
+      const nextMonth = new Date(2024, 6, 5, 10, 0);
+      const nextItem: PendingRegistration = { ...item, key: 'recurrence:r1:2024-07' };
+      const third = evaluateNotifications(baseParams({
+        now: nextMonth,
+        pendingRegistrations: [nextItem],
+        existingNotifications: [persisted],
+      }));
+      expect(third).toHaveLength(1);
+      expect(third[0]).toMatchObject({
+        type: 'register_due',
+        related_id: 'recurrence:r1:2024-07',
+        cycle_key: '2024-07',
+      });
+    });
+
+    it('3-month simulation with zero user actions produces 0 movements and exactly 1 notification per item and month (SC-004)', () => {
+      const rule: MovementRecurrence = {
+        id: 'r-gym',
+        user_id: userId,
+        type: 'EXPENSE',
+        amount: 8000,
+        date: new Date(2026, 7, 5),
+        description: 'Gimnasio',
+        is_recurring: true,
+        active: true,
+        day_of_month: 5,
+        activated_month: '2026-08',
+        created_at: new Date(2026, 7, 5),
+        updated_at: new Date(2026, 7, 5),
+      };
+
+      const existing: Notification[] = [];
+      const createdMovementsCount = 0;
+
+      // Simulate evaluating on days 1, 5, 10, 20 across 3 months (Sep, Oct, Nov 2026)
+      for (const monthIndex of [8, 9, 10]) {
+        for (const day of [1, 5, 10, 20]) {
+          const current = new Date(2026, monthIndex, day, 12, 0);
+          const pending = buildPendingRegistrations({
+            today: current,
+            rules: [rule],
+            incomeSources: [],
+            loans: [],
+            loanIdByPaymentId: {},
+            accounts: [],
+            cardOwed: {},
+            monthMovements: [],
+            skips: [],
+          });
+          const emitted = evaluateNotifications(baseParams({
+            now: current,
+            pendingRegistrations: pending,
+            existingNotifications: existing,
+          }));
+          for (const n of emitted) {
+            existing.push({ ...n, id: `n-${existing.length + 1}`, created_at: current, updated_at: current });
+          }
+        }
+      }
+
+      expect(createdMovementsCount).toBe(0);
+      expect(existing).toHaveLength(3);
+      expect(existing.map(n => n.cycle_key)).toEqual(['2026-09', '2026-10', '2026-11']);
+      expect(existing.every(n => n.type === 'register_due')).toBe(true);
+    });
   });
 });

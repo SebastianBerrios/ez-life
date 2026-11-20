@@ -13,6 +13,7 @@ import { calculateMonthlyCycle } from '../../core/use-cases/calculateMonthlyCycl
 import { compareMonthlyPeriods } from '../../core/use-cases/compareMonthlyPeriods';
 import { calculateAvailableCapital } from '../../core/use-cases/calculateAvailableCapital';
 import { buildFinancesKpis, type FinancesKpis } from '../../core/use-cases/buildFinancesKpis';
+import { buildFinancesHero, type FinancesHeroSummary } from '../../core/use-cases/buildFinancesHero';
 import { buildRuleView, type RuleView } from '../../core/use-cases/buildRuleView';
 import type { MovementLookups } from '../../core/use-cases/describeMovement';
 import { useLocalQuery } from './useLocalQuery';
@@ -27,9 +28,16 @@ export interface FinancesView {
   today: Date;
   /** Movements of the selected month (all types, newest first is up to the list). */
   movements: Movement[];
+  allMovements: Movement[];
+  accounts: PaymentAccount[];
+  loans: InstallmentLoan[];
+  debts: Debt[];
   lookups: MovementLookups;
   /** Movement ids with a change not yet pushed to the server. */
   pendingMovementIds: ReadonlySet<string>;
+  /** Distribution category ids marked as savings buckets (`is_savings === true`). */
+  savingsBucketIds: ReadonlySet<string>;
+  hero: FinancesHeroSummary;
   kpis: FinancesKpis;
   rule: RuleView;
   activeDebtCount: number;
@@ -104,10 +112,25 @@ function buildView(raw: RawData): FinancesView {
   const rule = buildRuleView(raw.movements, raw.distCategories, raw.expenseCategories, raw.expenseSubcategories, expectedIncome);
   const { income, expense } = compareMonthlyPeriods(raw.movements, []).current;
   const activeAccounts = raw.accounts.filter(account => !account.archived);
+  const savingsBucketIds = new Set(
+    raw.distCategories.filter(c => !c.deleted_at && c.is_savings).map(c => c.id),
+  );
+  const hero = buildFinancesHero({
+    filteredMovements: raw.movements,
+    allMovements: raw.allMovements,
+    accounts: raw.accounts,
+    loans: raw.loans,
+    debts: raw.debts,
+    rule,
+  });
 
   return {
     today: raw.loadedAt,
     movements: raw.movements,
+    allMovements: raw.allMovements,
+    accounts: raw.accounts,
+    loans: raw.loans,
+    debts: raw.debts,
     lookups: {
       categoryName: byId(raw.expenseCategories),
       subcategoryName: byId(raw.expenseSubcategories),
@@ -116,6 +139,8 @@ function buildView(raw: RawData): FinancesView {
       accountName: byId(raw.accounts),
     },
     pendingMovementIds: raw.pending,
+    savingsBucketIds,
+    hero,
     kpis: buildFinancesKpis({
       income,
       expense,
@@ -132,9 +157,9 @@ function buildView(raw: RawData): FinancesView {
 
 /**
  * Everything the Finanzas screen needs for `(userId, month)`: the month's movements, lookups,
- * KPIs, the 50/30/20 execution and loan counts, read from the local (Dexie) repositories so it works
- * offline. Shares its refresh lifecycle with Inicio (`useLocalQuery`); `refreshKey` forces a reload
- * (the app shell bumps it after saving a movement). Components only render `view`.
+ * hero summaries, the 50/30/20 execution and loan counts, read from the local (Dexie) repositories
+ * so it works offline. Shares its refresh lifecycle with Inicio (`useLocalQuery`); `refreshKey`
+ * forces a reload. Components only render `view`.
  */
 export function useFinancesData(userId: string, refDateProp?: Date, refreshKey = 0): FinancesData {
   const year = (refDateProp ?? new Date()).getFullYear();

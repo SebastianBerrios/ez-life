@@ -1,7 +1,7 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
-/** Dashboard panel: surface-1 + hairline, 8px radius, no shadow. */
+/** Warm card panel: 28px radius, plum-tinted shadow, no hard divider lines. */
 const Panel = React.forwardRef<HTMLElement, React.ComponentProps<"section">>(
   function Panel({ className, ...props }, ref) {
     return (
@@ -9,7 +9,7 @@ const Panel = React.forwardRef<HTMLElement, React.ComponentProps<"section">>(
         ref={ref}
         data-slot="panel"
         className={cn(
-          "flex flex-col rounded-lg border border-border bg-card text-card-foreground",
+          "flex flex-col rounded-card bg-card text-card-foreground shadow-card",
           className
         )}
         {...props}
@@ -20,7 +20,7 @@ const Panel = React.forwardRef<HTMLElement, React.ComponentProps<"section">>(
 
 export interface PanelHeaderProps
   extends Omit<React.ComponentProps<"div">, "title"> {
-  /** Mono uppercase micro-label above the title. */
+  /** Subtle secondary label above the title. */
   eyebrow?: React.ReactNode
   title?: React.ReactNode
   /** Heading level for `title` (default h3). */
@@ -46,12 +46,12 @@ function PanelHeader({
     >
       <div className="flex min-w-0 flex-col gap-0.5">
         {eyebrow !== undefined && (
-          <span className="font-mono text-label-mono-xs uppercase text-muted-foreground">
+          <span className="text-xs font-medium text-muted-foreground">
             {eyebrow}
           </span>
         )}
         {title !== undefined && (
-          <Title className="text-headline-md text-foreground">{title}</Title>
+          <Title className="font-fredoka text-headline-md text-foreground">{title}</Title>
         )}
         {children}
       </div>

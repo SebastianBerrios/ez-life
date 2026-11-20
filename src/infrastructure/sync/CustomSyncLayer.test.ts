@@ -129,4 +129,34 @@ describe('CustomSyncLayer', () => {
     const call = mocks.rpc.mock.calls.map(c => c[1]).find(c => c.table_name === 'tasks');
     expect(call.payload).toMatchObject({ due_date: '2026-10-16', priority: 'high', tag: 'Maestría' });
   });
+  it('pushes queued reminder_skips and pulls remote reminder_skips (spec 013)', async () => {
+    await db.reminder_skips.put({
+      id: 'skip-local',
+      user_id: 'A',
+      item_key: 'recurrence:r1:2026-11',
+      month: '2026-11',
+      created_at: now,
+      updated_at: now,
+    });
+    remote.reminder_skips = [{
+      id: 'skip-remote',
+      user_id: 'A',
+      item_key: 'card:c1:2026-11',
+      month: '2026-11',
+      created_at: now.toISOString(),
+      updated_at: now.toISOString(),
+      deleted_at: null,
+    }];
+    await new CustomSyncLayer().sync();
+    expect(mocks.rpc).toHaveBeenCalledWith('sync_record', expect.objectContaining({
+      table_name: 'reminder_skips',
+      payload: expect.objectContaining({ id: 'skip-local', item_key: 'recurrence:r1:2026-11', month: '2026-11' }),
+    }));
+    expect(await db.reminder_skips.get('skip-remote')).toMatchObject({
+      item_key: 'card:c1:2026-11',
+      month: '2026-11',
+      created_at: expect.any(Date),
+    });
+    expect(await db.sync_queue.count()).toBe(0);
+  });
 });

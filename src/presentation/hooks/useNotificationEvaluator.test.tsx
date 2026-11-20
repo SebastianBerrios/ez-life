@@ -24,6 +24,11 @@ describe('useNotificationEvaluator', () => {
     await db.shared_spaces.clear();
     await db.memberships.clear();
     await db.shared_movements.clear();
+    await db.payment_accounts.clear();
+    await db.movement_recurrences.clear();
+    await db.installment_loans.clear();
+    await db.installment_payments.clear();
+    await db.reminder_skips.clear();
   });
 
   afterEach(() => {
@@ -141,6 +146,56 @@ describe('useNotificationEvaluator', () => {
       const notifications = await db.notifications.where('user_id').equals(userId).toArray();
       const types = notifications.map(n => n.type).sort();
       expect(types).toEqual(['loan_due_soon', 'task_due']);
+    });
+
+    unmount();
+  });
+
+  it('emits register_due for a credit card with owed balance inside the 3-day window and emits nothing when owed is 0', async () => {
+    const today = new Date();
+    const payDay = Math.min(today.getDate() + 1, 28);
+    const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    await db.profiles.put({
+      id: userId,
+      push_enabled: false,
+      balance_since: currentMonthKey,
+      created_at: today,
+      updated_at: today,
+    });
+
+    await db.payment_accounts.bulkPut([
+      {
+        id: 'card-owed',
+        user_id: userId,
+        name: 'Visa BCP',
+        kind: 'credit',
+        opening_balance: -80000,
+        credit_limit: 500000,
+        payment_day: payDay,
+        created_at: today,
+        updated_at: today,
+      },
+      {
+        id: 'card-zero',
+        user_id: userId,
+        name: 'Mastercard',
+        kind: 'credit',
+        opening_balance: 0,
+        credit_limit: 300000,
+        payment_day: payDay,
+        created_at: today,
+        updated_at: today,
+      },
+    ]);
+
+    const { unmount } = renderHook(() => useNotificationEvaluator(userId));
+
+    await waitFor(async () => {
+      const notifications = await db.notifications.where('user_id').equals(userId).toArray();
+      const registerDue = notifications.filter(n => n.type === 'register_due');
+      expect(registerDue).toHaveLength(1);
+      expect(registerDue[0].title).toBe('Toca registrar: Pagar tarjeta Visa BCP');
+      expect(registerDue[0].body).toBe(`Pagar tarjeta Visa BCP · S/ 800.00 · día ${payDay}`);
     });
 
     unmount();

@@ -80,7 +80,7 @@ function TaskRow({
           </div>
           <p className={cn('break-words text-body-lg font-medium text-foreground', done && 'text-muted-foreground line-through')}>{task.title}</p>
           {task.description && <p className="line-clamp-2 text-body-md text-muted-foreground">{task.description}</p>}
-          <p className={cn('font-mono text-label-mono-xs', DUE_TONE[due.tone])} data-testid={`task-due-${task.id}`}>{due.text}</p>
+          <p className={cn('text-label-xs', DUE_TONE[due.tone])} data-testid={`task-due-${task.id}`}>{due.text}</p>
         </div>
         <ItemMenu
           label={task.title}
@@ -175,7 +175,6 @@ export default function TasksPanel({ windows, today, urgentCount, onAdd, onDone,
             ariaLabel="Ventana de tareas"
             idPrefix="control-tasks"
             size={desktop ? 'sm' : 'md'}
-            mono
             value={tab}
             onValueChange={value => setTab(value as TaskTab)}
             options={[
@@ -184,7 +183,7 @@ export default function TasksPanel({ windows, today, urgentCount, onAdd, onDone,
               { value: 'done', label: 'Hechas', count: windows.done.length },
             ]}
           />
-          <span className="font-mono text-label-mono-xs text-primary" data-testid="pending-count">
+          <span className="text-label-xs text-primary" data-testid="pending-count">
             {pending} {pending === 1 ? 'pendiente' : 'pendientes'}
           </span>
         </div>
@@ -203,7 +202,7 @@ export default function TasksPanel({ windows, today, urgentCount, onAdd, onDone,
                   {windows.week.length > 0 && <ul className="flex flex-col gap-2">{rows(windows.week)}</ul>}
                   {windows.later.length > 0 && (
                     <>
-                      <p className="mt-1 font-mono text-label-mono-xs uppercase text-muted-foreground">Más adelante</p>
+                      <p className="mt-1 text-label-xs text-muted-foreground">Más adelante</p>
                       <ul className="flex flex-col gap-2">{rows(windows.later)}</ul>
                     </>
                   )}
@@ -219,7 +218,7 @@ export default function TasksPanel({ windows, today, urgentCount, onAdd, onDone,
                     {rows(windows.done.slice(0, DONE_TASKS_SHOWN).map(task => ({ task, overdue: false })))}
                   </ul>
                   {windows.done.length > DONE_TASKS_SHOWN && (
-                    <p className="font-mono text-label-mono-xs text-muted-foreground">
+                    <p className="text-label-xs text-muted-foreground">
                       Mostrando las {DONE_TASKS_SHOWN} más recientes de {windows.done.length}.
                     </p>
                   )}
@@ -246,7 +245,7 @@ export default function TasksPanel({ windows, today, urgentCount, onAdd, onDone,
             <Kbd className="hidden md:inline-flex" aria-hidden="true">Enter ↵</Kbd>
           </div>
           {error && <p id="quick-task-error" role="alert" className="mt-1 text-body-md text-destructive">{error}</p>}
-          <p role="status" aria-live="polite" className={notice ? 'mt-1 font-mono text-label-mono-xs text-primary' : 'sr-only'}>{notice}</p>
+          <p role="status" aria-live="polite" className={notice ? 'mt-1 text-label-xs text-primary' : 'sr-only'}>{notice}</p>
         </form>
       </PanelBody>
     </Panel>

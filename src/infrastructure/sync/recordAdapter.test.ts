@@ -8,3 +8,11 @@ it('preserves calendar dates from SQL date columns in the local timezone', () =>
   expect(row.deleted_at).toBeUndefined();
   expect(() => fromRemoteRecord({ id: 'a', updated_at: 'invalid' })).toThrow();
 });
+it('round-trips opening_date between Date and ISO string, and maps undefined to null', () => {
+  const iso = '2026-11-10T12:00:00.000Z';
+  const row = fromRemoteRecord({ id: 'acc-1', updated_at: iso, opening_date: iso });
+  expect(row.opening_date).toBeInstanceOf(Date);
+  expect((row.opening_date as Date).toISOString()).toBe(iso);
+  expect(toRemoteRecord(row, 'payment_accounts').opening_date).toBe(iso);
+  expect(toRemoteRecord({ id: 'acc-2', updated_at: new Date(iso), opening_date: undefined }, 'payment_accounts').opening_date).toBeNull();
+});

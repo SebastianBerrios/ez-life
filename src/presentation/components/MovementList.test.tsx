@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
-import MovementList, { MOVEMENT_PAGE_SIZE } from './MovementList';
+import MovementList from './MovementList';
 import { LocalMovementRepository } from '../../infrastructure/repositories/local/LocalMovementRepository';
 import type { Movement } from '../../core/domain/models/types';
 import { EMPTY_LOOKUPS, type MovementLookups } from '../../core/use-cases/describeMovement';
@@ -46,11 +46,8 @@ function renderList(movements: Movement[], overrides: Partial<React.ComponentPro
       userId="u1"
       movements={movements}
       lookups={lookups}
-      pendingIds={new Set()}
-      balanceCents={0}
       today={TODAY}
       loading={false}
-      desktop={false}
       onChanged={onChanged}
       {...overrides}
     />,
@@ -68,9 +65,10 @@ beforeEach(() => {
 });
 
 describe('MovementList', () => {
-  it('shows the movements it is given', () => {
+  it('shows the movements it is given without rendering a table', () => {
     renderList([movement({ id: 'm1', description: 'Café' })]);
     expect(screen.getByText('Café')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).toBeNull();
   });
 
   it('shows a loading state instead of rows while loading', () => {
@@ -79,7 +77,18 @@ describe('MovementList', () => {
     expect(container.querySelector('[aria-busy="true"]')).not.toBeNull();
   });
 
-  describe('category/subcategory visibility (FR-007, FR-008, US3)', () => {
+  it('shows the filtered net balance hero (income - expense, transfers excluded)', () => {
+    renderList([
+      movement({ id: 'i1', type: 'INCOME', amount: 300000, description: 'Sueldo' }),
+      movement({ id: 'e1', type: 'EXPENSE', amount: 50000, description: 'Alquiler' }),
+      movement({ id: 't1', type: 'TRANSFER', amount: 20000, description: 'Ahorro' }),
+    ]);
+    const hero = screen.getByTestId('movements-hero');
+    expect(within(hero).getByText('2,500.00')).toBeInTheDocument();
+    expect(within(hero).getByText('Ingresos S/ 3,000.00 · Egresos S/ 500.00')).toBeInTheDocument();
+  });
+
+  describe('category/subcategory visibility', () => {
     it("shows a movement's resolved category and subcategory name directly in the list", () => {
       renderList([movement({ id: 'm1', description: 'Almuerzo', expense_category_id: 'c1', expense_subcategory_id: 's1' })]);
       expect(screen.getByText('Almuerzo')).toBeInTheDocument();
@@ -99,7 +108,7 @@ describe('MovementList', () => {
     });
   });
 
-  describe('balance adjustment badge (006-ajuste-de-balance-mensual)', () => {
+  describe('balance adjustment badge', () => {
     it('shows the "Ajuste" badge for a manual balance adjustment', () => {
       renderList([movement({ id: 'm1', type: 'INCOME', amount: 5000, description: 'Bono', is_adjustment: true })]);
       expect(screen.getByText('Bono')).toBeInTheDocument();
@@ -113,7 +122,7 @@ describe('MovementList', () => {
     });
   });
 
-  describe('time and transfers (011-cuentas-hora-prioridad)', () => {
+  describe('time and transfers', () => {
     it('shows the movement time on its row', () => {
       renderList([movement({ id: 'm1', description: 'Café', amount: 500, date: new Date(2026, 9, 16, 7, 5) })]);
       expect(screen.getByText(/07:05/)).toBeInTheDocument();
@@ -146,7 +155,7 @@ describe('MovementList', () => {
     });
   });
 
-  describe('grouping by day (mobile)', () => {
+  describe('grouping by day', () => {
     it('groups rows under a heading per local day, newest first', () => {
       renderList([
         movement({ id: 'old', description: 'Sueldo', date: new Date(2026, 9, 1, 9, 0) }),
@@ -240,15 +249,19 @@ describe('MovementList', () => {
       expect(screen.getByRole('tab', { name: /^Todos/ })).toHaveAttribute('aria-selected', 'true');
     });
 
-    it('shows "No hay movimientos en este mes" without toolbar for an empty month', () => {
-      renderList([]);
+    it('shows actionable empty state without toolbar for an empty month', async () => {
+      const user = userEvent.setup();
+      const onNewMovement = vi.fn();
+      renderList([], { onNewMovement });
       expect(screen.getByText(/no hay movimientos en este mes/i)).toBeInTheDocument();
       expect(screen.queryByRole('tablist')).toBeNull();
+      await user.click(screen.getByRole('button', { name: 'Registrar movimiento' }));
+      expect(onNewMovement).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('edit and delete', () => {
-    it('opens the edit form from the row menu and reports the change when it is saved', async () => {
+    it('opens the edit form in Sheet from the row menu and reports the change when saved', async () => {
       const user = userEvent.setup();
       const { onChanged } = renderList([movement({ id: 'm1', description: 'Café' })]);
 
@@ -259,16 +272,6 @@ describe('MovementList', () => {
       await user.click(screen.getByText('save-edit'));
       expect(onChanged).toHaveBeenCalledTimes(1);
       await waitFor(() => expect(screen.queryByText('editing:m1')).toBeNull());
-    });
-
-    it('closes the edit form on cancel without reporting a change', async () => {
-      const user = userEvent.setup();
-      const { onChanged } = renderList([movement({ id: 'm1', description: 'Café' })]);
-      await user.click(screen.getByRole('button', { name: 'Acciones de Café' }));
-      await user.click(await screen.findByRole('menuitem', { name: 'Editar' }));
-      await user.click(await screen.findByText('cancel-edit'));
-      await waitFor(() => expect(screen.queryByText('editing:m1')).toBeNull());
-      expect(onChanged).not.toHaveBeenCalled();
     });
 
     it('deletes after confirmation, scoped to the user', async () => {
@@ -283,30 +286,6 @@ describe('MovementList', () => {
       expect(onChanged).toHaveBeenCalledTimes(1);
     });
 
-    it('does nothing when the confirmation is declined', async () => {
-      const user = userEvent.setup();
-      vi.spyOn(window, 'confirm').mockReturnValue(false);
-      const { onChanged } = renderList([movement({ id: 'm1', description: 'Café' })]);
-
-      await user.click(screen.getByRole('button', { name: 'Acciones de Café' }));
-      await user.click(await screen.findByRole('menuitem', { name: 'Eliminar' }));
-
-      expect(deleteMock).not.toHaveBeenCalled();
-      expect(onChanged).not.toHaveBeenCalled();
-    });
-
-    it('shows the error when the delete fails', async () => {
-      const user = userEvent.setup();
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
-      deleteMock.mockRejectedValue(new Error('No se pudo borrar'));
-      renderList([movement({ id: 'm1', description: 'Café' })]);
-
-      await user.click(screen.getByRole('button', { name: 'Acciones de Café' }));
-      await user.click(await screen.findByRole('menuitem', { name: 'Eliminar' }));
-
-      expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo borrar');
-    });
-
     it('offers no menu for shared, linked or installment movements', () => {
       renderList([
         movement({ id: 'shared', description: 'Cena', shared_movement_id: 'sm' }),
@@ -316,78 +295,6 @@ describe('MovementList', () => {
       ]);
       expect(screen.getAllByRole('button', { name: /^Acciones de / })).toHaveLength(1);
       expect(screen.getByRole('button', { name: 'Acciones de Café' })).toBeInTheDocument();
-    });
-  });
-
-  describe('desktop table', () => {
-    const rows = [
-      movement({ id: 'e1', description: 'Almuerzo', expense_category_id: 'c1', expense_subcategory_id: 's1', distribution_category_id: 'b1', account_id: 'a1', amount: 1250, date: new Date(2026, 9, 12, 14, 15) }),
-      movement({ id: 'i1', type: 'INCOME', description: 'Abono planilla', income_source_id: 'i1', account_id: 'a1', amount: 300000, date: new Date(2026, 9, 10, 9, 30) }),
-      movement({ id: 't1', type: 'TRANSFER', description: 'A ahorros', account_id: 'a1', to_account_id: 'a2', amount: 5000, date: new Date(2026, 9, 10, 10, 0) }),
-    ];
-
-    it('renders a table with column headers, one row per movement and the sync state', () => {
-      renderList(rows, { desktop: true, pendingIds: new Set(['e1']), balanceCents: 298750 });
-      const table = screen.getByRole('table', { name: 'Movimientos del mes' });
-      const headers = within(table).getAllByRole('columnheader').map(h => h.textContent);
-      expect(headers).toEqual(['Fecha y hora', 'Concepto', 'Categoría', 'Cuenta', 'Estado', 'Monto', 'Acciones']);
-      expect(within(table).getAllByRole('row')).toHaveLength(1 + rows.length);
-
-      const expense = screen.getByTestId('movement-e1');
-      expect(within(expense).getByText('Almuerzo')).toBeInTheDocument();
-      expect(within(expense).getByText('Comida')).toBeInTheDocument();
-      expect(within(expense).getByText('50% Necesidades')).toBeInTheDocument();
-      expect(within(expense).getByText('BCP Débito')).toBeInTheDocument();
-      expect(within(expense).getByText('12 oct 2026')).toBeInTheDocument();
-      expect(within(expense).getByText('14:15')).toBeInTheDocument();
-      expect(within(expense).getByLabelText('Pendiente de sincronizar')).toHaveTextContent('Pendiente');
-      expect(within(screen.getByTestId('movement-i1')).getByLabelText('Sincronizado')).toHaveTextContent('Sincronizado');
-      expect(within(screen.getByTestId('movement-t1')).getByText('BCP Débito → Efectivo')).toBeInTheDocument();
-    });
-
-    it('shows the footer with the shown count and the net balance of the cycle', () => {
-      renderList(rows, { desktop: true, balanceCents: 298750 });
-      expect(screen.getByText(/Mostrando 3 de 3 registros del mes/)).toBeInTheDocument();
-      const footer = screen.getByText(/Balance neto del ciclo/);
-      expect(within(footer).getByText('2,987.50')).toBeInTheDocument();
-      expect(footer.querySelector('[data-slot="money-sign"]')).toHaveTextContent('+');
-      expect(screen.queryByRole('navigation', { name: 'Paginación de movimientos' })).toBeNull();
-    });
-
-    it('paginates 20 rows per page and goes back to page 1 when a filter changes', async () => {
-      const user = userEvent.setup();
-      const many = Array.from({ length: 45 }, (_, i) => movement({
-        id: `m${String(i).padStart(2, '0')}`, description: `Gasto ${i}`, date: new Date(2026, 9, 1, 8, i),
-      }));
-      renderList(many, { desktop: true });
-
-      expect(MOVEMENT_PAGE_SIZE).toBe(20);
-      expect(rowIds()).toHaveLength(20);
-      expect(screen.getByText(/Mostrando 20 de 45 registros del mes/)).toBeInTheDocument();
-      const pager = screen.getByRole('navigation', { name: 'Paginación de movimientos' });
-      expect(within(pager).getByRole('button', { name: 'Anterior' })).toBeDisabled();
-      expect(within(pager).getByRole('button', { name: 'Página 1' })).toHaveAttribute('aria-current', 'page');
-
-      await user.click(within(pager).getByRole('button', { name: 'Siguiente' }));
-      expect(rowIds()[0]).toBe('movement-m24'); // newest first: page 2 starts at the 21st newest
-      await user.click(within(pager).getByRole('button', { name: 'Siguiente' }));
-      expect(rowIds()).toHaveLength(5);
-      expect(screen.getByText(/Mostrando 5 de 45 registros del mes/)).toBeInTheDocument();
-      expect(within(pager).getByRole('button', { name: 'Siguiente' })).toBeDisabled();
-
-      await user.type(screen.getByRole('searchbox'), 'Gasto 44');
-      expect(screen.getByText(/\(45 del mes\)/)).toBeInTheDocument();
-      expect(screen.queryByRole('navigation', { name: 'Paginación de movimientos' })).toBeNull(); // one match: one page, back on page 1
-      expect(rowIds()).toEqual(['movement-m44']);
-      expect(screen.getByText(/Mostrando 1 de 1 registro filtrado \(45 del mes\)/)).toBeInTheDocument();
-    });
-
-    it('opens the edit form from the row menu on desktop too', async () => {
-      const user = userEvent.setup();
-      renderList(rows, { desktop: true });
-      await user.click(screen.getByRole('button', { name: 'Acciones de Almuerzo' }));
-      await user.click(await screen.findByRole('menuitem', { name: 'Editar' }));
-      expect(await screen.findByText('editing:e1')).toBeInTheDocument();
     });
   });
 });

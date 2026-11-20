@@ -3,7 +3,6 @@ import { onLocalChanges } from '../../infrastructure/db/localChanges';
 import { onSyncCompleted } from '../../infrastructure/sync/syncEvents';
 import { useEffect, useState } from 'react';
 import { LocalProfileRepository } from '../../infrastructure/repositories/local/LocalProfileRepository';
-import { LocalIncomeSourceRepository } from '../../infrastructure/repositories/local/LocalIncomeSourceRepository';
 import { LocalMovementRepository } from '../../infrastructure/repositories/local/LocalMovementRepository';
 import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
 import { LocalSavingsGoalRepository } from '../../infrastructure/repositories/local/LocalSavingsGoalRepository';
@@ -11,6 +10,7 @@ import { LocalNotificationRepository } from '../../infrastructure/repositories/l
 import { LocalDebtRepository } from '../../infrastructure/repositories/local/LocalDebtRepository';
 import { LocalSharedSpaceRepository } from '../../infrastructure/repositories/local/LocalSharedSpaceRepository';
 import { LocalSharedMovementRepository } from '../../infrastructure/repositories/local/LocalSharedMovementRepository';
+import { LocalRegistrationRepository } from '../../infrastructure/repositories/local/LocalRegistrationRepository';
 import { SharedMovement } from '../../core/domain/models/types';
 import { LocalHabitRepository } from '../../infrastructure/repositories/local/LocalHabitRepository';
 import { findHabitsPendingToday } from '../../core/use-cases/findHabitsPendingToday';
@@ -20,16 +20,18 @@ import { calculateMonthlyCycle } from '../../core/use-cases/calculateMonthlyCycl
 import { calculateBudgets } from '../../core/use-cases/calculateBudgets';
 import { calculateSpentByBucket } from '../../core/use-cases/calculateCategoryBreakdown';
 import { calculateSavingsGoalProgress } from '../../core/use-cases/calculateSavingsGoalProgress';
+import { calculateMonthBalance } from '../../core/use-cases/calculateMonthBalance';
+import { selectCardOwed } from '../../core/use-cases/selectCardOwed';
+import { buildPendingRegistrations } from '../../core/use-cases/buildPendingRegistrations';
 import { evaluateNotifications } from '../../core/use-cases/evaluateNotifications';
 
 const EVALUATION_INTERVAL_MS = 5 * 60 * 1000;
 
 /**
- * Evaluates RF-16's notification triggers (80%-of-budget, goal completed,
- * daily reminder) on mount and every 5 minutes thereafter — unlike
- * useRecurrenceEvaluator (which only needs to run once per session), a
- * budget/goal threshold can be crossed by movements the user loads during
- * the session, so a single mount-time check isn't enough.
+ * Evaluates notification triggers (80%-of-budget, goal completed, daily reminder,
+ * pending registrations `register_due`, debts, tasks, habits) on mount and every
+ * 5 minutes thereafter. A threshold or due item can change while the user works
+ * in the session, so a single mount-time check isn't enough (Principio XI).
  */
 export function useNotificationEvaluator(userId: string | null) {
   const [celebration, setCelebration] = useState<{ userId: string; count: number } | null>(null);
@@ -47,6 +49,7 @@ export function useNotificationEvaluator(userId: string | null) {
     const habitRepo = new LocalHabitRepository();
     const goalRepoGeneric = new LocalGoalRepository();
     const taskRepo = new LocalTaskRepository();
+    const registrationRepo = new LocalRegistrationRepository();
 
     let active = true;
     const runProgress = async () => {
@@ -60,17 +63,19 @@ export function useNotificationEvaluator(userId: string | null) {
     void runProgress();
     const run = async () => {
       try {
+        const now = new Date();
         const profile = await profileRepo.get(userId);
-        const [start, end] = calculateMonthlyCycle(new Date());
+        const [start, end] = calculateMonthlyCycle(now);
 
-        const [cycleMovements, allMovements, distributionCategories, savingsGoals, existingNotifications, debts] =
+        const [cycleMovements, allMovements, distributionCategories, savingsGoals, existingNotifications, debts, regInputs] =
           await Promise.all([
             movementRepo.getAllByCycle(userId, start, end),
-            movementRepo.getAll(userId), // savings goal progress is lifetime, not cycle-scoped
+            movementRepo.getAll(userId), // savings goal progress & month balance are lifetime, not cycle-scoped
             categoryRepo.getDistributionCategories(userId),
             goalRepo.getAll(userId),
             notificationRepo.getAllByUser(userId),
             debtRepo.getAll(userId),
+            registrationRepo.getInputs(userId, now),
           ]);
 
         const sharedSpaces = await sharedSpaceRepo.getAllForUser(userId);
@@ -83,13 +88,12 @@ export function useNotificationEvaluator(userId: string | null) {
         const completionsByHabit = Object.fromEntries(
           await Promise.all(habits.map(async habit => [habit.id, await habitRepo.getCompletions(habit.id)] as const)),
         );
-        const habitsPendingToday = findHabitsPendingToday(habits, completionsByHabit, new Date());
+        const habitsPendingToday = findHabitsPendingToday(habits, completionsByHabit, now);
 
         const goals = await goalRepoGeneric.getAll(userId);
         const tasks = await taskRepo.getAll(userId);
 
-        const sources = await new LocalIncomeSourceRepository().getAll(userId);
-        const totalIncome = sources.reduce((total, source) => total + source.amount, 0);
+        const totalIncome = regInputs.incomeSources.reduce((total, source) => total + source.amount, 0);
 
         const budgetedCategories = calculateBudgets(totalIncome, distributionCategories);
         const spentByBucketId = calculateSpentByBucket(cycleMovements, distributionCategories);
@@ -99,9 +103,28 @@ export function useNotificationEvaluator(userId: string | null) {
           currentAmountCents: calculateSavingsGoalProgress(goal, allMovements).currentAmountCents,
         }));
 
+        const monthBalance = calculateMonthBalance({
+          month: now,
+          accounts: regInputs.accounts,
+          movements: allMovements,
+          distributionCategories,
+          balanceSince: profile?.balance_since,
+        });
+        const pendingRegistrations = buildPendingRegistrations({
+          today: now,
+          rules: regInputs.rules,
+          incomeSources: regInputs.incomeSources,
+          loans: regInputs.loans,
+          loanIdByPaymentId: regInputs.loanIdByPaymentId,
+          accounts: regInputs.accounts,
+          cardOwed: selectCardOwed(monthBalance),
+          monthMovements: regInputs.monthMovements,
+          skips: regInputs.skips,
+        });
+
         const newNotifications = evaluateNotifications({
           userId,
-          now: new Date(),
+          now,
           budgetedCategories,
           spentByBucketId,
           savingsGoals: savingsGoalsWithProgress,
@@ -110,6 +133,7 @@ export function useNotificationEvaluator(userId: string | null) {
           habitsPendingToday,
           goals,
           tasks,
+          pendingRegistrations,
           notificationHour: profile?.notification_hour,
           existingNotifications,
         });

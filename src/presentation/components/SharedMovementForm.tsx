@@ -108,8 +108,8 @@ export default function SharedMovementForm({ spaceId, currentUserId, members, in
 
   return (
     <div className="w-full">
-      <p className="font-mono text-label-mono-xs uppercase text-muted-foreground">Espacio compartido</p>
-      <h2 className="mb-4 text-headline-md text-foreground">Nuevo Movimiento Compartido</h2>
+      <p className="text-xs font-medium text-muted-foreground">Espacio compartido</p>
+      <h2 className="mb-4 font-fredoka text-headline-md text-foreground">Nuevo movimiento compartido</h2>
       <form onSubmit={handleSubmit} data-testid="shared-movement-form" className="space-y-5">
         <div className="space-y-2">
           <Label htmlFor="movementType">Tipo</Label>
@@ -128,7 +128,7 @@ export default function SharedMovementForm({ spaceId, currentUserId, members, in
           <Label htmlFor="totalAmount">Monto total</Label>
           <div className="relative">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-              <span className="font-mono text-body-md text-muted-foreground">S/</span>
+              <span className="text-body-md text-muted-foreground">S/</span>
             </div>
             <Input
               type="text"
@@ -190,7 +190,7 @@ export default function SharedMovementForm({ spaceId, currentUserId, members, in
 
         {error && <p role="alert" className="text-body-md text-destructive">{error}</p>}
 
-        <div className="flex gap-3 pt-2">
+        <div className="sticky -bottom-4 z-10 -mx-4 -mb-4 flex gap-3 border-t border-border/60 bg-popover px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting} className="flex-1">
             Cancelar
           </Button>

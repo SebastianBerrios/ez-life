@@ -16,7 +16,8 @@ function accountFromUser(user: SessionUser): LocalAccount {
   };
 }
 
-export interface AccountState { account: LocalAccount | null; startStep: 1 | 2 | 3; completed: boolean }
+export type OnboardingStartStep = 1 | 2 | 3 | 4 | 5 | 6;
+export interface AccountState { account: LocalAccount | null; startStep: OnboardingStartStep; completed: boolean }
 /** Async setup has an immediate cleanup boundary; callbacks never await under the auth lock. */
 export function observeAccountSession(syncNow: () => Promise<void>, listener: (state: AccountState) => void): () => void {
   const supabase = getSupabaseBrowserClient();
@@ -36,7 +37,9 @@ export function observeAccountSession(syncNow: () => Promise<void>, listener: (s
     }
     const progress = await new LocalOnboardingRepository().progress(account.id);
     if (disposed || version !== generation || getLocalAccount()?.id !== account.id) return;
-    listener({ account, startStep: progress === 0 ? 1 : progress === 1 ? 2 : 3, completed: progress === 3 });
+    const completed = progress === 6;
+    const startStep = (progress >= 6 ? 6 : progress + 1) as OnboardingStartStep;
+    listener({ account, startStep, completed });
   }
   const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
     if (event === 'TOKEN_REFRESHED') return;

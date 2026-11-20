@@ -169,7 +169,7 @@ function PaletteBody({ onOpenChange, userId, gamificationVisible = true, onNavig
           const headingId = `${baseId}-group-${group.kind}`;
           return (
             <div key={group.kind} role="group" aria-labelledby={headingId} className="pb-1">
-              <div id={headingId} className="px-3 pb-1 pt-2 font-mono text-label-mono-xs uppercase text-muted-foreground">{group.label}</div>
+              <div id={headingId} className="px-3 pb-1 pt-2 text-label-xs text-muted-foreground">{group.label}</div>
               {group.entries.map(entry => {
                 position += 1;
                 const mine = position;
@@ -191,7 +191,7 @@ function PaletteBody({ onOpenChange, userId, gamificationVisible = true, onNavig
                     <EntryIcon entry={entry} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-body-md font-medium">{entry.title}</span>
-                      {entry.subtitle && <span className="block truncate font-mono text-label-mono-xs text-muted-foreground">{entry.subtitle}</span>}
+                      {entry.subtitle && <span className="block truncate text-label-xs text-muted-foreground">{entry.subtitle}</span>}
                     </span>
                     <EntryAmount entry={entry} />
                     {selected && <CornerDownLeft aria-hidden="true" className="hidden size-3.5 shrink-0 text-muted-foreground sm:block" />}
@@ -203,7 +203,7 @@ function PaletteBody({ onOpenChange, userId, gamificationVisible = true, onNavig
         })}
       </div>
 
-      <div className="hidden items-center gap-4 border-t border-border px-4 py-2.5 font-mono text-label-mono-xs text-muted-foreground sm:flex" aria-hidden="true">
+      <div className="hidden items-center gap-4 border-t border-border px-4 py-2.5 text-label-xs text-muted-foreground sm:flex" aria-hidden="true">
         <span className="flex items-center gap-1.5"><Kbd><ArrowUp className="size-3" /></Kbd><Kbd><ArrowDown className="size-3" /></Kbd> navegar</span>
         <span className="flex items-center gap-1.5"><Kbd><CornerDownLeft className="size-3" /></Kbd> abrir</span>
         <span className="flex items-center gap-1.5"><Kbd>esc</Kbd> cerrar</span>

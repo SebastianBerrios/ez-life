@@ -22,8 +22,8 @@ export default function MobileHeader({ currentRoute, refDate, onShiftMonth, avat
   const showMonth = MONTH_SELECTOR_ROUTES.includes(currentRoute);
 
   return (
-    <header aria-label="Encabezado móvil" className="flex items-center justify-between gap-2 py-2 md:hidden">
-      <h1 className="text-headline-md font-semibold tracking-tight text-foreground">
+    <header aria-label="Encabezado móvil" className="flex items-center justify-between gap-2 pt-[calc(0.5rem+env(safe-area-inset-top))] pb-2 lg:hidden">
+      <h1 className="font-fredoka text-headline-md font-semibold tracking-tight text-foreground">
         ez<span className="text-primary">·</span>life
       </h1>
       <div className="flex items-center gap-1">

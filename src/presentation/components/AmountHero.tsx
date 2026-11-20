@@ -29,7 +29,7 @@ export default function AmountHero({ value, onChange, badge, error, inputRef, au
   return (
     <div className={cn('rounded-lg border border-border bg-card p-4 text-center', className)}>
       <div className="mb-2 flex items-center justify-center gap-2">
-        <span className="font-mono text-label-mono-xs uppercase text-muted-foreground" aria-hidden="true">Monto a registrar</span>
+        <span className="text-label-xs text-muted-foreground" aria-hidden="true">Monto a registrar</span>
         {badge}
       </div>
 
@@ -66,7 +66,7 @@ export default function AmountHero({ value, onChange, badge, error, inputRef, au
               type="button"
               aria-label={`Sumar ${label}`}
               onClick={() => onChange(addQuickAmount(value, cents))}
-              className="h-11 rounded-lg border border-border bg-surface-3 font-mono text-label-mono-sm tabular-nums text-muted-foreground outline-none transition-colors hover:text-primary focus-visible:shadow-focus active:translate-y-px"
+              className="h-11 rounded-full border border-border bg-surface-2 font-fredoka text-label-sm tabular-nums text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:shadow-focus active:translate-y-px"
             >
               +{label}
             </button>
@@ -77,7 +77,7 @@ export default function AmountHero({ value, onChange, badge, error, inputRef, au
       <button
         type="button"
         onClick={() => onChange('')}
-        className="mt-1 min-h-11 px-3 font-mono text-label-mono-xs text-muted-foreground underline underline-offset-2 outline-none hover:text-foreground focus-visible:shadow-focus"
+        className="mt-1 min-h-11 px-3 text-label-xs text-muted-foreground underline underline-offset-2 outline-none hover:text-foreground focus-visible:shadow-focus"
       >
         Limpiar monto
       </button>

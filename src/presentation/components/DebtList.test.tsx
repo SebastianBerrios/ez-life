@@ -40,7 +40,7 @@ describe('DebtList', () => {
     render(<DebtList userId="u1" />);
 
     const card = await screen.findByTestId('debt-debt-1');
-    expect(within(card).getByText(/Le prestaste a Juan/)).toBeInTheDocument();
+    expect(within(card).getByText('Juan te debe S/ 75.00')).toBeInTheDocument();
     expect(within(card).getByText('Pendiente')).toBeInTheDocument();
     expect(within(card).getByText('75.00')).toBeInTheDocument(); // 100.00 - 25.00
     expect(within(card).getByText('100.00')).toBeInTheDocument();
@@ -67,7 +67,7 @@ describe('DebtList', () => {
     mockRepo([{ ...lentDebt, direction: 'borrowed', settled_amount: 10000 }]);
     render(<DebtList userId="u1" />);
 
-    expect(await screen.findByText(/Te prestó Juan/)).toBeInTheDocument();
+    expect(await screen.findByText('Saldado con Juan')).toBeInTheDocument();
     expect(screen.getByText('Saldado ✓')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Registrar devolución' })).toBeNull();
   });

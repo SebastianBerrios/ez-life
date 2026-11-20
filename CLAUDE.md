@@ -67,9 +67,20 @@ considered unauthorized by this project's own convention.
   single client component holding a `step` state machine
   (`loading → login → onboarding-wizard → app`) and a `currentRoute` string
   switched inside `Layout`/`BottomNav`. There is no Next.js file-based routing
-  beyond the single `src/app/page.tsx` entry point.
+  beyond the single `src/app/page.tsx` entry point. On entering `app`, it runs
+  one-time setup helpers (`ensureDefault`, `adoptLegacySources`,
+  `ensureBalanceSince`) without ever creating movements automatically.
+- `presentation/components/Dashboard.tsx` (Resumen) is fed exclusively by
+  `presentation/hooks/useSummaryData.ts` (no `useDashboardData`) and composes
+  the minimalist sections under `presentation/components/summary/`
+  (`BalanceHero`, `PendingRegistrations`, `AccountsAndDebts`, `CompactRule`,
+  `PrimaryGoal`, `SetupChecklistCard`, `GuidedTour`).
+- `presentation/components/OnboardingWizard.tsx` walks 6 steps (`Ingresos`,
+  `Dinero`, `Tarjetas`, `Préstamos`, `Distribución`, `Categorías`) and can open
+  any individual step from Resumen/Ajustes in `mode="settings"`.
 - `presentation/hooks/` — background jobs (`useSyncManager`,
-  `useRecurrenceEvaluator`) wired into `MainFlow`, not into individual screens.
+  `useNotificationEvaluator`, `useTaskRecurrenceEvaluator`) wired into
+  `MainFlow`, not into individual screens.
 
 `src/components/ui/*` are shadcn-generated primitives (`components.json`
 config); `src/components/theme-provider.tsx` wraps `next-themes`, mounted once

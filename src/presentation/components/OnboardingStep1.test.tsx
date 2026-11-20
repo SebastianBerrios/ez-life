@@ -1,78 +1,66 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import React from 'react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import OnboardingStep1 from './OnboardingStep1';
-import { LocalOnboardingRepository } from '../../infrastructure/repositories/local/LocalOnboardingRepository';
 
-// Mock the repositories
-vi.mock('../../infrastructure/repositories/local/LocalOnboardingRepository');
+const saveIncome = vi.fn();
 
-const mockSaveStartingPoint = vi.fn();
-const mockOnComplete = vi.fn();
+vi.mock('../../infrastructure/repositories/local/LocalOnboardingRepository', () => ({
+  LocalOnboardingRepository: vi.fn(function () {
+    return { saveIncome };
+  }),
+}));
 
-function renderStep() {
-  vi.mocked(LocalOnboardingRepository).mockImplementation(function() { return { saveStartingPoint: mockSaveStartingPoint } as unknown as LocalOnboardingRepository; });
-  return render(<OnboardingStep1 profileId="real-session-id" onComplete={mockOnComplete} />);
-}
-
-const submit = () => fireEvent.submit(screen.getByRole('button', { name: /continuar/i }).closest('form')!);
-
-describe('OnboardingStep1', () => {
-  beforeEach(() => { mockSaveStartingPoint.mockReset(); mockOnComplete.mockReset(); });
-
-  it('shows the starting point copy, both fields and the balance help text', () => {
-    renderStep();
-    expect(screen.getByRole('heading', { name: 'Tu punto de partida' })).toBeInTheDocument();
-    expect(screen.getByText('Paso 1 de 3')).toBeInTheDocument();
-    expect(screen.getByLabelText('Sueldo o ingreso mensual')).toBeRequired();
-    const balance = screen.getByLabelText('Saldo actual (opcional)');
-    expect(balance).not.toBeRequired();
-    expect(screen.getByText('Lo que tienes hoy entre efectivo y cuentas. Puedes ajustarlo después en Ajustes → Cuentas.')).toBeInTheDocument();
-    expect(balance).toHaveAccessibleDescription(/Lo que tienes hoy/);
+describe('OnboardingStep1 (Tus ingresos)', () => {
+  beforeEach(() => {
+    saveIncome.mockReset().mockResolvedValue(undefined);
   });
 
-  it('should render form and submit successfully with the real session profile id', async () => {
+  it('keeps Continuar disabled until a valid positive income is entered', async () => {
     const user = userEvent.setup();
-    renderStep();
-    // Regression guard: the real session profileId is used, never a freshly minted uuid.
-    await user.type(screen.getByLabelText('Sueldo o ingreso mensual'), '5000.50');
-    submit();
-    await waitFor(() => {
-      expect(mockSaveStartingPoint).toHaveBeenCalledWith('real-session-id', { income: 500050, openingBalance: 0 });
-    });
-    expect(mockOnComplete).toHaveBeenCalledWith('real-session-id');
+    render(<OnboardingStep1 profileId="u1" onComplete={vi.fn()} />);
+
+    expect(screen.getByRole('heading', { name: 'Tus ingresos' })).toBeInTheDocument();
+    const submit = screen.getByRole('button', { name: 'Continuar' });
+    expect(submit).toBeDisabled();
+
+    const incomeInput = screen.getByLabelText('Ingreso mensual');
+    await user.type(incomeInput, '0');
+    expect(submit).toBeDisabled();
+
+    await user.clear(incomeInput);
+    await user.type(incomeInput, '3000');
+    expect(submit).toBeEnabled();
   });
 
-  it('sends the current balance in cents next to the income', async () => {
+  it('submits income, optional payDay and receivedThisMonth to saveIncome', async () => {
     const user = userEvent.setup();
-    renderStep();
-    await user.type(screen.getByLabelText('Sueldo o ingreso mensual'), '3000');
-    await user.type(screen.getByLabelText('Saldo actual (opcional)'), '800');
-    submit();
-    await waitFor(() => {
-      expect(mockSaveStartingPoint).toHaveBeenCalledWith('real-session-id', { income: 300000, openingBalance: 80000 });
-    });
-    expect(mockOnComplete).toHaveBeenCalledWith('real-session-id');
+    const onComplete = vi.fn();
+    render(<OnboardingStep1 profileId="u1" onComplete={onComplete} />);
+
+    await user.type(screen.getByLabelText('Ingreso mensual'), '3000');
+    await user.type(screen.getByLabelText(/qué día te pagan/i), '28');
+    await user.click(screen.getByRole('radio', { name: 'Sí' }));
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+
+    await waitFor(() => expect(saveIncome).toHaveBeenCalledWith('u1', {
+      income: 300000,
+      payDay: 28,
+      receivedThisMonth: true,
+    }));
+    expect(onComplete).toHaveBeenCalledWith('u1');
   });
 
-  it('blocks a negative balance with a message and does not call the repository', async () => {
+  it('shows a field alert for an invalid payDay without calling saveIncome', async () => {
     const user = userEvent.setup();
-    renderStep();
-    await user.type(screen.getByLabelText('Sueldo o ingreso mensual'), '3000');
-    await user.type(screen.getByLabelText('Saldo actual (opcional)'), '-5');
-    submit();
-    expect(await screen.findByRole('alert')).toHaveTextContent('El saldo actual no puede ser negativo.');
-    expect(mockSaveStartingPoint).not.toHaveBeenCalled();
-    expect(mockOnComplete).not.toHaveBeenCalled();
-  });
+    render(<OnboardingStep1 profileId="u1" onComplete={vi.fn()} />);
 
-  it('shows a persistent error when saving fails', async () => {
-    const user = userEvent.setup();
-    mockSaveStartingPoint.mockRejectedValue('boom');
-    renderStep();
-    await user.type(screen.getByLabelText('Sueldo o ingreso mensual'), '3000');
-    submit();
-    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo guardar tu punto de partida.');
-    expect(mockOnComplete).not.toHaveBeenCalled();
+    await user.type(screen.getByLabelText('Ingreso mensual'), '3000');
+    await user.type(screen.getByLabelText(/qué día te pagan/i), '35');
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ingresa un día entre 1 y 31.');
+    expect(saveIncome).not.toHaveBeenCalled();
   });
 });

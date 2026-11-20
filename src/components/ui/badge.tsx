@@ -3,15 +3,18 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const badgeVariants = cva(
-  "inline-flex items-center gap-1 rounded-sm border px-2 py-0.5 font-mono text-label-mono-sm whitespace-nowrap tabular-nums [&_svg]:size-3 [&_svg]:shrink-0",
+  "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap tabular-nums [&_svg]:size-3 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        positive: "border-primary/25 bg-primary/[0.12] text-success",
-        negative: "border-expense/25 bg-expense/10 text-expense",
-        neutral: "border-border bg-foreground/[0.04] text-muted-foreground",
-        warning: "border-warning/25 bg-warning/10 text-warning",
-        primary: "border-transparent bg-primary text-primary-foreground",
+        positive: "bg-pill-savings text-pill-savings-foreground",
+        negative: "bg-expense/15 text-expense",
+        neutral: "bg-surface-2 text-muted-foreground",
+        warning: "bg-warning/15 text-warning",
+        primary: "bg-primary text-primary-foreground",
+        needs: "bg-pill-needs text-pill-needs-foreground",
+        wants: "bg-pill-wants text-pill-wants-foreground",
+        savings: "bg-pill-savings text-pill-savings-foreground",
       },
     },
     defaultVariants: {

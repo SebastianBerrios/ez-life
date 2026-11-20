@@ -9,10 +9,18 @@ vi.mock('../hooks/useSharedSpaceRealtime', () => ({ useSharedSpaceRealtime: vi.f
 
 const stamp = { created_at: new Date(), updated_at: new Date() };
 
-function movement(id: string, createdBy: string, total: number, splits: Array<[string, number]>) {
+function movement(id: string, createdBy: string, totalCents: number, splits: Array<[string, number]>) {
   return {
-    ...stamp, id, shared_space_id: 'space-1', created_by: createdBy, type: 'expense', total_amount: total, split_mode: 'fixed_amount',
-    date: new Date(), splits: splits.map(([user_id, share_cents]) => ({ user_id, share_cents })),
+    ...stamp,
+    id,
+    shared_space_id: 'space-1',
+    created_by: createdBy,
+    type: 'expense' as const,
+    total_amount_cents: totalCents,
+    split_mode: 'percentage' as const,
+    linked_movement_ids: [],
+    date: new Date(2026, 9, 15),
+    splits: splits.map(([user_id, share_cents]) => ({ user_id, share_cents })),
   };
 }
 
@@ -25,34 +33,44 @@ function useMovements(rows: unknown[]) {
 beforeEach(() => vi.clearAllMocks());
 
 describe('SharedSpaceBalances', () => {
-  it('says there is nothing pending when nobody owes anything', async () => {
+  it('shows "Están al día" when nobody owes anything', async () => {
     useMovements([]);
     render(<SharedSpaceBalances spaceId="space-1" currentUserId="ana" refreshKey={0} />);
-    expect(await screen.findByText('No hay saldos pendientes en este espacio.')).toBeInTheDocument();
+    expect(await screen.findByText('Están al día')).toBeInTheDocument();
   });
 
-  it('shows who owes whom with the amount formatted from cents, colored from the signed-in user point of view', async () => {
-    // Ana paid S/ 100.00 split 50/50: Bob owes Ana S/ 50.00.
+  it('shows natural balance phrases, net hero, and readable shared movements list', async () => {
     useMovements([movement('m1', 'ana', 10000, [['ana', 5000], ['bob', 5000]])]);
-    const { rerender } = render(<SharedSpaceBalances spaceId="space-1" currentUserId="ana" refreshKey={0} />);
+    const memberNames = { ana: 'Ana', bob: 'Bob' };
+    const { rerender } = render(
+      <SharedSpaceBalances spaceId="space-1" currentUserId="ana" refreshKey={0} memberNames={memberNames} />,
+    );
 
-    const list = await screen.findByRole('list');
-    const row = within(list).getByRole('listitem');
-    expect(row).toHaveTextContent('bob te debe');
-    expect(row).toHaveTextContent(/S\/\s?50\.00/);
+    const hero = await screen.findByTestId('shared-balances-hero');
+    expect(within(hero).getByText('Te deben S/ 50.00')).toBeInTheDocument();
+
+    const balancesPanel = screen.getByTestId('shared-balances');
+    const row = within(balancesPanel).getByRole('listitem');
+    expect(row).toHaveTextContent('Bob te debe S/ 50.00');
     expect(row.querySelector('[data-slot="money"]')).toHaveAttribute('data-tone', 'income');
 
-    // Same data seen by Bob: he owes.
-    rerender(<SharedSpaceBalances spaceId="space-1" currentUserId="bob" refreshKey={1} />);
-    expect(await screen.findByText('Tú le debes a ana')).toBeInTheDocument();
-    expect(screen.getByRole('listitem').querySelector('[data-slot="money"]')).toHaveAttribute('data-tone', 'expense');
+    const movementsPanel = screen.getByTestId('shared-movements-list');
+    expect(within(movementsPanel).getByText('Pagaste tú · dividido en partes iguales')).toBeInTheDocument();
+
+    // Same data seen by Bob: he owes Ana.
+    rerender(
+      <SharedSpaceBalances spaceId="space-1" currentUserId="bob" refreshKey={1} memberNames={memberNames} />,
+    );
+    expect(await screen.findByText('Debes S/ 50.00')).toBeInTheDocument();
+    expect(screen.getByText('Le debes S/ 50.00 a Ana')).toBeInTheDocument();
   });
 
-  it('never shows a sign on the debt amount', async () => {
+  it('falls back to "Otro miembro" when names are not provided', async () => {
     useMovements([movement('m1', 'ana', 10000, [['ana', 5000], ['bob', 5000]])]);
     render(<SharedSpaceBalances spaceId="space-1" currentUserId="carla" refreshKey={0} />);
-    const row = await screen.findByRole('listitem');
-    expect(row).toHaveTextContent('bob le debe a ana');
+    const balancesPanel = await screen.findByTestId('shared-balances');
+    const row = within(balancesPanel).getByRole('listitem');
+    expect(row).toHaveTextContent('Otro miembro le debe S/ 50.00 a Otro miembro');
     expect(row.querySelector('[data-slot="money-sign"]')).toBeNull();
     expect(row.querySelector('[data-slot="money"]')).toHaveAttribute('data-tone', 'neutral');
   });

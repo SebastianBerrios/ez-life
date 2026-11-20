@@ -22,6 +22,7 @@ const NOTIFICATION_ICONS: Record<NotificationType, LucideIcon> = {
   habit_reminder: Flame,
   streak_at_risk: AlertTriangle,
   task_due: CalendarClock,
+  register_due: CalendarClock,
 };
 
 interface Props {
@@ -67,7 +68,7 @@ export default function NotificationHistory({ userId, onClose }: Props) {
     <div className="w-full">
       <div className="mb-4 flex flex-row items-center justify-between gap-3">
         <div>
-          <p className="font-mono text-label-mono-xs uppercase text-muted-foreground">Historial</p>
+          <p className="text-label-xs text-muted-foreground">Historial</p>
           <h2 className="text-headline-md text-foreground">Notificaciones</h2>
         </div>
         <Button variant="ghost" size="icon" onClick={onClose} aria-label="Cerrar">
@@ -110,7 +111,7 @@ export default function NotificationHistory({ userId, onClose }: Props) {
                       <span className="min-w-0 break-words">{n.title}</span>
                     </p>
                     <p className="text-body-md text-muted-foreground">{n.body}</p>
-                    <p className="font-mono text-label-mono-xs text-muted-foreground">{formatMovementWhen(new Date(n.created_at), now)}</p>
+                    <p className="text-label-xs text-muted-foreground">{formatMovementWhen(new Date(n.created_at), now)}</p>
                   </div>
                   {isUnread && (
                     <Button

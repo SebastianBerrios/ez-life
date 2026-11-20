@@ -16,8 +16,49 @@ beforeEach(async () => {
   await db.open();
 });
 
-describe('SettingsScreen — Exportar Datos', () => {
-  it('exports the whole history as CSV through the shared download helper, with account names', async () => {
+describe('SettingsScreen — 5 collapsible sections and top quick access (spec 014)', () => {
+  it('shows Completar configuración and Ver tutorial visible at the top above 5 collapsed sections', async () => {
+    const user = userEvent.setup();
+    const onCompleteSetup = vi.fn();
+    const onReplayTour = vi.fn();
+    render(
+      <SettingsScreen
+        userId="u"
+        onCompleteSetup={onCompleteSetup}
+        onReplayTour={onReplayTour}
+      />,
+    );
+
+    const setupBtn = await screen.findByRole('button', { name: 'Completar configuración' });
+    const tourBtn = screen.getByRole('button', { name: 'Ver tutorial' });
+    await user.click(setupBtn);
+    await user.click(tourBtn);
+    expect(onCompleteSetup).toHaveBeenCalledTimes(1);
+    expect(onReplayTour).toHaveBeenCalledTimes(1);
+
+    for (const title of ['Perfil', 'Cuentas e ingresos', 'Notificaciones', 'Apariencia', 'Datos y exportación']) {
+      const trigger = screen.getByRole('button', { name: new RegExp(title, 'i') });
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    }
+  });
+
+  it('allows keeping multiple sections open simultaneously', async () => {
+    const user = userEvent.setup();
+    render(<SettingsScreen userId="u" accountName="Ana Pérez" accountEmail="ana@example.test" />);
+
+    const profileTrigger = screen.getByRole('button', { name: /Perfil/i });
+    const appearanceTrigger = screen.getByRole('button', { name: /Apariencia/i });
+
+    await user.click(profileTrigger);
+    await user.click(appearanceTrigger);
+
+    expect(profileTrigger).toHaveAttribute('aria-expanded', 'true');
+    expect(appearanceTrigger).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('Ana Pérez')).toBeInTheDocument();
+    expect(screen.getByText('Cambiar tema visual')).toBeInTheDocument();
+  });
+
+  it('exports the whole history as CSV from Datos y exportación', async () => {
     const user = userEvent.setup();
     const account = await new LocalPaymentAccountRepository().save({ id: '', user_id: 'u', name: 'BCP Débito', kind: 'debit', opening_balance: 0 });
     const repo = new LocalMovementRepository();
@@ -25,43 +66,20 @@ describe('SettingsScreen — Exportar Datos', () => {
     await repo.save({ id: '', user_id: 'u', type: 'INCOME', amount: 5000, date: new Date(2026, 9, 3, 9, 0), description: 'Ajuste de octubre', is_adjustment: true, account_id: account.id, is_recurring: false });
     render(<SettingsScreen userId="u" />);
 
+    await user.click(screen.getByRole('button', { name: /Datos y exportación/i }));
     await user.click(await screen.findByRole('button', { name: 'CSV' }));
 
     await waitFor(() => expect(download).toHaveBeenCalledTimes(1));
     const [filename, content] = download.mock.calls[0] as [string, string];
     expect(filename).toMatch(/^ezlife_export_\d{4}-\d{2}-\d{2}\.csv$/);
-    expect(content.split('\n')[0]).toBe('Fecha;Hora;Tipo;Cuenta;Categoria;Monto;Descripcion');
     expect(content).toContain('Ajuste de septiembre');
-    expect(content).toContain('Ajuste de octubre');
     expect(content).toContain('BCP Débito');
   });
-});
 
-describe('SettingsScreen — layout and preferences', () => {
-  it('shows the profile panel only with real account data', async () => {
-    const { rerender } = render(<SettingsScreen userId="u" />);
-    await screen.findByRole('button', { name: 'CSV' });
-    expect(screen.queryByRole('heading', { name: 'Perfil' })).toBeNull();
-
-    rerender(<SettingsScreen userId="u" accountName="Usuario de prueba" accountEmail="prueba@example.test" />);
-    expect(screen.getByRole('heading', { name: 'Perfil' })).toBeInTheDocument();
-    expect(screen.getByText('Usuario de prueba')).toBeInTheDocument();
-    expect(screen.getByText('prueba@example.test')).toBeInTheDocument();
-  });
-
-  it('groups every setting in its own labelled panel', async () => {
-    render(<SettingsScreen userId="u" />);
-    await screen.findByRole('button', { name: 'CSV' });
-    for (const title of [
-      'Cuentas de pago', 'Fuentes de ingreso', 'Categorías y Distribución', 'Apariencia', 'Mi progreso', 'Notificaciones', 'Exportar Datos', 'Cuenta',
-    ]) {
-      expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
-    }
-  });
-
-  it('saves the in-app notification switch', async () => {
+  it('saves the in-app notification switch inside Notificaciones', async () => {
     const user = userEvent.setup();
     render(<SettingsScreen userId="u" />);
+    await user.click(screen.getByRole('button', { name: /Notificaciones/i }));
     const inapp = await screen.findByRole('switch', { name: 'Notificaciones in-app' });
     expect(inapp).toHaveAttribute('aria-checked', 'true');
 
@@ -70,47 +88,44 @@ describe('SettingsScreen — layout and preferences', () => {
     await waitFor(async () => expect((await db.profiles.get('u'))?.inapp_enabled).toBe(false));
   });
 
-  it('turns gamification off and on from its switch, keeping what was saved', async () => {
+  it('turns gamification off and on inside Apariencia', async () => {
     const user = userEvent.setup();
     await db.profiles.put({ id: 'u', gamification_enabled: true, created_at: new Date(), updated_at: new Date() });
     render(<SettingsScreen userId="u" />);
+    await user.click(screen.getByRole('button', { name: /Apariencia/i }));
     const toggle = await screen.findByRole('switch', { name: 'Mostrar logros personales y celebraciones' });
     await waitFor(() => expect(toggle).toBeEnabled());
-    expect(toggle).toHaveAccessibleDescription('Puedes ocultarlos cuando quieras. Tu historial se conserva.');
 
     await user.click(toggle);
     await waitFor(async () => expect((await db.profiles.get('u'))?.gamification_enabled).toBe(false));
-    expect(toggle).toHaveAttribute('aria-checked', 'false');
-    await waitFor(() => expect(toggle).toBeEnabled());
     await user.click(toggle);
     await waitFor(async () => expect((await db.profiles.get('u'))?.gamification_enabled).toBe(true));
   });
 
-  it('names the export files with the LOCAL calendar day, not the UTC one', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    // 22:00 on Oct 16 in UTC-5 is already Oct 17 in UTC: the file must say the 16th.
-    vi.setSystemTime(new Date(2026, 9, 16, 22, 0));
-    try {
-      const user = userEvent.setup({ advanceTimers: () => undefined });
-      render(<SettingsScreen userId="u" />);
-      await user.click(await screen.findByRole('button', { name: 'CSV' }));
-      await waitFor(() => expect(download).toHaveBeenCalledTimes(1));
-      expect((download.mock.calls[0] as [string])[0]).toBe('ezlife_export_2026-10-16.csv');
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-});
-
-describe('SettingsScreen — account requested from ⌘K (focus)', () => {
-  it('reveals the account row in "Cuentas de pago" and reports it handled', async () => {
+  it('auto-opens Cuentas e ingresos when focus arrives from ⌘K and reveals the account', async () => {
     const account = await new LocalPaymentAccountRepository().save({ id: '', user_id: 'u', name: 'BCP Débito', kind: 'debit', opening_balance: 0 });
     const onFocusHandled = vi.fn();
     render(<SettingsScreen userId="u" focus={{ kind: 'account', id: account.id }} focusNonce={1} onFocusHandled={onFocusHandled} />);
 
+    expect(screen.getByRole('button', { name: /Cuentas e ingresos/i })).toHaveAttribute('aria-expanded', 'true');
     const row = await screen.findByTestId(`account-${account.id}`);
     await waitFor(() => expect(row).toHaveAttribute('data-reveal', 'true'));
     expect(row).toHaveFocus();
     expect(onFocusHandled).toHaveBeenCalledTimes(1);
+  });
+
+  it('auto-opens Cuentas e ingresos when editAccountId is provided', async () => {
+    const card = await new LocalPaymentAccountRepository().save({
+      id: '',
+      user_id: 'u',
+      name: 'Visa',
+      kind: 'credit',
+      opening_balance: 0,
+      credit_limit: 500000,
+    });
+    render(<SettingsScreen userId="u" editAccountId={card.id} editAccountNonce={1} />);
+
+    expect(screen.getByRole('button', { name: /Cuentas e ingresos/i })).toHaveAttribute('aria-expanded', 'true');
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 });

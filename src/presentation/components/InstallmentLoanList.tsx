@@ -3,52 +3,45 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Landmark } from 'lucide-react';
 import { LocalInstallmentLoanRepository } from '../../infrastructure/repositories/local/LocalInstallmentLoanRepository';
-import { InstallmentAdjustmentType, InstallmentLoan, InstallmentPayment } from '../../core/domain/models/types';
+import { LocalPaymentAccountRepository } from '../../infrastructure/repositories/local/LocalPaymentAccountRepository';
+import { InstallmentAdjustmentType, InstallmentLoan, InstallmentPayment, PaymentAccount } from '../../core/domain/models/types';
 import { DomainError } from '../../core/domain/errors/DomainError';
 import { parseMoney } from '../../core/use-cases/parseMoney';
+import { pickPrimaryAccount } from '../../core/use-cases/pickPrimaryAccount';
 import { formatShortDate } from '../../core/use-cases/formatMovementWhen';
+import { formatInstallmentLoanPhrase } from '../../core/use-cases/formatFinancesPhrases';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Money } from '@/components/ui/money';
+import { Panel } from '@/components/ui/panel';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { onLocalChanges } from '../../infrastructure/db/localChanges';
 import InstallmentLoanForm from './InstallmentLoanForm';
-import { FORM_DIALOG_CONTENT_CLASS } from './dialogChrome';
 
 interface Props {
   userId: string;
 }
 
-const EYEBROW = 'font-mono text-label-mono-xs uppercase text-muted-foreground';
-
-function Metric({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex min-w-0 flex-col gap-1">
-      <dt className={EYEBROW}>{label}</dt>
-      <dd className="text-body-md text-foreground">{children}</dd>
-    </div>
-  );
-}
-
 export default function InstallmentLoanList({ userId }: Props) {
   const [loans, setLoans] = useState<InstallmentLoan[]>([]);
+  const [accounts, setAccounts] = useState<PaymentAccount[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [installmentDrafts, setInstallmentDrafts] = useState<Record<string, string>>({});
+  const [installmentAccountDrafts, setInstallmentAccountDrafts] = useState<Record<string, string>>({});
   const [installmentErrors, setInstallmentErrors] = useState<Record<string, string>>({});
 
   const [showPrincipalFlow, setShowPrincipalFlow] = useState<Record<string, boolean>>({});
   const [principalAmountDrafts, setPrincipalAmountDrafts] = useState<Record<string, string>>({});
+  const [principalAccountDrafts, setPrincipalAccountDrafts] = useState<Record<string, string>>({});
   const [adjustmentTypeDrafts, setAdjustmentTypeDrafts] = useState<Record<string, InstallmentAdjustmentType | ''>>({});
   const [resultingValueDrafts, setResultingValueDrafts] = useState<Record<string, string>>({});
   const [principalErrors, setPrincipalErrors] = useState<Record<string, string>>({});
-  // FR-014: disables "Confirmar abono" while the payment is in flight, to
-  // prevent an accidental double-submit from creating two payments/Movements.
   const [principalSubmitting, setPrincipalSubmitting] = useState<Record<string, boolean>>({});
 
   const [paymentHistory, setPaymentHistory] = useState<Record<string, InstallmentPayment[]>>({});
@@ -56,10 +49,18 @@ export default function InstallmentLoanList({ userId }: Props) {
 
   const [editingLoan, setEditingLoan] = useState<InstallmentLoan | null>(null);
 
+  const activeAccounts = accounts.filter(a => !a.archived && !a.deleted_at);
+  const primaryAccountId = pickPrimaryAccount(accounts, userId)?.id ?? activeAccounts[0]?.id ?? '';
+
   const loadLoans = useCallback(async () => {
     try {
       const repo = new LocalInstallmentLoanRepository();
-      setLoans(await repo.getAll(userId));
+      const [loadedLoans, loadedAccounts] = await Promise.all([
+        repo.getAll(userId),
+        new LocalPaymentAccountRepository().getAll(userId).catch(() => [] as PaymentAccount[]),
+      ]);
+      setLoans(loadedLoans);
+      setAccounts(loadedAccounts);
     } catch (err) {
       console.error(err);
     } finally {
@@ -69,17 +70,21 @@ export default function InstallmentLoanList({ userId }: Props) {
 
   useEffect(() => {
     loadLoans();
-    // A loan changed from another tab or by a sync pull must show up without remounting.
-    return onLocalChanges(['installment_loans'], loadLoans);
+    return onLocalChanges(['installment_loans', 'payment_accounts'], loadLoans);
   }, [loadLoans]);
 
   const handlePayInstallments = async (loan: InstallmentLoan) => {
     const draft = installmentDrafts[loan.id] ?? '';
     const count = parseInt(draft, 10);
+    const selectedAccountId = installmentAccountDrafts[loan.id] || primaryAccountId || undefined;
 
     try {
       const repo = new LocalInstallmentLoanRepository();
-      await repo.recordInstallmentPayment(loan.id, count, new Date());
+      if (selectedAccountId) {
+        await repo.recordInstallmentPayment(loan.id, count, new Date(), selectedAccountId);
+      } else {
+        await repo.recordInstallmentPayment(loan.id, count, new Date());
+      }
       setInstallmentDrafts(prev => ({ ...prev, [loan.id]: '' }));
       setInstallmentErrors(prev => ({ ...prev, [loan.id]: '' }));
       await loadLoans();
@@ -104,9 +109,14 @@ export default function InstallmentLoanList({ userId }: Props) {
       const adjustment = adjustmentType === 'reduce_term'
         ? { type: 'reduce_term' as const, newRemainingInstallments: parseInt(resultingDraft, 10) }
         : { type: 'reduce_installment_amount' as const, newInstallmentAmountCents: parseMoney(resultingDraft) };
+      const selectedAccountId = principalAccountDrafts[loan.id] || primaryAccountId || undefined;
 
       const repo = new LocalInstallmentLoanRepository();
-      await repo.recordPrincipalPayment(loan.id, amountInCents, new Date(), adjustment);
+      if (selectedAccountId) {
+        await repo.recordPrincipalPayment(loan.id, amountInCents, new Date(), adjustment, selectedAccountId);
+      } else {
+        await repo.recordPrincipalPayment(loan.id, amountInCents, new Date(), adjustment);
+      }
       setPrincipalAmountDrafts(prev => ({ ...prev, [loan.id]: '' }));
       setAdjustmentTypeDrafts(prev => ({ ...prev, [loan.id]: '' }));
       setResultingValueDrafts(prev => ({ ...prev, [loan.id]: '' }));
@@ -147,7 +157,7 @@ export default function InstallmentLoanList({ userId }: Props) {
   if (loading) {
     return (
       <div className="space-y-3">
-        <Skeleton className="h-28 w-full rounded-lg" />
+        <Skeleton className="h-28 w-full rounded-card" />
       </div>
     );
   }
@@ -157,28 +167,27 @@ export default function InstallmentLoanList({ userId }: Props) {
   }
 
   return (
-    <div className="animate-fade-slide-up flex flex-col gap-3" data-testid="installment-loans">
-      <p className={EYEBROW}>Con cuotas</p>
+    <div className="flex flex-col gap-3" data-testid="installment-loans">
+      <p className="px-1 text-xs font-medium text-muted-foreground">Préstamos en cuotas</p>
       {loans.map(loan => {
         const isSettled = loan.status === 'settled';
         const paid = Math.max(0, loan.installment_count - loan.remaining_installments);
         const paidPercent = loan.installment_count > 0 ? Math.round((paid * 100) / loan.installment_count) : 0;
+        const phrase = formatInstallmentLoanPhrase(loan);
 
         return (
-          <article key={loan.id} className="flex flex-col gap-4 rounded-lg border border-border bg-background p-4" data-testid={`installment-loan-${loan.id}`}>
+          <Panel key={loan.id} className="gap-4 p-5" data-testid={`installment-loan-${loan.id}`}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
-                <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-primary">
+                <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-2 text-primary">
                   <Landmark className="size-5" />
                 </span>
                 <div className="min-w-0">
-                  <h4 className="flex flex-wrap items-center gap-2 text-headline-sm text-foreground">
+                  <h4 className="flex flex-wrap items-center gap-2 font-fredoka text-headline-sm text-foreground">
                     {loan.lender_name}
                     <Badge variant={isSettled ? 'positive' : 'primary'}>{isSettled ? 'Saldado' : 'Activo'}</Badge>
                   </h4>
-                  <p className="font-mono text-label-mono-xs text-muted-foreground">
-                    {loan.interest_rate !== undefined ? `${loan.interest_rate}% (informativo)` : 'Sin tasa informada'}
-                  </p>
+                  <p className="text-sm text-muted-foreground">{phrase}</p>
                 </div>
               </div>
               <div className="flex gap-1">
@@ -196,22 +205,19 @@ export default function InstallmentLoanList({ userId }: Props) {
               </div>
             </div>
 
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 md:grid-cols-3">
-              <Metric label="Monto original">
-                <Money cents={loan.amount} size="sm" className="font-semibold text-primary" />
-              </Metric>
-              <Metric label="Cuota actual">
-                <Money cents={loan.installment_amount} size="sm" className="font-semibold" />
-                <span className="text-muted-foreground"> c/u</span>
-              </Metric>
-              <Metric label="Cuotas">
-                <span className="tabular-nums">{loan.remaining_installments} de {loan.installment_count} cuotas restantes</span>
-              </Metric>
-            </dl>
+            <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm text-muted-foreground">
+              <span>
+                Cuota actual: <Money cents={loan.installment_amount} size="sm" className="font-semibold text-foreground" />
+              </span>
+              <span>
+                Original: <Money cents={loan.amount} size="sm" className="text-foreground" />
+                {loan.interest_rate !== undefined && ` · ${loan.interest_rate}%`}
+              </span>
+            </div>
 
             <div className="flex flex-col gap-1.5">
-              <div className="flex items-baseline justify-between gap-2 font-mono text-label-mono-xs text-muted-foreground">
-                <span>Avance de cuotas</span>
+              <div className="flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
+                <span>{loan.remaining_installments} de {loan.installment_count} cuotas restantes</span>
                 <span>{paidPercent}%</span>
               </div>
               <Progress value={paidPercent} aria-label={`Avance de cuotas de ${loan.lender_name}`} />
@@ -224,13 +230,13 @@ export default function InstallmentLoanList({ userId }: Props) {
             </div>
 
             {historyOpenFor === loan.id && (
-              <ul className="flex flex-col gap-1">
+              <ul className="flex flex-col gap-1.5 rounded-2xl bg-surface-2/60 p-3">
                 {(paymentHistory[loan.id] ?? []).length === 0 && (
                   <li className="text-body-sm text-muted-foreground">Todavía no hay pagos registrados.</li>
                 )}
                 {(paymentHistory[loan.id] ?? []).map(payment => (
                   <li key={payment.id} className="flex flex-wrap items-baseline gap-x-2 text-body-sm text-muted-foreground">
-                    <span className="font-mono text-label-mono-sm">{formatShortDate(new Date(payment.date))}</span>
+                    <span className="text-xs">{formatShortDate(new Date(payment.date))}</span>
                     <Money cents={payment.amount} size="sm" className="text-foreground" />
                     <span>· {payment.kind === 'installment' ? 'Cuota' : 'Abono a capital'}</span>
                   </li>
@@ -247,7 +253,22 @@ export default function InstallmentLoanList({ userId }: Props) {
             {!isSettled && loan.distribution_category_id && (
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-2">
-                  <h5 className={EYEBROW}>Pagar cuota(s)</h5>
+                  <h5 className="text-xs font-medium text-muted-foreground">Pagar cuota(s)</h5>
+                  {activeAccounts.length > 0 && (
+                    <div className="flex flex-col gap-1">
+                      <Label htmlFor={`installment-account-${loan.id}`}>Cuenta de origen</Label>
+                      <select
+                        id={`installment-account-${loan.id}`}
+                        value={installmentAccountDrafts[loan.id] || primaryAccountId}
+                        onChange={(e) => setInstallmentAccountDrafts(prev => ({ ...prev, [loan.id]: e.target.value }))}
+                        className="flex h-11 w-full rounded-full border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:shadow-focus"
+                      >
+                        {activeAccounts.map(acc => (
+                          <option key={acc.id} value={acc.id}>{acc.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div className="flex items-end gap-2">
                     <div className="flex flex-1 flex-col gap-1">
                       <Label htmlFor={`installments-${loan.id}`}>Cuotas a pagar</Label>
@@ -267,8 +288,8 @@ export default function InstallmentLoanList({ userId }: Props) {
                   {installmentErrors[loan.id] && <p className="text-body-sm text-destructive">{installmentErrors[loan.id]}</p>}
                 </div>
 
-                <div className="flex flex-col gap-2 border-t border-border pt-3">
-                  <h5 className={EYEBROW}>Registrar abono a capital</h5>
+                <div className="flex flex-col gap-2 pt-1">
+                  <h5 className="text-xs font-medium text-muted-foreground">Registrar abono a capital</h5>
 
                   {!showPrincipalFlow[loan.id] && (
                     <Button variant="outline" className="w-full" onClick={() => setShowPrincipalFlow(prev => ({ ...prev, [loan.id]: true }))}>
@@ -277,7 +298,23 @@ export default function InstallmentLoanList({ userId }: Props) {
                   )}
 
                   {showPrincipalFlow[loan.id] && (
-                    <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3">
+                    <div className="flex flex-col gap-3 rounded-2xl bg-surface-2/60 p-4">
+                      {activeAccounts.length > 0 && (
+                        <div className="flex flex-col gap-1">
+                          <Label htmlFor={`principal-account-${loan.id}`}>Cuenta de origen del abono</Label>
+                          <select
+                            id={`principal-account-${loan.id}`}
+                            value={principalAccountDrafts[loan.id] || primaryAccountId}
+                            onChange={(e) => setPrincipalAccountDrafts(prev => ({ ...prev, [loan.id]: e.target.value }))}
+                            className="flex h-11 w-full rounded-full border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:shadow-focus"
+                          >
+                            {activeAccounts.map(acc => (
+                              <option key={acc.id} value={acc.id}>{acc.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
                       <div className="flex flex-col gap-1">
                         <Label htmlFor={`principal-amount-${loan.id}`}>Monto del abono</Label>
                         <Input
@@ -349,21 +386,21 @@ export default function InstallmentLoanList({ userId }: Props) {
             {isSettled && (
               <p className="text-body-md font-medium text-success">Pagado/Saldado ✓</p>
             )}
-          </article>
+          </Panel>
         );
       })}
 
       {editingLoan && (
-        <Dialog open onOpenChange={(open) => !open && setEditingLoan(null)}>
-          <DialogContent className={FORM_DIALOG_CONTENT_CLASS}>
+        <Sheet open onOpenChange={(open) => !open && setEditingLoan(null)}>
+          <SheetContent>
             <InstallmentLoanForm
               userId={userId}
               existing={editingLoan}
               onComplete={() => { setEditingLoan(null); loadLoans(); }}
               onCancel={() => setEditingLoan(null)}
             />
-          </DialogContent>
-        </Dialog>
+          </SheetContent>
+        </Sheet>
       )}
     </div>
   );

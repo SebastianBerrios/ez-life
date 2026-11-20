@@ -1,23 +1,22 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
-import { JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import { OfflineRegistration } from '@/components/offline-registration';
 
-// Geist (variable, self-hosted) for text; JetBrains Mono for micro-labels, hotkeys and metadata.
-const geist = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist",
-  weight: "100 900",
+// Fredoka (variable, self-hosted OFL) for figures and titles; Figtree (variable, self-hosted OFL) for body copy.
+const fredoka = localFont({
+  src: "./fonts/Fredoka-Variable.woff2",
+  variable: "--font-fredoka",
+  weight: "300 700",
   display: "swap",
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-jetbrains",
-  weight: ["400", "500", "600"],
+const figtree = localFont({
+  src: "./fonts/Figtree-Variable.woff2",
+  variable: "--font-figtree",
+  weight: "300 900",
   display: "swap",
 });
 
@@ -42,15 +41,15 @@ export const metadata: Metadata = {
   },
 };
 
-// `viewportFit: "cover"` makes `env(safe-area-inset-bottom)` real on notched devices, which the
-// bottom navigation uses as padding. Theme colors match `--background` (dark default / light).
+// `viewportFit: "cover"` makes `env(safe-area-inset-bottom)` real on notched devices.
+// Theme colors match warm cream (light) and deep plum (dark).
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#090A0F" },
-    { media: "(prefers-color-scheme: light)", color: "#F7F8FA" },
+    { media: "(prefers-color-scheme: light)", color: "#FBF5EA" },
+    { media: "(prefers-color-scheme: dark)", color: "#241A2B" },
   ],
 };
 
@@ -63,14 +62,14 @@ export default function RootLayout({
     <html
       lang="es"
       suppressHydrationWarning
-      className={cn("font-sans", geist.variable, jetbrainsMono.variable)}
+      className={cn("font-sans", fredoka.variable, figtree.variable)}
     >
-      <body className="antialiased min-h-screen bg-background">
+      <body className={cn("antialiased min-h-screen bg-background font-sans", fredoka.variable, figtree.variable)}>
         <OfflineRegistration />
         <ThemeProvider
           attribute="class"
-          defaultTheme="dark"
-          enableSystem={false}
+          defaultTheme="system"
+          enableSystem
           disableTransitionOnChange
         >
           {children}

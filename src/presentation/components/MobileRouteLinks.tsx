@@ -20,13 +20,13 @@ export default function MobileRouteLinks({ onNavigate, showProgress }: Props) {
   ].filter((row) => row.visible);
 
   return (
-    <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card md:hidden" data-testid="mobile-route-links">
+    <ul className="space-y-1.5 rounded-card bg-card p-2 shadow-card lg:hidden" data-testid="mobile-route-links">
       {rows.map(({ id, label, Icon }) => (
         <li key={id}>
           <button
             type="button"
             onClick={() => onNavigate(id)}
-            className="flex min-h-11 w-full items-center gap-3 px-4 text-left text-body-md text-foreground outline-none transition-colors hover:bg-surface-3 focus-visible:shadow-focus"
+            className="flex min-h-11 w-full items-center gap-3 rounded-2xl px-3.5 text-left text-body-md text-foreground outline-none transition-colors hover:bg-surface-2 focus-visible:shadow-focus"
           >
             <Icon className="size-[18px] text-muted-foreground" />
             <span className="flex-1">{label}</span>

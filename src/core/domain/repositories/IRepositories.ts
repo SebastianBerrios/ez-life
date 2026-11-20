@@ -1,4 +1,4 @@
-import { UUID, Profile, IncomeSource, DistributionCategory, ExpenseCategory, ExpenseSubcategory, SavingsGoal, Movement, Notification, Debt, SharedSpace, SharedSpacePermissionMode, SharedInvite, Membership, SharedMovement, SharedMovementSplit, SharedMovementType, SharedMovementSplitMode, Habit, HabitCompletion, Goal, Task, InstallmentLoan, InstallmentPayment, PaymentAccount } from '../models/types';
+import { UUID, Profile, IncomeSource, DistributionCategory, ExpenseCategory, ExpenseSubcategory, SavingsGoal, Movement, MovementRecurrence, Notification, Debt, SharedSpace, SharedSpacePermissionMode, SharedInvite, Membership, SharedMovement, SharedMovementSplit, SharedMovementType, SharedMovementSplitMode, Habit, HabitCompletion, Goal, Task, InstallmentLoan, InstallmentPayment, PaymentAccount, ReminderSkip } from '../models/types';
 
 /** The user's own choice from FR-016 — the resulting value is always theirs, never computed (FR-017). */
 export type PrincipalPaymentAdjustment =
@@ -8,6 +8,8 @@ export type PrincipalPaymentAdjustment =
 export interface IProfileRepository {
   get(id: UUID): Promise<Profile | undefined>;
   save(profile: Omit<Profile, 'created_at' | 'updated_at'>): Promise<Profile>;
+  /** Sets `balance_since` once if a local profile already exists without it; never creates a stub profile. */
+  ensureBalanceSince(userId: UUID, now: Date): Promise<Profile | undefined>;
 }
 
 export interface IIncomeSourceRepository {
@@ -90,16 +92,39 @@ export interface IDebtRepository {
 export interface IInstallmentLoanRepository {
   getAll(userId: UUID): Promise<InstallmentLoan[]>;
   getById(id: UUID): Promise<InstallmentLoan | undefined>;
-  /** `remaining_installments` is always initialized to `installment_count` (FR-011). */
-  create(loan: Omit<InstallmentLoan, 'created_at' | 'updated_at' | 'remaining_installments' | 'status'>): Promise<void>;
+  /** `remaining_installments` is initialized to `installment_count - alreadyPaid` without creating payments or movements (FR-025). */
+  create(loan: Omit<InstallmentLoan, 'created_at' | 'updated_at' | 'remaining_installments' | 'status'>, alreadyPaid?: number): Promise<void>;
   /** Corrects the original terms — independent of recording a payment, never changes status (FR-022). `distributionCategoryId` lets a pre-existing loan (created before spec 003) gain the bucket its future payments' Movements need. */
-  updateTerms(id: UUID, changes: { amount?: number; installmentCount?: number; installmentAmount?: number; interestRate?: number; distributionCategoryId?: UUID }): Promise<void>;
-  recordInstallmentPayment(loanId: UUID, installmentsPaid: number, date: Date): Promise<void>;
-  recordPrincipalPayment(loanId: UUID, amountCents: number, date: Date, adjustment: PrincipalPaymentAdjustment): Promise<void>;
+  updateTerms(id: UUID, changes: { amount?: number; installmentCount?: number; installmentAmount?: number; interestRate?: number; distributionCategoryId?: UUID; paymentDay?: number }): Promise<void>;
+  recordInstallmentPayment(loanId: UUID, installmentsPaid: number, date: Date, accountId?: UUID): Promise<void>;
+  recordPrincipalPayment(loanId: UUID, amountCents: number, date: Date, adjustment: PrincipalPaymentAdjustment, accountId?: UUID): Promise<void>;
   /** Full history, ordered by date (FR-026). */
   getPayments(loanId: UUID): Promise<InstallmentPayment[]>;
   delete(id: UUID): Promise<void>;
 }
+
+export interface IMovementRecurrenceRepository {
+  /** Converts legacy `is_recurring` movements without a rule into recurrence rules without creating new occurrences (FR-014, FR-018). */
+  adoptLegacySources(userId: UUID): Promise<void>;
+}
+
+export interface RegistrationRepositoryInputs {
+  rules: MovementRecurrence[];
+  incomeSources: IncomeSource[];
+  loans: InstallmentLoan[];
+  loanIdByPaymentId: Record<string, string>;
+  accounts: PaymentAccount[];
+  monthMovements: Movement[];
+  skips: ReminderSkip[];
+}
+
+export interface IRegistrationRepository {
+  getInputs(userId: UUID, today: Date): Promise<RegistrationRepositoryInputs>;
+  skip(userId: UUID, itemKey: string): Promise<ReminderSkip>;
+  unskip(userId: UUID, itemKey: string): Promise<void>;
+}
+
+export type IReminderSkipRepository = IRegistrationRepository;
 
 /**
  * Creation/redemption/leaving all go through server-side RPCs

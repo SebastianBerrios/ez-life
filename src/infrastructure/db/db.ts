@@ -22,6 +22,7 @@ import type {
   InstallmentLoan,
   InstallmentPayment,
   PaymentAccount,
+  ReminderSkip,
 } from '../../core/domain/models/types';
 
 export interface SyncQueueItem {
@@ -42,7 +43,8 @@ const SYNCED_TABLES = [
   'profiles', 'income_sources', 'distribution_categories',
   'expense_categories', 'expense_subcategories', 'savings_goals', 'movements',
   'notifications', 'debts', 'habits', 'habit_completions', 'goals', 'tasks',
-  'installment_loans', 'installment_payments', 'movement_recurrences', 'achievement_receipts', 'payment_accounts'
+  'installment_loans', 'installment_payments', 'movement_recurrences', 'achievement_receipts', 'payment_accounts',
+  'reminder_skips'
 ] as const;
 
 export class EzLifeDB extends Dexie {
@@ -69,6 +71,7 @@ export class EzLifeDB extends Dexie {
   }
   achievement_receipts!: Table<AchievementReceipt, string>;
   payment_accounts!: Table<PaymentAccount, string>;
+  reminder_skips!: Table<ReminderSkip, string>;
   profiles!: Table<Profile, string>;
   income_sources!: Table<IncomeSource, string>;
   distribution_categories!: Table<DistributionCategory, string>;
@@ -373,6 +376,9 @@ export class EzLifeDB extends Dexie {
     // spec 011: payment accounts; Movement.account_id/to_account_id/TRANSFER and
     // Task.priority/tag are plain optional fields (no new indexes needed).
     this.version(18).stores({ payment_accounts: 'id, user_id' });
+    // spec 013: reminder_skips table for "Omitir este mes"; optional fields on
+    // payment_accounts, income_sources, installment_loans and profiles need no index.
+    this.version(19).stores({ reminder_skips: 'id, user_id, month' });
     this.setupSyncQueueTransactionScope();
     this.setupHooks();
   }

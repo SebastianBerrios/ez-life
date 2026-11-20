@@ -34,9 +34,9 @@ export interface NavItem {
 export const navItems: NavItem[] = [
   { id: 'dashboard', label: 'Resumen', mobileLabel: 'Inicio', Icon: LayoutDashboard },
   { id: 'finances', label: 'Finanzas', Icon: Wallet },
-  { id: 'control', label: 'Control & Hábitos', mobileLabel: 'Hábitos', Icon: CheckCircle2 },
-  { id: 'shared-space', label: 'Espacio Compartido', Icon: Users },
-  { id: 'progress', label: 'Mi Progreso', Icon: Award },
+  { id: 'control', label: 'Control y hábitos', mobileLabel: 'Hábitos', Icon: CheckCircle2 },
+  { id: 'shared-space', label: 'Espacio compartido', Icon: Users },
+  { id: 'progress', label: 'Mi progreso', Icon: Award },
   { id: 'settings', label: 'Ajustes', Icon: Settings },
 ];
 
@@ -56,6 +56,7 @@ function MobileNavButton({ item, active, onNavigate }: { item: NavItem; active: 
     <button
       type="button"
       data-route-id={id}
+      data-tour={id === 'settings' ? 'settings' : undefined}
       onClick={() => onNavigate(id)}
       aria-current={active ? 'page' : undefined}
       className={cn(
@@ -64,7 +65,7 @@ function MobileNavButton({ item, active, onNavigate }: { item: NavItem; active: 
       )}
     >
       <Icon className="size-5" strokeWidth={active ? 2.25 : 1.75} />
-      <span className="font-mono text-label-mono-xs uppercase">{mobileLabel ?? label}</span>
+      <span className="text-label-xs">{mobileLabel ?? label}</span>
     </button>
   );
 }
@@ -107,21 +108,22 @@ export default function Navigation({
 
   return (
     <>
-      {/* ── Mobile Bottom Nav ─────────────────────────────────── */}
+      {/* ── Mobile & Tablet Portrait Bottom Nav ──────────────── */}
       <nav
-        className="fixed bottom-0 z-40 w-full border-t border-border bg-card pb-[env(safe-area-inset-bottom)] md:hidden"
+        className="fixed bottom-0 z-40 w-full border-t border-border/60 bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden"
         aria-label="Navegación principal"
       >
-        <div className="grid h-16 grid-cols-5 items-center">
+        <div className="mx-auto grid h-16 max-w-[720px] grid-cols-5 items-center">
           {mobileLeft.map((item) => (
             <MobileNavButton key={item.id} item={item} active={currentRoute === item.id} onNavigate={onNavigate} />
           ))}
           <div className="flex justify-center">
             <button
               type="button"
+              data-tour="add"
               onClick={() => onNewMovement?.()}
               aria-label={NEW_MOVEMENT_LABEL}
-              className="-mt-6 flex size-14 items-center justify-center rounded-xl border border-primary bg-primary text-primary-foreground outline-none transition-colors hover:bg-primary-hover focus-visible:shadow-focus active:translate-y-px"
+              className="-mt-6 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-card outline-none transition-colors hover:bg-primary-hover focus-visible:shadow-focus active:translate-y-px"
             >
               <Plus className="size-6" strokeWidth={2.25} />
             </button>
@@ -132,13 +134,13 @@ export default function Navigation({
         </div>
       </nav>
 
-      {/* ── Desktop Sidebar ───────────────────────────────────── */}
+      {/* ── Desktop & Tablet Landscape Sidebar ───────────────── */}
       <aside
-        className="fixed left-0 top-0 z-40 hidden h-screen w-60 flex-col overflow-y-auto border-r border-border bg-card md:flex"
+        className="fixed left-0 top-0 z-40 hidden h-screen w-60 flex-col overflow-y-auto border-r border-border/60 bg-card lg:flex"
         aria-label="Barra lateral"
       >
         <div className="flex h-14 shrink-0 items-center gap-2 px-5">
-          <h1 className="text-headline-md font-semibold tracking-tight text-foreground">
+          <h1 className="font-fredoka text-headline-md font-semibold tracking-tight text-foreground">
             ez<span className="text-primary">·</span>life
           </h1>
           <span
@@ -155,11 +157,12 @@ export default function Navigation({
         <div className="shrink-0 px-4 pb-4 pt-2">
           <button
             type="button"
+            data-tour="add"
             onClick={onNewMovement}
-            className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground outline-none transition-colors hover:bg-primary-hover focus-visible:shadow-focus"
+            className="flex h-11 min-h-11 w-full items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground shadow-sm outline-none transition-colors hover:bg-primary-hover focus-visible:shadow-focus"
           >
             <Plus className="size-4" />
-            Nuevo Registro
+            Nuevo registro
           </button>
         </div>
 
@@ -171,11 +174,12 @@ export default function Navigation({
                 type="button"
                 key={id}
                 data-route-id={id}
+                data-tour={id === 'settings' ? 'settings' : undefined}
                 onClick={() => onNavigate(id)}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm outline-none transition-colors focus-visible:shadow-focus',
-                  active ? 'bg-surface-2 font-medium text-foreground' : 'text-muted-foreground hover:bg-surface-3 hover:text-foreground'
+                  'flex min-h-11 w-full items-center gap-3 rounded-full px-3.5 py-2 text-sm outline-none transition-colors focus-visible:shadow-focus',
+                  active ? 'bg-surface-2 font-medium text-foreground' : 'text-muted-foreground hover:bg-surface-2/60 hover:text-foreground'
                 )}
               >
                 <Icon className="size-[18px] shrink-0" strokeWidth={1.75} />
@@ -186,22 +190,22 @@ export default function Navigation({
         </nav>
 
         <div className="shrink-0 p-3">
-          <div className="rounded-lg border border-border bg-background p-2">
+          <div className="rounded-2xl bg-surface-2/60 p-2.5">
             <div className="flex items-center gap-2">
               <AccountAvatar avatarUrl={avatarUrl} className="size-8 shrink-0" />
               <div className="min-w-0 flex-1">
                 {accountTitle && <p className="truncate text-body-md font-medium text-foreground">{accountTitle}</p>}
-                {accountSubtitle && <p className="truncate font-mono text-label-mono-xs text-muted-foreground">{accountSubtitle}</p>}
+                {accountSubtitle && <p className="truncate text-label-xs text-muted-foreground">{accountSubtitle}</p>}
               </div>
             </div>
-            <div className="mt-2 flex items-center justify-end gap-1 border-t border-border pt-2">
-              <ThemeToggle />
+            <div className="mt-2 flex items-center justify-between gap-1 pt-1">
+              <ThemeToggle compact />
               <button
                 type="button"
                 onClick={handleLogout}
                 aria-label="Cerrar sesión"
                 title="Cerrar sesión"
-                className="flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:shadow-focus-destructive"
+                className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:shadow-focus-destructive"
               >
                 <LogOut className="size-4" />
               </button>

@@ -2,7 +2,7 @@ import { db } from '../../db/db';
 import { IPaymentAccountRepository } from '../../../core/domain/repositories/IRepositories';
 import { PaymentAccount, UUID } from '../../../core/domain/models/types';
 import { DomainError } from '../../../core/domain/errors/DomainError';
-import { validatePaymentAccount } from '../../../core/use-cases/validatePaymentAccount';
+import { validateNewCreditCard, validatePaymentAccount } from '../../../core/use-cases/validatePaymentAccount';
 import { buildDefaultCashAccount, defaultCashAccountId } from '../../../core/use-cases/defaultPaymentAccount';
 import { uuidv7 } from 'uuidv7';
 
@@ -20,6 +20,9 @@ export class LocalPaymentAccountRepository implements IPaymentAccountRepository 
       const existing = await db.payment_accounts.get(id);
       if (existing && existing.user_id !== data.user_id) throw new DomainError('La cuenta pertenece a otro usuario.');
       if (existing?.deleted_at) throw new DomainError('La cuenta fue eliminada.');
+      if (!existing && data.kind === 'credit') {
+        validateNewCreditCard(data);
+      }
       const account: PaymentAccount = existing
         ? { ...existing, ...data, id, name: data.name.trim(), updated_at: now }
         : { ...data, id, name: data.name.trim(), created_at: now, updated_at: now };

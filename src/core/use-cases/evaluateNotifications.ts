@@ -1,7 +1,8 @@
-import { Debt, Goal, Notification, SavingsGoal, SharedMovement, Task, UUID } from '../domain/models/types';
+import { Debt, Goal, Notification, PendingRegistration, SavingsGoal, SharedMovement, Task, UUID } from '../domain/models/types';
 import { evaluateGoalCompletion } from './evaluateGoalCompletion';
 import { daysUntilDue } from './calendar';
 import { BudgetedCategory } from './calculateBudgets';
+import { formatMoney } from './formatMoney';
 
 interface SavingsGoalWithProgress {
   goal: SavingsGoal;
@@ -27,6 +28,8 @@ export interface EvaluateNotificationsParams {
   tasks: Task[];
   notificationHour: number | undefined;
   existingNotifications: Notification[];
+  /** Visible (neither skipped nor covered) items from "Por registrar" (spec 013 FR-017). */
+  pendingRegistrations?: PendingRegistration[];
 }
 
 export type NewNotification = Omit<Notification, 'id' | 'created_at' | 'updated_at'>;
@@ -78,6 +81,7 @@ export function evaluateNotifications(params: EvaluateNotificationsParams): NewN
     tasks,
     notificationHour,
     existingNotifications,
+    pendingRegistrations = [],
   } = params;
 
   const notifications: NewNotification[] = [];
@@ -234,6 +238,21 @@ export function evaluateNotifications(params: EvaluateNotificationsParams): NewN
       body: `"${task.title}" vence pronto.`,
       related_id: task.id,
       cycle_key: dayKey,
+    });
+  }
+
+  // 9. register_due — once per item and month via the existing Notification
+  // pipeline (Principio XI, spec 013 FR-017, SC-004).
+  for (const item of pendingRegistrations) {
+    if (hasEquivalent(existingNotifications, 'register_due', item.key, monthKey)) continue;
+
+    notifications.push({
+      user_id: userId,
+      type: 'register_due',
+      title: `Toca registrar: ${item.title}`,
+      body: `${item.title} · ${formatMoney(item.amount)} · día ${item.day}`,
+      related_id: item.key,
+      cycle_key: monthKey,
     });
   }
 

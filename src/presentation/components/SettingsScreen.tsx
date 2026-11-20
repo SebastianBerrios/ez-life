@@ -14,32 +14,57 @@ import { loadExportLookups } from '../lib/loadExportLookups';
 import { useRevealTarget } from '../hooks/useRevealTarget';
 import { ThemeToggle } from './ThemeToggle';
 import { Button } from '@/components/ui/button';
-import { Panel, PanelBody, PanelHeader } from '@/components/ui/panel';
+import { Panel } from '@/components/ui/panel';
+import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Edit2, Download, FileText, Bell, LogOut, Loader2, User } from 'lucide-react';
+import {
+  Bell, Compass, Download, Edit2, FileText, ListChecks, Loader2, LogOut, Palette, User, Wallet,
+} from 'lucide-react';
 import { getSupabaseBrowserClient } from '../../infrastructure/supabase/client';
 import IncomeSourceSettings from './IncomeSourceSettings';
 import PaymentAccountSettings from './PaymentAccountSettings';
 import { forgetLocalAccount } from '../../infrastructure/auth/localAccount';
 
+export type SettingsSectionId =
+  | 'profile'
+  | 'accounts'
+  | 'notifications'
+  | 'appearance'
+  | 'data';
+
 interface Props {
   userId: string;
   onEditDistribution?: () => void;
   onEditCategories?: () => void;
+  onCompleteSetup?: () => void;
+  onReplayTour?: () => void;
   onLogout?: () => void;
-  /** Real account data from the session; the profile panel only shows what exists. */
   accountName?: string;
   accountEmail?: string;
-  /** Account a ⌘K selection wants revealed in "Cuentas de pago". */
   focus?: AccountFocus;
-  /** Changes every time the same account is requested again. */
   focusNonce?: number;
   onFocusHandled?: () => void;
+  editAccountId?: string;
+  editAccountNonce?: number;
+  onEditAccountHandled?: () => void;
 }
 
 export default function SettingsScreen({
-  userId, onEditDistribution, onEditCategories, onLogout, accountName, accountEmail, focus, focusNonce, onFocusHandled,
+  userId,
+  onEditDistribution,
+  onEditCategories,
+  onCompleteSetup,
+  onReplayTour,
+  onLogout,
+  accountName,
+  accountEmail,
+  focus,
+  focusNonce,
+  onFocusHandled,
+  editAccountId,
+  editAccountNonce,
+  onEditAccountHandled,
 }: Props) {
   const [exporting, setExporting] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -49,7 +74,32 @@ export default function SettingsScreen({
   const [gamificationEnabled, setGamificationEnabled] = useState(true);
   const [savingGamification, setSavingGamification] = useState(false);
   const [preferenceError, setPreferenceError] = useState<string | null>(null);
-  useRevealTarget(focus ? `account-${focus.id}` : undefined, focusNonce, true, onFocusHandled);
+  const [openSections, setOpenSections] = useState<Set<SettingsSectionId>>(() => {
+    const initial = new Set<SettingsSectionId>();
+    if (focus || editAccountId) initial.add('accounts');
+    return initial;
+  });
+
+  useEffect(() => {
+    if (!focus && !editAccountId) return;
+    setOpenSections((prev) => {
+      if (prev.has('accounts')) return prev;
+      const next = new Set(prev);
+      next.add('accounts');
+      return next;
+    });
+  }, [focus, focusNonce, editAccountId, editAccountNonce]);
+
+  useRevealTarget(focus ? `account-${focus.id}` : undefined, focusNonce, openSections.has('accounts'), onFocusHandled);
+
+  const toggleSection = (id: SettingsSectionId, open: boolean) => {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (open) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -102,7 +152,6 @@ export default function SettingsScreen({
     try {
       const repo = new LocalMovementRepository();
       const moves = await repo.getAll(userId);
-
       const csvContent = buildMovementsCsv(moves, await loadExportLookups(userId));
       downloadTextFile(`ezlife_export_${calendarKey(new Date())}.csv`, csvContent);
     } catch (err) {
@@ -130,8 +179,7 @@ export default function SettingsScreen({
         head,
         body,
         theme: 'striped',
-        // Brand emerald (primary #047857) in RGB: jsPDF takes numbers, not CSS variables.
-        headStyles: { fillColor: [4, 120, 87] }
+        headStyles: { fillColor: [4, 120, 87] },
       });
 
       doc.save(`ezlife_report_${calendarKey(new Date())}.pdf`);
@@ -212,67 +260,114 @@ export default function SettingsScreen({
 
   return (
     <div className="space-y-4 pb-6" data-testid="settings-screen">
-      <h2 className="text-headline-lg-mobile text-foreground md:text-headline-lg">Ajustes</h2>
+      <h2 className="font-fredoka text-headline-lg-mobile text-foreground md:text-headline-lg">Ajustes</h2>
 
-      <div className="grid items-start gap-4 xl:grid-cols-2">
-        <div className="flex flex-col gap-4">
-          {(accountName || accountEmail) && (
-            <Section title="Perfil" eyebrow="Cuenta">
-              <div className="flex items-center gap-3">
+      {/* Always-visible quick access entries at the top (FR-020) */}
+      <Panel className="gap-3 p-5" data-testid="settings-quick-access">
+        <p className="text-sm text-muted-foreground">
+          Retoma cualquier paso pendiente de tu configuración inicial o vuelve a ver el recorrido rápido.
+        </p>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button variant="outline" onClick={onCompleteSetup} className="flex-1">
+            <ListChecks className="size-4" aria-hidden="true" />
+            Completar configuración
+          </Button>
+          <Button variant="outline" onClick={onReplayTour} className="flex-1">
+            <Compass className="size-4" aria-hidden="true" />
+            Ver tutorial
+          </Button>
+        </div>
+      </Panel>
+
+      {/* 5 independent collapsible sections, all collapsed by default (FR-021) */}
+      <div className="flex flex-col gap-3">
+        <CollapsibleSection
+          variant="panel"
+          testId="settings-section-profile"
+          icon={<User className="size-4" />}
+          title="Perfil"
+          subtitle="Tu cuenta y sesión"
+          open={openSections.has('profile')}
+          onOpenChange={(open) => toggleSection('profile', open)}
+        >
+          <div className="space-y-4 pt-2">
+            {(accountName || accountEmail) && (
+              <div className="flex items-center gap-3 rounded-2xl bg-surface-2/60 p-3.5">
                 <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
                   <User className="size-5" />
                 </span>
                 <div className="min-w-0">
                   {accountName && <p className="truncate text-body-md font-medium text-foreground">{accountName}</p>}
-                  {accountEmail && <p className="truncate font-mono text-label-mono-xs text-muted-foreground">{accountEmail}</p>}
+                  {accountEmail && <p className="truncate text-xs text-muted-foreground">{accountEmail}</p>}
                 </div>
               </div>
-            </Section>
-          )}
-
-          <Section title="Cuentas de pago" eyebrow="Dinero"><PaymentAccountSettings userId={userId} /></Section>
-          <Section title="Fuentes de ingreso" eyebrow="Dinero"><IncomeSourceSettings userId={userId} /></Section>
-
-          <Section title="Categorías y Distribución" eyebrow="Presupuesto">
-            <p className="text-body-md text-muted-foreground">
-              Ajusta tus categorías de distribución (%) y gestiona las categorías y subcategorías de gasto.
-            </p>
-            <div className="space-y-2">
-              <Button variant="outline" onClick={onEditDistribution} className="w-full">
-                <Edit2 className="size-4" />
-                Editar distribución (%)
-              </Button>
-              <Button variant="outline" onClick={onEditCategories} className="w-full">
-                <Edit2 className="size-4" />
-                Gestionar categorías de gasto
-              </Button>
-            </div>
-          </Section>
-        </div>
-
-        <div className="flex flex-col gap-4">
-          <Section title="Apariencia" eyebrow="Preferencias">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-body-md text-muted-foreground">Cambiar tema visual</p>
-              <ThemeToggle />
-            </div>
-          </Section>
-
-          <Section title="Mi progreso" eyebrow="Preferencias">
-            {switchRow(
-              'gamificationEnabled',
-              'Mostrar logros personales y celebraciones',
-              'Puedes ocultarlos cuando quieras. Tu historial se conserva.',
-              gamificationEnabled,
-              next => void handleGamificationChange(next),
-              savingGamification || !profile,
             )}
-            {preferenceError && <p role="alert" className="text-body-md text-destructive">{preferenceError}</p>}
-          </Section>
+            <p className="text-body-sm text-muted-foreground">
+              Al cerrar sesión, tus datos locales se conservan en este dispositivo.
+            </p>
+            <Button variant="destructive" onClick={handleLogout} className="w-full">
+              <LogOut className="size-4" aria-hidden="true" />
+              Cerrar sesión
+            </Button>
+          </div>
+        </CollapsibleSection>
 
-          <Section title="Notificaciones" eyebrow="Preferencias">
-            <p className="text-body-md text-muted-foreground">
-              Recibí alertas cuando superes el 80% de un presupuesto, cumplas una meta de ahorro,
+        <CollapsibleSection
+          variant="panel"
+          testId="settings-section-accounts"
+          icon={<Wallet className="size-4" />}
+          title="Cuentas e ingresos"
+          subtitle="Cuentas de pago, ingresos y categorías 50/30/20"
+          open={openSections.has('accounts')}
+          onOpenChange={(open) => toggleSection('accounts', open)}
+        >
+          <div className="space-y-6 pt-2">
+            <div className="space-y-2">
+              <h3 className="font-fredoka text-headline-sm text-foreground">Cuentas de pago</h3>
+              <PaymentAccountSettings
+                userId={userId}
+                editAccountId={editAccountId}
+                editNonce={editAccountNonce}
+                onEditHandled={onEditAccountHandled}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="font-fredoka text-headline-sm text-foreground">Fuentes de ingreso</h3>
+              <IncomeSourceSettings userId={userId} />
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="font-fredoka text-headline-sm text-foreground">Categorías y distribución</h3>
+              <p className="text-body-sm text-muted-foreground">
+                Ajusta tus porcentajes 50/30/20 y gestiona tus categorías y subcategorías de gasto.
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button variant="outline" onClick={onEditDistribution} className="flex-1">
+                  <Edit2 className="size-4" aria-hidden="true" />
+                  Editar distribución (%)
+                </Button>
+                <Button variant="outline" onClick={onEditCategories} className="flex-1">
+                  <Edit2 className="size-4" aria-hidden="true" />
+                  Gestionar categorías de gasto
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          variant="panel"
+          testId="settings-section-notifications"
+          icon={<Bell className="size-4" />}
+          title="Notificaciones"
+          subtitle="Recordatorio diario y alertas de presupuesto"
+          open={openSections.has('notifications')}
+          onOpenChange={(open) => toggleSection('notifications', open)}
+        >
+          <div className="space-y-4 pt-2">
+            <p className="text-body-sm text-muted-foreground">
+              Recibe alertas cuando superes el 80% de un presupuesto, cumplas una meta de ahorro,
               o un recordatorio diario para registrar tus movimientos.
             </p>
 
@@ -301,15 +396,52 @@ export default function SettingsScreen({
             {switchRow('inappEnabled', 'Notificaciones in-app', null, inappEnabled, next => void handleToggleInapp(next))}
             {switchRow(
               'pushEnabled',
-              <span className="flex items-center gap-1.5"><Bell className="size-3.5" />Notificaciones push del navegador</span>,
+              <span className="flex items-center gap-1.5"><Bell className="size-3.5" aria-hidden="true" />Notificaciones push del navegador</span>,
               null,
               pushEnabled,
               next => void handleTogglePush(next),
             )}
-          </Section>
+          </div>
+        </CollapsibleSection>
 
-          <Section title="Exportar Datos" eyebrow="Datos">
-            <p className="text-body-md text-muted-foreground">
+        <CollapsibleSection
+          variant="panel"
+          testId="settings-section-appearance"
+          icon={<Palette className="size-4" />}
+          title="Apariencia"
+          subtitle="Tema visual y visibilidad de logros"
+          open={openSections.has('appearance')}
+          onOpenChange={(open) => toggleSection('appearance', open)}
+        >
+          <div className="space-y-4 pt-2">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-body-md text-muted-foreground">Cambiar tema visual</p>
+              <ThemeToggle />
+            </div>
+
+            {switchRow(
+              'gamificationEnabled',
+              'Mostrar logros personales y celebraciones',
+              'Puedes ocultarlos cuando quieras. Tu historial se conserva.',
+              gamificationEnabled,
+              next => void handleGamificationChange(next),
+              savingGamification || !profile,
+            )}
+            {preferenceError && <p role="alert" className="text-body-md text-destructive">{preferenceError}</p>}
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          variant="panel"
+          testId="settings-section-data"
+          icon={<Download className="size-4" />}
+          title="Datos y exportación"
+          subtitle="Descarga tu historial en CSV o PDF"
+          open={openSections.has('data')}
+          onOpenChange={(open) => toggleSection('data', open)}
+        >
+          <div className="space-y-3 pt-2">
+            <p className="text-body-sm text-muted-foreground">
               Descarga todo tu historial de movimientos en CSV (Excel) o PDF.
             </p>
             <div className="flex gap-3">
@@ -322,29 +454,9 @@ export default function SettingsScreen({
                 PDF
               </Button>
             </div>
-          </Section>
-
-          <Section title="Cuenta" eyebrow="Sesión">
-            <p className="text-body-md text-muted-foreground">
-              Al cerrar sesión, tus datos locales se conservan en este dispositivo.
-            </p>
-            <Button variant="destructive" onClick={handleLogout} className="w-full">
-              <LogOut className="size-4" />
-              Cerrar sesión
-            </Button>
-          </Section>
-        </div>
+          </div>
+        </CollapsibleSection>
       </div>
     </div>
-  );
-}
-
-// Shared section wrapper: one Panel per setting group.
-function Section({ title, eyebrow, children }: { title: string; eyebrow?: string; children: React.ReactNode }) {
-  return (
-    <Panel>
-      <PanelHeader eyebrow={eyebrow} title={title} />
-      <PanelBody className="space-y-3">{children}</PanelBody>
-    </Panel>
   );
 }

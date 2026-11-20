@@ -7,26 +7,31 @@ import { cn } from '@/lib/utils';
 import OnboardingStep1 from './OnboardingStep1';
 import OnboardingStep2 from './OnboardingStep2';
 import OnboardingStep3 from './OnboardingStep3';
+import OnboardingStep4 from './OnboardingStep4';
+import OnboardingStep5 from './OnboardingStep5';
+import OnboardingStep6 from './OnboardingStep6';
+
+export type WizardStepNumber = 1 | 2 | 3 | 4 | 5 | 6;
 
 interface Props {
   profileId: string;
-  startStep?: 1 | 2 | 3;
+  startStep?: WizardStepNumber;
   mode?: 'setup' | 'settings';
   onComplete: (profileId: string) => void;
 }
 
-const STEPS = [
-  { number: 1, label: 'Inicio' },
-  { number: 2, label: 'Distribución' },
-  { number: 3, label: 'Categorías' },
+const STEPS: readonly { number: WizardStepNumber; label: string }[] = [
+  { number: 1, label: 'Ingresos' },
+  { number: 2, label: 'Dinero' },
+  { number: 3, label: 'Tarjetas' },
+  { number: 4, label: 'Préstamos' },
+  { number: 5, label: 'Distribución' },
+  { number: 6, label: 'Categorías' },
 ] as const;
 
-// ---------------------------------------------------------------------------
-// Progress indicator: numbered dots joined by hairlines, current step marked for assistive tech.
-// ---------------------------------------------------------------------------
-function ProgressDots({ currentStep }: { currentStep: 1 | 2 | 3 }) {
+function ProgressDots({ currentStep }: { currentStep: WizardStepNumber }) {
   return (
-    <ol aria-label="Progreso de la configuración" className="mb-6 flex items-start justify-center px-4">
+    <ol aria-label="Progreso de la configuración" className="mb-6 flex flex-wrap items-start justify-center gap-y-2 px-2">
       {STEPS.map((step, idx) => {
         const isCompleted = step.number < currentStep;
         const isActive = step.number === currentStep;
@@ -36,18 +41,18 @@ function ProgressDots({ currentStep }: { currentStep: 1 | 2 | 3 }) {
             aria-current={isActive ? 'step' : undefined}
             className="flex items-start"
           >
-            <div className="flex w-20 flex-col items-center gap-1.5">
+            <div className="flex w-14 flex-col items-center gap-1 sm:w-16">
               <span
                 className={cn(
-                  'flex size-8 items-center justify-center rounded-full border font-mono text-label-mono-sm transition-colors',
+                  'flex size-8 items-center justify-center rounded-full border text-xs font-medium transition-colors',
                   isCompleted && 'border-primary bg-primary text-primary-foreground',
-                  isActive && 'border-primary bg-primary/10 text-primary shadow-focus',
+                  isActive && 'border-primary bg-primary/15 text-foreground shadow-focus',
                   !isCompleted && !isActive && 'border-border bg-card text-muted-foreground',
                 )}
               >
                 {isCompleted ? <Check aria-hidden="true" className="size-4" /> : step.number}
               </span>
-              <span className={cn('font-mono text-label-mono-xs uppercase', isActive ? 'text-foreground' : 'text-muted-foreground')}>
+              <span className={cn('text-center text-xs', isActive ? 'font-medium text-foreground' : 'text-muted-foreground')}>
                 {step.label}
               </span>
               <span className="sr-only">
@@ -57,7 +62,7 @@ function ProgressDots({ currentStep }: { currentStep: 1 | 2 | 3 }) {
             {idx < STEPS.length - 1 && (
               <span
                 aria-hidden="true"
-                className={cn('mt-4 h-px w-8 transition-colors sm:w-12', isCompleted ? 'bg-primary' : 'bg-border')}
+                className={cn('mt-4 hidden h-px w-4 transition-colors sm:block', isCompleted ? 'bg-primary' : 'bg-border')}
               />
             )}
           </li>
@@ -67,38 +72,40 @@ function ProgressDots({ currentStep }: { currentStep: 1 | 2 | 3 }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main wizard component
-// ---------------------------------------------------------------------------
 export default function OnboardingWizard({ profileId, startStep = 1, mode = 'setup', onComplete }: Props) {
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(startStep);
+  const [currentStep, setCurrentStep] = useState<WizardStepNumber>(startStep);
   const [wizardProfileId, setWizardProfileId] = useState<string>(profileId);
 
-  const handleStep1Complete = (newProfileId: string) => {
-    setWizardProfileId(newProfileId);
-    setCurrentStep(2);
+  const finishOrAdvance = (nextStep: WizardStepNumber, newProfileId?: string) => {
+    const id = newProfileId ?? wizardProfileId;
+    if (newProfileId) setWizardProfileId(newProfileId);
+    if (mode === 'settings') {
+      onComplete(id);
+      return;
+    }
+    setCurrentStep(nextStep);
   };
 
-  const handleStep2Complete = async () => {
-    // Entered directly to edit distribution (e.g. from Settings) — return
-    // right away instead of dragging the user into category management too.
+  const handleStep5Complete = async () => {
     if (mode === 'settings') {
       onComplete(wizardProfileId);
       return;
     }
-    await new LocalOnboardingRepository().completeStep(wizardProfileId, 2);
-    setCurrentStep(3);
+    await new LocalOnboardingRepository().completeStep(wizardProfileId, 5);
+    setCurrentStep(6);
   };
 
-  const handleStep3Complete = async () => {
-    if (mode === 'setup') await new LocalOnboardingRepository().completeStep(wizardProfileId, 3);
+  const handleStep6Complete = async () => {
+    if (mode === 'setup') {
+      await new LocalOnboardingRepository().completeStep(wizardProfileId, 6);
+    }
     onComplete(wizardProfileId);
   };
 
   return (
-    <main className="flex min-h-screen flex-col justify-center bg-background py-12 sm:px-6 lg:px-8">
-      <div className="mb-2 sm:mx-auto sm:w-full sm:max-w-md">
-        <h1 className="mb-6 text-center text-headline-lg-mobile tracking-tight text-foreground">
+    <main className="flex min-h-screen flex-col justify-center bg-background py-10 sm:px-6 lg:px-8">
+      <div className="mb-2 sm:mx-auto sm:w-full sm:max-w-lg">
+        <h1 className="mb-5 text-center font-fredoka text-headline-lg-mobile tracking-tight text-foreground">
           ez<span className="text-primary">·</span>life
         </h1>
         <ProgressDots currentStep={currentStep} />
@@ -106,15 +113,45 @@ export default function OnboardingWizard({ profileId, startStep = 1, mode = 'set
 
       <div key={currentStep} className="animate-fade-slide-up">
         {currentStep === 1 && (
-          <OnboardingStep1 profileId={wizardProfileId} onComplete={handleStep1Complete} />
+          <OnboardingStep1
+            profileId={wizardProfileId}
+            onComplete={(newId) => finishOrAdvance(2, newId)}
+          />
         )}
 
         {currentStep === 2 && (
-          <OnboardingStep2 profileId={wizardProfileId} onComplete={handleStep2Complete} />
+          <OnboardingStep2
+            profileId={wizardProfileId}
+            onComplete={() => finishOrAdvance(3)}
+          />
         )}
 
         {currentStep === 3 && (
-          <OnboardingStep3 profileId={wizardProfileId} onComplete={handleStep3Complete} />
+          <OnboardingStep3
+            profileId={wizardProfileId}
+            onComplete={() => finishOrAdvance(4)}
+          />
+        )}
+
+        {currentStep === 4 && (
+          <OnboardingStep4
+            profileId={wizardProfileId}
+            onComplete={() => finishOrAdvance(5)}
+          />
+        )}
+
+        {currentStep === 5 && (
+          <OnboardingStep5
+            profileId={wizardProfileId}
+            onComplete={handleStep5Complete}
+          />
+        )}
+
+        {currentStep === 6 && (
+          <OnboardingStep6
+            profileId={wizardProfileId}
+            onComplete={handleStep6Complete}
+          />
         )}
       </div>
     </main>

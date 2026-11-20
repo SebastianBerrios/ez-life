@@ -62,4 +62,36 @@ describe('calculateAccountBalances', () => {
     expect(calculateTotalBalance(accounts, balances)).toBe(150);
     expect(calculateTotalBalance(accounts, balances, { includeArchived: false })).toBe(100);
   });
+
+  it('ignores movements dated before an account opening_date (local day) and counts same-day or later movements', () => {
+    const openingDate = new Date(2026, 10, 10, 15, 30);
+    const accounts = [
+      account('new-acc', 100000, { opening_date: openingDate }),
+      account('legacy-acc', 50000),
+    ];
+    const movements = [
+      // Day before opening_date -> ignored on new-acc, counted on legacy-acc
+      movement('EXPENSE', 20000, { account_id: 'new-acc', date: new Date(2026, 10, 9, 23, 59) }),
+      movement('EXPENSE', 10000, { account_id: 'legacy-acc', date: new Date(2026, 10, 9, 23, 59) }),
+      // Same local calendar day (even earlier hour) -> counted
+      movement('INCOME', 5000, { account_id: 'new-acc', date: new Date(2026, 10, 10, 8, 0) }),
+      // Transfer from legacy to new-acc before opening_date -> legacy loses, new-acc ignores
+      movement('TRANSFER', 3000, { account_id: 'legacy-acc', to_account_id: 'new-acc', date: new Date(2026, 10, 8, 12, 0) }),
+      // Next day -> counted
+      movement('EXPENSE', 1500, { account_id: 'new-acc', date: new Date(2026, 10, 11, 9, 0) }),
+    ];
+    expect(calculateAccountBalances(accounts, movements)).toEqual({
+      'new-acc': 103500, // 100000 + 5000 - 1500
+      'legacy-acc': 37000, // 50000 - 10000 - 3000
+    });
+  });
+
+  it('produces identical results for accounts without opening_date regardless of historical dates', () => {
+    const accounts = [account('a', 1000)];
+    const movements = [
+      movement('INCOME', 500, { account_id: 'a', date: new Date(2020, 0, 1) }),
+      movement('EXPENSE', 200, { account_id: 'a', date: new Date(2026, 10, 15) }),
+    ];
+    expect(calculateAccountBalances(accounts, movements)).toEqual({ a: 1300 });
+  });
 });

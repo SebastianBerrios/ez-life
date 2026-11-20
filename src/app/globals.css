@@ -11,110 +11,130 @@
 }
 
 /*
- * Obsidian Precision tokens (spec 010).
- * HSL triplets (no alpha) so tailwind.config.ts can consume them as
- * `hsl(var(--x) / <alpha-value>)`. Hairline borders are the OPAQUE equivalent of
- * white 8% (dark) / #0B0D12 8% (light) over the card surface, because a triplet cannot carry alpha.
- * Full table + contrast ratios: specs/010-rediseno-obsidian/tokens.md
+ * ez-life warm visual language tokens (spec 013 FR-039..FR-044).
+ * HSL triplets (no alpha) so tailwind.config.ts consumes them as
+ * `hsl(var(--x) / <alpha-value>)`. Contrast verified by src/tokens.contrast.test.ts (SC-007).
  */
 @layer base {
-  /* Light theme: derived variant of Obsidian (default theme is dark, see layout.tsx) */
+  /* Light theme: warm cream canvas, deep plum ink, pastel green accent */
   :root {
     color-scheme: light;
 
-    --background: 220 23.1% 97.5%; /* #F7F8FA */
-    --foreground: 222.9 24.1% 5.7%; /* #0B0D12 */
+    --background: 38.8 68% 95.1%; /* #FBF5EA */
+    --foreground: 278 27.8% 21.2%; /* #3A2745 */
 
-    --card: 0 0% 100%; /* #FFFFFF (surface-1) */
-    --card-foreground: 222.9 24.1% 5.7%;
+    --card: 0 0% 100%; /* #FFFFFF */
+    --card-foreground: 278 27.8% 21.2%; /* #3A2745 */
 
-    --popover: 0 0% 100%; /* #FFFFFF: floating layers stay white in light */
-    --popover-foreground: 222.9 24.1% 5.7%;
+    --popover: 0 0% 100%; /* #FFFFFF */
+    --popover-foreground: 278 27.8% 21.2%; /* #3A2745 */
 
-    --surface-2: 216 21.7% 95.5%; /* #F1F3F6 */
-    --surface-3: 220 22% 92%; /* #E6E9EF */
+    --surface-2: 41.5 50% 90.2%; /* #F3EBD9 */
+    --surface-3: 40 42.9% 85.9%; /* #EAE0CC */
 
-    /* #047857: #059669 only reaches 3.77:1 against white, below AA 4.5:1 */
-    --primary: 162.9 93.5% 24.3%; /* #047857 */
-    --primary-hover: 163.1 88.1% 19.8%; /* #065F46 */
-    --primary-foreground: 0 0% 100%;
+    /* Pastel green accent with deep plum ink (AA >= 9:1) */
+    --primary: 139.7 42.3% 68.8%; /* #8ED1A4 */
+    --primary-hover: 140.5 40.9% 62.7%; /* #7AC694 */
+    --primary-foreground: 277.5 30.8% 15.3%; /* #2A1B33 */
 
-    --secondary: 216 21.7% 95.5%;
-    --secondary-foreground: 222.9 24.1% 5.7%;
+    --secondary: 41.5 50% 90.2%; /* #F3EBD9 */
+    --secondary-foreground: 278 27.8% 21.2%; /* #3A2745 */
 
-    --muted: 220 22% 92%;
-    --muted-foreground: 215.3 19.3% 34.5%; /* #475569 */
+    --muted: 39 45% 88.6%; /* #EFE6D5 */
+    --muted-foreground: 278 15.8% 37.3%; /* #63506E */
 
-    --accent: 220 22% 92%;
-    --accent-foreground: 222.9 24.1% 5.7%;
+    --accent: 39 45% 88.6%; /* #EFE6D5 */
+    --accent-foreground: 278 27.8% 21.2%; /* #3A2745 */
 
-    --destructive: 345.3 82.7% 40.8%; /* #BE123C (rose-700: #E11D48 was 3.8:1 on tinted badges) */
-    --destructive-foreground: 0 0% 100%;
-    --expense: 345.3 82.7% 40.8%; /* #BE123C */
+    --destructive: 342.1 67.4% 42%; /* #B4234E */
+    --destructive-foreground: 0 0% 100%; /* #FFFFFF */
+    --expense: 342.1 67.4% 42%; /* #B4234E */
 
-    --success: 163.1 88.1% 19.8%; /* #065F46 (emerald-800: #047857 was 4.4:1 on tinted badges) */
+    --success: 149.6 56.2% 26.9%; /* #1E6B44 */
 
-    --warning: 22.7 82.5% 31.4%; /* #92400E (amber-800: #B45309 was 4.4:1 on tinted badges) */
-    --warning-foreground: 0 0% 100%;
+    --warning: 29.8 89.4% 29.6%; /* #8F4B08 */
+    --warning-foreground: 0 0% 100%; /* #FFFFFF */
 
-    --subtle: 215.4 16.3% 46.9%; /* #64748B */
+    --subtle: 275.6 11.4% 46.9%; /* #7A6A85 */
 
-    --border: 180 2.6% 92.4%; /* #0B0D12 @ 8% over #FFFFFF */
-    --border-strong: 240 1.3% 84.9%; /* #0B0D12 @ 16% over #FFFFFF */
-    --input: 180 2.6% 92.4%;
-    --ring: 162.9 93.5% 24.3%;
+    /* 50/30/20 semantic pills (light) */
+    --pill-needs: 211 76% 92.4%; /* #DDEBFA */
+    --pill-needs-foreground: 210 47.5% 23.1%; /* #1F3B57 */
+    --pill-wants: 330 63.2% 92.5%; /* #F8E0EC */
+    --pill-wants-foreground: 325.3 46.3% 24.1%; /* #5A2142 */
+    --pill-savings: 139.1 45.8% 90.6%; /* #DCF2E3 */
+    --pill-savings-foreground: 147.3 42.3% 20.4%; /* #1E4A32 */
 
-    /* 8px base: sm 4px, md 6px, lg 8px (xl 12px is fixed in tailwind.config.ts) */
-    --radius: 0.5rem;
-    --radius-sm: calc(var(--radius) - 4px);
-    --radius-md: calc(var(--radius) - 2px);
-    --radius-lg: var(--radius);
+    --border: 40.6 39.5% 85.1%; /* #E8DEC9 */
+    --border-strong: 36.7 30.5% 76.1%; /* #D4C6B0 */
+    --input: 38.2 34.4% 81%; /* #DFD3BE */
+    --ring: 145.1 47.5% 38.8%; /* #34925B */
+
+    --shadow-card: 0 6px 24px -8px hsl(278 27.8% 21.2% / 0.12);
+    --shadow-dialog: 0 20px 40px -12px hsl(278 27.8% 21.2% / 0.25);
+
+    /* 28px cards, softer nested radii */
+    --radius: 1.75rem;
+    --radius-sm: 0.75rem;
+    --radius-md: 1rem;
+    --radius-lg: 1.25rem;
   }
 
-  /* Dark theme: Obsidian (default) */
+  /* Dark theme: deep plum canvas, warm cream ink, soft pastel green accent */
   .dark {
     color-scheme: dark;
 
-    --background: 230 25% 4.7%; /* #090A0F canvas */
-    --foreground: 210 20% 98%; /* #F9FAFB */
+    --background: 275.3 24.6% 13.5%; /* #241A2B */
+    --foreground: 34.7 51.4% 92.7%; /* #F6EEE3 */
 
-    --card: 225 18.2% 8.6%; /* #12141A surface-1 */
-    --card-foreground: 210 20% 98%;
+    --card: 274.3 23.1% 17.8%; /* #2F2338 */
+    --card-foreground: 34.7 51.4% 92.7%; /* #F6EEE3 */
 
-    --popover: 225 18.8% 12.5%; /* #1A1D26 surface-2 */
-    --popover-foreground: 210 20% 98%;
+    --popover: 272.5 22.2% 21.2%; /* #372A42 */
+    --popover-foreground: 34.7 51.4% 92.7%; /* #F6EEE3 */
 
-    --surface-2: 225 18.8% 12.5%; /* #1A1D26 */
-    --surface-3: 226.7 20.9% 16.9%; /* #222634 */
+    --surface-2: 272.5 21.8% 21.6%; /* #382B43 */
+    --surface-3: 272.1 21.2% 25.9%; /* #433450 */
 
-    --primary: 160.1 84.1% 39.4%; /* #10B981 */
-    --primary-hover: 158.1 64.4% 51.6%; /* #34D399 */
-    --primary-foreground: 230 25% 4.7%; /* dark canvas on emerald */
+    --primary: 140.3 47.4% 73.1%; /* #9ADBB0 */
+    --primary-hover: 140 50% 78.4%; /* #ADE3BF */
+    --primary-foreground: 275.3 24.6% 13.5%; /* #241A2B */
 
-    --secondary: 225 18.8% 12.5%;
-    --secondary-foreground: 210 20% 98%;
+    --secondary: 272.5 21.8% 21.6%; /* #382B43 */
+    --secondary-foreground: 34.7 51.4% 92.7%; /* #F6EEE3 */
 
-    --muted: 226.7 20.9% 16.9%;
-    --muted-foreground: 215 20.2% 65.1%; /* #94A3B8 */
+    --muted: 272.3 21.3% 23.5%; /* #3D2F49 */
+    --muted-foreground: 275.5 22.4% 80.4%; /* #CFC2D8 */
 
-    --accent: 226.7 20.9% 16.9%;
-    --accent-foreground: 210 20% 98%;
+    --accent: 272.1 21.2% 25.9%; /* #433450 */
+    --accent-foreground: 34.7 51.4% 92.7%; /* #F6EEE3 */
 
-    --destructive: 351.3 94.5% 71.4%; /* #FB7185 (rose-400: #F43F5E fell to 4.2:1 on tinted badges) */
-    --destructive-foreground: 210 20% 98%;
-    --expense: 351.3 94.5% 71.4%; /* #FB7185 */
+    --destructive: 345.3 87% 76.1%; /* #F78DA7 */
+    --destructive-foreground: 275.3 24.6% 13.5%; /* #241A2B */
+    --expense: 345.3 87% 76.1%; /* #F78DA7 */
 
-    --success: 158.1 64.4% 51.6%; /* #34D399 */
+    --success: 140.3 47.4% 73.1%; /* #9ADBB0 */
 
-    --warning: 37.7 92.1% 50.2%; /* #F59E0B */
-    --warning-foreground: 230 25% 4.7%;
+    --warning: 37.8 87.6% 69%; /* #F5C26B */
+    --warning-foreground: 275.3 24.6% 13.5%; /* #241A2B */
 
-    --subtle: 215.3 19.3% 34.5%; /* #475569 */
+    --subtle: 271.9 14.9% 55.7%; /* #8F7E9E */
 
-    --border: 222.9 8.6% 15.9%; /* white @ 8% over #12141A */
-    --border-strong: 228 7.4% 26.7%; /* white @ 16% over #1A1D26 */
-    --input: 222.9 8.6% 15.9%;
-    --ring: 160.1 84.1% 39.4%;
+    /* 50/30/20 semantic pills (dark) */
+    --pill-needs: 211.3 42.6% 21.2%; /* #1F354D */
+    --pill-needs-foreground: 210.7 85.4% 91%; /* #D3E7FC */
+    --pill-wants: 324.6 35.8% 21.4%; /* #4A233A */
+    --pill-wants-foreground: 330 75% 92.2%; /* #FADCEB */
+    --pill-savings: 146.2 35.6% 17.6%; /* #1D3D2B */
+    --pill-savings-foreground: 140.7 52.7% 89.2%; /* #D5F2DF */
+
+    --border: 272.3 19.7% 25.9%; /* #43354F */
+    --border-strong: 271.9 18% 34.9%; /* #5A4969 */
+    --input: 272.3 19.7% 25.9%; /* #43354F */
+    --ring: 140.3 47.4% 73.1%; /* #9ADBB0 */
+
+    --shadow-card: 0 6px 24px -8px hsl(275 40% 5% / 0.45);
+    --shadow-dialog: 0 20px 40px -10px hsl(275 40% 4% / 0.7);
   }
 
   * {
@@ -122,7 +142,7 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-figtree;
   }
 
   html {
@@ -130,14 +150,11 @@
   }
 }
 
-/* Typography helpers: Tailwind `fontSize` cannot set family / numeric features. */
+/* Numeric tabular features for financial figures */
 @layer components {
-  .text-label-mono-sm,
-  .text-label-mono-xs {
-    font-family: theme("fontFamily.mono");
-  }
   .text-metric-num-lg,
   .text-metric-num-md {
+    font-family: theme("fontFamily.fredoka");
     font-variant-numeric: tabular-nums;
   }
 }
@@ -150,8 +167,8 @@
   :is(button, a, input, summary, [role="button"]):focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; }
   summary { cursor: pointer; display: flex; align-items: center; }
 }
-/* Native <progress> used by PersonalProgress: 4px track, primary fill (same look as ui/progress) */
-.personal-progress { appearance: none; border: 0; border-radius: 2px; overflow: hidden; background: hsl(var(--surface-3)); }
+/* Native <progress> used by PersonalProgress: pill track, primary fill */
+.personal-progress { appearance: none; border: 0; border-radius: 9999px; overflow: hidden; background: hsl(var(--surface-3)); }
 .personal-progress::-webkit-progress-bar { background: hsl(var(--surface-3)); }
 .personal-progress::-webkit-progress-value { background: hsl(var(--primary)); transition: width 300ms ease-out; }
 .personal-progress::-moz-progress-bar { background: hsl(var(--primary)); }
@@ -160,4 +177,4 @@
 }
 
 /* Element revealed by a ⌘K navigation (see useRevealTarget): a static ring, no animation, so it is motion-safe. */
-[data-reveal] { outline: 2px solid hsl(var(--primary)); outline-offset: 2px; }
+[data-reveal] { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }

@@ -3,6 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import QuickRecordSheet, { type QuickRecordKind, type QuickRecordTab } from './QuickRecordSheet';
+import type { RegistrationPrefill } from '../../core/use-cases/buildRegistrationPrefill';
 
 const sharedSpaces = vi.hoisted(() => ({
   list: [] as Array<{ id: string; name: string; members: Array<{ user_id: string }> }>,
@@ -13,6 +14,8 @@ vi.mock('../hooks/useActiveSharedSpaces', () => ({ useActiveSharedSpaces: () => 
 vi.mock('./MovementForm', () => ({
   default: function MovementFormStub(props: {
     type?: string;
+    initialValues?: { amountCents?: number; description?: string; accountId?: string; incomeSourceId?: string };
+    links?: { recurrence_rule_id?: string; recurrence_month?: string; income_source_id?: string };
     sharedSpaces?: Array<{ id: string; name: string }>;
     onComplete: () => void;
     onSavedAndNew?: () => void;
@@ -20,7 +23,15 @@ vi.mock('./MovementForm', () => ({
   }) {
     const [text, setText] = React.useState('');
     return (
-      <div data-testid="movement-form" data-type={props.type} data-spaces={props.sharedSpaces?.map(s => s.id).join(',')}>
+      <div
+        data-testid="movement-form"
+        data-type={props.type}
+        data-spaces={props.sharedSpaces?.map(s => s.id).join(',')}
+        data-prefill-amount={props.initialValues?.amountCents ?? ''}
+        data-prefill-rule={props.links?.recurrence_rule_id ?? ''}
+        data-prefill-month={props.links?.recurrence_month ?? ''}
+        data-prefill-source={props.links?.income_source_id ?? ''}
+      >
         <input aria-label="Monto" value={text} onChange={event => setText(event.target.value)} />
         <button onClick={props.onComplete}>stub-save</button>
         <button onClick={props.onSavedAndNew}>stub-save-new</button>
@@ -30,7 +41,23 @@ vi.mock('./MovementForm', () => ({
   },
 }));
 vi.mock('./TransferForm', () => ({
-  default: ({ onComplete }: { onComplete: () => void }) => <div data-testid="transfer-form"><button onClick={onComplete}>stub-transfer-save</button></div>,
+  default: ({ onComplete, initialValues }: { onComplete: () => void; initialValues?: { amountCents?: number; fromAccountId?: string; toAccountId?: string } }) => (
+    <div
+      data-testid="transfer-form"
+      data-prefill-amount={initialValues?.amountCents ?? ''}
+      data-prefill-from={initialValues?.fromAccountId ?? ''}
+      data-prefill-to={initialValues?.toAccountId ?? ''}
+    >
+      <button onClick={onComplete}>stub-transfer-save</button>
+    </div>
+  ),
+}));
+vi.mock('./InstallmentPaymentQuickForm', () => ({
+  default: ({ loanId, initialAccountId, onComplete }: { loanId: string; initialAccountId?: string; onComplete: () => void }) => (
+    <div data-testid="loan-quick-form" data-loan-id={loanId} data-account-id={initialAccountId ?? ''}>
+      <button onClick={onComplete}>stub-loan-save</button>
+    </div>
+  ),
 }));
 vi.mock('./HabitForm', () => ({
   default: ({ onComplete }: { onComplete: () => void }) => <div data-testid="habit-form"><input aria-label="Nombre del hábito" /><button onClick={onComplete}>stub-habit-save</button></div>,
@@ -55,7 +82,7 @@ vi.mock('./SharedMovementForm', () => ({
   },
 }));
 
-function Host({ initialTab, initialKind, onSaved, onOpenChange }: { initialTab?: QuickRecordTab; initialKind?: QuickRecordKind; onSaved: (kind: string) => void; onOpenChange?: (open: boolean) => void }) {
+function Host({ initialTab, initialKind, prefill, onSaved, onOpenChange }: { initialTab?: QuickRecordTab; initialKind?: QuickRecordKind; prefill?: RegistrationPrefill; onSaved: (kind: string) => void; onOpenChange?: (open: boolean) => void }) {
   const [open, setOpen] = React.useState(true);
   return (
     <>
@@ -66,6 +93,7 @@ function Host({ initialTab, initialKind, onSaved, onOpenChange }: { initialTab?:
         userId="A"
         initialTab={initialTab}
         initialKind={initialKind}
+        prefill={prefill}
         onSaved={onSaved}
       />
     </>
@@ -110,9 +138,9 @@ describe('QuickRecordSheet: initialKind (deep links from Control)', () => {
 });
 
 describe('QuickRecordSheet', () => {
-  it('is titled "Nuevo Registro" and offers the five tabs in order', () => {
+  it('is titled "Nuevo registro" and offers the five tabs in order', () => {
     render(<Host onSaved={vi.fn()} />);
-    expect(screen.getByRole('dialog', { name: 'Nuevo Registro' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Nuevo registro' })).toBeInTheDocument();
     const tabs = screen.getAllByRole('tab').map(tab => tab.textContent);
     expect(tabs).toEqual(['Gasto', 'Ingreso', 'Mover', 'Hábito', 'Meta']);
     expect(screen.getByRole('tab', { name: 'Gasto' })).toHaveAttribute('aria-selected', 'true');
@@ -265,6 +293,74 @@ describe('QuickRecordSheet', () => {
       render(<Host onSaved={onSaved} onOpenChange={onOpenChange} />);
       await user.click(screen.getByRole('button', { name: 'stub-share' }));
       await user.click(screen.getByRole('button', { name: 'stub-shared-save' }));
+      expect(onSaved).toHaveBeenCalledWith('movement');
+      expect(onOpenChange).toHaveBeenLastCalledWith(false);
+    });
+  });
+
+  describe('prefill from "Por registrar"', () => {
+    it('opens the matching movement tab and forwards initialValues + recurrence links', () => {
+      render(
+        <Host
+          onSaved={vi.fn()}
+          prefill={{
+            tab: 'expense',
+            amountCents: 8000,
+            accountId: 'acc-1',
+            recurrenceRuleId: 'rule-1',
+            recurrenceMonth: '2026-11',
+            description: 'Gimnasio',
+          }}
+        />,
+      );
+      const form = screen.getByTestId('movement-form');
+      expect(form).toHaveAttribute('data-type', 'EXPENSE');
+      expect(form).toHaveAttribute('data-prefill-amount', '8000');
+      expect(form).toHaveAttribute('data-prefill-rule', 'rule-1');
+      expect(form).toHaveAttribute('data-prefill-month', '2026-11');
+    });
+
+    it('opens the transfer tab with origin, destination and suggested amount', () => {
+      render(
+        <Host
+          onSaved={vi.fn()}
+          prefill={{
+            tab: 'transfer',
+            amountCents: 80000,
+            accountId: 'bank-1',
+            toAccountId: 'card-1',
+            description: 'Pagar tarjeta Visa',
+          }}
+        />,
+      );
+      const form = screen.getByTestId('transfer-form');
+      expect(form).toHaveAttribute('data-prefill-amount', '80000');
+      expect(form).toHaveAttribute('data-prefill-from', 'bank-1');
+      expect(form).toHaveAttribute('data-prefill-to', 'card-1');
+    });
+
+    it('opens the loan quick payment form and reports movement saved on confirm', async () => {
+      const user = userEvent.setup();
+      const onSaved = vi.fn();
+      const onOpenChange = vi.fn();
+      render(
+        <Host
+          onSaved={onSaved}
+          onOpenChange={onOpenChange}
+          prefill={{
+            tab: 'loan',
+            loanId: 'loan-1',
+            amountCents: 25000,
+            accountId: 'bank-1',
+            description: 'Cuota de Banco',
+          }}
+        />,
+      );
+      const form = screen.getByTestId('loan-quick-form');
+      expect(form).toHaveAttribute('data-loan-id', 'loan-1');
+      expect(form).toHaveAttribute('data-account-id', 'bank-1');
+
+      await user.click(screen.getByRole('button', { name: 'stub-loan-save' }));
       expect(onSaved).toHaveBeenCalledWith('movement');
       expect(onOpenChange).toHaveBeenLastCalledWith(false);
     });

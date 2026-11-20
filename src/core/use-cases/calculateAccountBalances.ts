@@ -1,27 +1,40 @@
 import type { Movement, PaymentAccount } from '../domain/models/types';
+import { calendarKey } from './calendar';
 
 /**
  * Balance per payment account: opening balance + income - expense - transfers
  * out + transfers in (accountId -> cents). Balance adjustments count (they are
  * real money moves); soft-deleted rows are ignored; movements without an
  * account are not attributed to any (see `calculateUnassignedBalance`).
+ * When an account defines `opening_date`, movements dated on an earlier local
+ * calendar day are ignored for that account (spec 013 R2).
  */
 export function calculateAccountBalances(accounts: PaymentAccount[], movements: Movement[]): Record<string, number> {
   const balances: Record<string, number> = {};
+  const openingDays: Record<string, string> = {};
   for (const account of accounts) {
-    if (!account.deleted_at) balances[account.id] = account.opening_balance;
+    if (!account.deleted_at) {
+      balances[account.id] = account.opening_balance;
+      if (account.opening_date) {
+        openingDays[account.id] = calendarKey(account.opening_date);
+      }
+    }
   }
-  const apply = (accountId: string | undefined, delta: number) => {
-    if (accountId !== undefined && accountId in balances) balances[accountId] += delta;
+  const apply = (accountId: string | undefined, delta: number, moveDay: string) => {
+    if (accountId === undefined || !(accountId in balances)) return;
+    const openDay = openingDays[accountId];
+    if (openDay !== undefined && moveDay < openDay) return;
+    balances[accountId] += delta;
   };
 
   for (const m of movements) {
     if (m.deleted_at) continue;
+    const moveDay = calendarKey(m.date);
     if (m.type === 'TRANSFER') {
-      apply(m.account_id, -m.amount);
-      apply(m.to_account_id, m.amount);
+      apply(m.account_id, -m.amount, moveDay);
+      apply(m.to_account_id, m.amount, moveDay);
     } else {
-      apply(m.account_id, m.type === 'INCOME' ? m.amount : -m.amount);
+      apply(m.account_id, m.type === 'INCOME' ? m.amount : -m.amount, moveDay);
     }
   }
   return balances;

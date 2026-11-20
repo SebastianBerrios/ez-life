@@ -1,39 +1,77 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { LocalOnboardingRepository } from '../../infrastructure/repositories/local/LocalOnboardingRepository';
 import { parseMoney } from '../../core/use-cases/parseMoney';
-import { parseCurrentBalance } from '../../core/use-cases/parseCurrentBalance';
+import { parseDayOfMonth } from '../../core/use-cases/parseDayOfMonth';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Panel, PanelBody, PanelHeader } from '@/components/ui/panel';
+import { cn } from '@/lib/utils';
 
 interface Props {
   profileId: string;
   onComplete: (profileId: string) => void;
 }
 
+function tryParsePositiveMoney(text: string): number | null {
+  if (!text.trim()) return null;
+  try {
+    const cents = parseMoney(text);
+    return cents > 0 ? cents : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function OnboardingStep1({ profileId, onComplete }: Props) {
   const [income, setIncome] = useState<string>('');
-  const [balance, setBalance] = useState<string>('');
+  const [payDayText, setPayDayText] = useState<string>('');
+  const [receivedThisMonth, setReceivedThisMonth] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const [incomeError, setIncomeError] = useState('');
+  const [payDayError, setPayDayError] = useState('');
+  const [formError, setFormError] = useState('');
+
+  const validIncomeCents = useMemo(() => tryParsePositiveMoney(income), [income]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    setError('');
+    setIncomeError('');
+    setPayDayError('');
+    setFormError('');
 
+    let parsedIncome: number;
     try {
-      await new LocalOnboardingRepository().saveStartingPoint(profileId, {
-        income: parseMoney(income),
-        openingBalance: parseCurrentBalance(balance),
-      });
+      parsedIncome = parseMoney(income);
+      if (parsedIncome <= 0) {
+        setIncomeError('Ingresa un monto mayor a cero.');
+        return;
+      }
+    } catch (err) {
+      setIncomeError(err instanceof Error ? err.message : 'Ingresa un monto válido.');
+      return;
+    }
 
+    let parsedPayDay: number | undefined;
+    try {
+      parsedPayDay = parseDayOfMonth(payDayText);
+    } catch (err) {
+      setPayDayError(err instanceof Error ? err.message : 'Ingresa un día entre 1 y 31.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await new LocalOnboardingRepository().saveIncome(profileId, {
+        income: parsedIncome,
+        payDay: parsedPayDay,
+        receivedThisMonth,
+      });
       onComplete(profileId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo guardar tu punto de partida.');
+      setFormError(err instanceof Error ? err.message : 'No se pudieron guardar tus ingresos.');
     } finally {
       setIsSubmitting(false);
     }
@@ -42,60 +80,88 @@ export default function OnboardingStep1({ profileId, onComplete }: Props) {
   return (
     <div className="mx-auto w-full max-w-md px-4">
       <Panel>
-        <PanelHeader eyebrow="Paso 1 de 3" title="Tu punto de partida" titleAs="h2" />
+        <PanelHeader eyebrow="Paso 1 de 6" title="Tus ingresos" titleAs="h2" />
         <PanelBody>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="income">
-                Sueldo o ingreso mensual
-              </Label>
+              <Label htmlFor="income">Ingreso mensual</Label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                  <span className="font-mono text-body-md text-muted-foreground">S/</span>
+                  <span className="text-body-md text-muted-foreground">S/</span>
                 </div>
                 <Input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   name="income"
                   id="income"
-                  required
-                  step="0.01"
-                  min="0"
                   className="pl-10 tabular-nums"
                   placeholder="0.00"
                   value={income}
-                  onChange={(e) => setIncome(e.target.value)}
+                  onChange={(e) => {
+                    setIncome(e.target.value);
+                    setIncomeError('');
+                  }}
                 />
               </div>
+              {incomeError && <p role="alert" className="text-sm text-destructive">{incomeError}</p>}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="openingBalance">
-                Saldo actual (opcional)
-              </Label>
-              <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                  <span className="font-mono text-body-md text-muted-foreground">S/</span>
-                </div>
-                <Input
-                  type="number"
-                  name="openingBalance"
-                  id="openingBalance"
-                  step="0.01"
-                  min="0"
-                  className="pl-10 tabular-nums"
-                  placeholder="0.00"
-                  aria-describedby="openingBalance-help"
-                  value={balance}
-                  onChange={(e) => setBalance(e.target.value)}
-                />
-              </div>
-              <p id="openingBalance-help" className="text-body-md text-muted-foreground">
-                Lo que tienes hoy entre efectivo y cuentas. Puedes ajustarlo después en Ajustes → Cuentas.
-              </p>
+              <Label htmlFor="payDay">¿Qué día te pagan? (opcional)</Label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                name="payDay"
+                id="payDay"
+                className="tabular-nums"
+                placeholder="Ej. 28"
+                value={payDayText}
+                onChange={(e) => {
+                  setPayDayText(e.target.value);
+                  setPayDayError('');
+                }}
+              />
+              {payDayError && <p role="alert" className="text-sm text-destructive">{payDayError}</p>}
             </div>
 
-            {error && <p role="alert" className="text-body-md text-destructive">{error}</p>}
-            <Button type="submit" size="lg" disabled={isSubmitting} className="w-full">
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium text-foreground">
+                ¿Ya recibiste tu sueldo de este mes?
+              </legend>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { value: true, label: 'Sí' },
+                  { value: false, label: 'No' },
+                ].map(option => {
+                  const selected = receivedThisMonth === option.value;
+                  return (
+                    <label
+                      key={option.label}
+                      className={cn(
+                        'flex min-h-11 cursor-pointer items-center justify-center rounded-full border px-4 text-sm font-medium transition-colors',
+                        selected
+                          ? 'border-primary bg-primary/15 text-foreground'
+                          : 'border-border bg-card text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="receivedThisMonth"
+                        value={option.value ? 'yes' : 'no'}
+                        checked={selected}
+                        onChange={() => setReceivedThisMonth(option.value)}
+                        className="sr-only"
+                      />
+                      {option.label}
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+
+            {formError && <p role="alert" className="text-sm text-destructive">{formError}</p>}
+
+            <Button type="submit" size="lg" disabled={validIncomeCents === null || isSubmitting} className="w-full">
               {isSubmitting ? 'Guardando...' : 'Continuar'}
             </Button>
           </form>

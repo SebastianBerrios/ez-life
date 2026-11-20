@@ -4,7 +4,7 @@ import React from 'react';
 import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-/** Mono uppercase micro-title with an icon and an action slot, the header of every Control panel. */
+/** Subtle micro-title with an icon and an action slot, the header of every Control panel. */
 export function SectionHeader({
   icon,
   eyebrow,
@@ -25,7 +25,7 @@ export function SectionHeader({
       <div className="flex min-w-0 items-start gap-2.5">
         {icon && <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-surface-2 text-primary [&_svg]:size-4">{icon}</span>}
         <div className="flex min-w-0 flex-col gap-0.5">
-          {eyebrow && <span className="font-mono text-label-mono-xs uppercase text-muted-foreground">{eyebrow}</span>}
+          {eyebrow && <span className="text-label-xs text-muted-foreground">{eyebrow}</span>}
           <h3 id={titleId} className="text-headline-md text-foreground">{title}</h3>
           {subtitle && <p className="text-body-sm text-muted-foreground">{subtitle}</p>}
         </div>

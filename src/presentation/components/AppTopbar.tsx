@@ -25,7 +25,7 @@ export default function AppTopbar({ currentRoute, refDate, onShiftMonth, avatarU
   return (
     <header
       aria-label="Barra superior"
-      className="sticky top-0 z-30 hidden h-14 items-center justify-between border-b border-border bg-background/80 px-6 backdrop-blur-md md:flex lg:px-10"
+      className="sticky top-0 z-30 hidden h-14 items-center justify-between border-b border-border/60 bg-background/85 px-6 backdrop-blur-md lg:flex lg:px-10"
     >
       <div className="flex min-w-0 items-center gap-4">
         <nav aria-label="Ruta de navegación" className="flex items-center gap-1.5 text-body-md">

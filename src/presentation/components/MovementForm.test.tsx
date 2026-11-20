@@ -29,6 +29,7 @@ describe('MovementForm', () => {
     render(<MovementForm userId="A" onComplete={vi.fn()} onCancel={vi.fn()} movement={{ id: 'original', user_id: 'A', type: 'INCOME', amount: 1200, date: new Date(2026, 8, 5), income_source_id: 'salary', is_recurring: false, created_at: new Date(), updated_at: new Date() }} />);
     await screen.findByRole('combobox', { name: 'Fuente de ingreso' });
     await user.clear(screen.getByLabelText('Monto')); await user.type(screen.getByLabelText('Monto'), '15.25');
+    await user.click(screen.getByRole('button', { name: /Más opciones/i }));
     fireEvent.change(screen.getByLabelText('Fecha'), { target: { value: '2026-09-06' } });
     await user.click(screen.getByRole('button', { name: /^Guardar$/ }));
     await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: 'original', amount: 1525, income_source_id: 'salary', date: new Date(2026, 8, 6, 0, 0) })));
@@ -90,10 +91,10 @@ describe('MovementForm', () => {
     const amountInput = screen.getByLabelText(/monto/i);
     await user.type(amountInput, '150.50');
 
-    const disclosure = screen.getByText('Opciones adicionales').closest('details');
-    expect(disclosure).not.toHaveAttribute('open');
-    await user.click(screen.getByText('Opciones adicionales'));
-    expect(disclosure).toHaveAttribute('open');
+    const moreBtn = screen.getByRole('button', { name: /Más opciones/i });
+    expect(moreBtn).toHaveAttribute('aria-expanded', 'false');
+    await user.click(moreBtn);
+    expect(moreBtn).toHaveAttribute('aria-expanded', 'true');
 
     // Enter description
     const descInput = screen.getByLabelText(/descripción/i);
@@ -151,6 +152,7 @@ describe('MovementForm', () => {
 
       expect(await screen.findByRole('radiogroup', { name: /Categoría/i })).toBeInTheDocument();
 
+      await user.click(screen.getByRole('button', { name: /Más opciones/i }));
       const adjustmentToggle = screen.getByLabelText(/es un ajuste de balance/i);
       await user.click(adjustmentToggle);
 
@@ -165,6 +167,7 @@ describe('MovementForm', () => {
       render(<MovementForm userId="fake-user-id" onComplete={vi.fn()} onCancel={vi.fn()} />);
 
       await screen.findByRole('radiogroup', { name: /Categoría/i });
+      await user.click(screen.getByRole('button', { name: /Más opciones/i }));
       const adjustmentToggle = screen.getByLabelText(/es un ajuste de balance/i);
       await user.click(adjustmentToggle);
 
@@ -187,6 +190,7 @@ describe('MovementForm', () => {
       render(<MovementForm userId="fake-user-id" onComplete={vi.fn()} onCancel={vi.fn()} />);
 
       await screen.findByRole('radiogroup', { name: /Categoría/i });
+      await user.click(screen.getByRole('button', { name: /Más opciones/i }));
       const adjustmentToggle = screen.getByLabelText(/es un ajuste de balance/i);
       await user.click(adjustmentToggle);
 
@@ -234,9 +238,11 @@ describe('MovementForm', () => {
     it('shows the movement time when editing and keeps it on save', async () => {
       accountRows.list = [];
       const save = mockRepositories();
+      const user = userEvent.setup();
       render(<MovementForm userId="A" onComplete={vi.fn()} onCancel={vi.fn()}
         movement={{ id: 'm1', user_id: 'A', type: 'INCOME', amount: 1200, date: when, income_source_id: 'salary', is_recurring: false, created_at: when, updated_at: when }} />);
       await screen.findByRole('combobox', { name: 'Fuente de ingreso' });
+      await user.click(screen.getByRole('button', { name: /Más opciones/i }));
       expect(screen.getByLabelText('Hora')).toHaveValue('19:45');
       fireEvent.submit(screen.getByTestId('movement-form'));
       await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: 'm1', date: new Date(2026, 8, 5, 19, 45) })));
@@ -248,6 +254,7 @@ describe('MovementForm', () => {
       const user = userEvent.setup();
       render(<MovementForm userId="A" onComplete={vi.fn()} onCancel={vi.fn()} />);
       await screen.findByRole('radiogroup', { name: /Categoría/i });
+      await user.click(screen.getByRole('button', { name: /Más opciones/i }));
       fireEvent.change(screen.getByLabelText('Fecha'), { target: { value: '2026-10-16' } });
       fireEvent.change(screen.getByLabelText('Hora'), { target: { value: '08:05' } });
       await user.type(screen.getByLabelText(/monto/i), '10');
@@ -355,6 +362,7 @@ describe('MovementForm', () => {
       const user = userEvent.setup();
       renderForm({ type: 'EXPENSE' });
       await user.click(await screen.findByRole('radio', { name: /Entretenimiento/ }));
+      await user.click(screen.getByRole('button', { name: /Más opciones/i }));
       expect(screen.queryByRole('button', { name: 'Desayuno' })).not.toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: 'Cine' }));
       expect(screen.getByRole('button', { name: 'Cine' })).toHaveAttribute('aria-pressed', 'true');
@@ -394,12 +402,12 @@ describe('MovementForm', () => {
       const user = userEvent.setup();
       const { rerender } = renderForm({ type: 'EXPENSE' });
       await screen.findByRole('radio', { name: /Alimentación/ });
-      expect(screen.getByText('EGRESO')).toBeInTheDocument();
+      expect(screen.getByText('Gasto')).toBeInTheDocument();
       expect(screen.queryByRole('tab', { name: 'Gasto' })).not.toBeInTheDocument(); // no own switch when fixed from outside
       await user.type(screen.getByLabelText('Monto'), '42.5');
       await user.type(screen.getByLabelText(/descripción/i), 'Bono');
       rerender(<MovementForm userId="A" type="INCOME" onComplete={vi.fn()} onCancel={vi.fn()} />);
-      expect(screen.getByText('INGRESO')).toBeInTheDocument();
+      expect(screen.getByText('Ingreso')).toBeInTheDocument();
       expect(screen.getByLabelText('Monto')).toHaveValue('42.50');
       expect(screen.getByLabelText(/descripción/i)).toHaveValue('Bono');
       expect(screen.queryByRole('radiogroup', { name: /Categoría/i })).not.toBeInTheDocument();
@@ -418,6 +426,7 @@ describe('MovementForm', () => {
       await screen.findByRole('radiogroup', { name: /Categoría/i });
       expect(screen.getAllByText('Opcional').length).toBeGreaterThan(0);
       expect(screen.queryByText('Requerido')).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: /Más opciones/i }));
       await user.click(screen.getByLabelText(/es un ajuste de balance/i));
       expect(screen.getByText('Requerido')).toBeInTheDocument();
     });
@@ -433,6 +442,7 @@ describe('MovementForm', () => {
         renderForm({ type: 'EXPENSE', onComplete, onSavedAndNew });
         await user.click(await screen.findByRole('radio', { name: /Entretenimiento/ }));
         await user.click(screen.getByRole('radio', { name: 'BCP' }));
+        await user.click(screen.getByRole('button', { name: /Más opciones/i }));
         fireEvent.change(screen.getByLabelText('Hora'), { target: { value: '08:05' } });
         await user.type(screen.getByLabelText('Monto'), '12');
         await user.type(screen.getByLabelText(/descripción/i), 'Cine con amigos');
@@ -502,7 +512,10 @@ describe('MovementForm', () => {
       it('is offered for a new expense when the user has a shared space', async () => {
         accountRows.list = [];
         mockRepositories();
+        const user = userEvent.setup();
         renderForm({ type: 'EXPENSE', sharedSpaces: spaces, onContinueShared: vi.fn() });
+        await screen.findByLabelText('Monto');
+        await user.click(screen.getByRole('button', { name: /Más opciones/i }));
         const toggle = await screen.findByRole('switch', { name: /afecta al espacio compartido/i });
         expect(toggle).toHaveAttribute('aria-checked', 'false');
         expect(screen.getByText('Divide este registro con tu pareja o conviviente.')).toBeInTheDocument();
@@ -514,9 +527,10 @@ describe('MovementForm', () => {
       ])('is hidden %s', async (_name, props) => {
         accountRows.list = [];
         mockRepositories();
+        const user = userEvent.setup();
         renderForm(props);
         await screen.findByLabelText('Monto');
-        await screen.findByText('Opciones adicionales');
+        await user.click(await screen.findByRole('button', { name: /Más opciones/i }));
         expect(screen.queryByRole('switch', { name: /afecta al espacio compartido/i })).not.toBeInTheDocument();
       });
 
@@ -529,9 +543,12 @@ describe('MovementForm', () => {
           movement: { id: 'm1', user_id: 'A', type: 'EXPENSE', amount: 1200, date: when, distribution_category_id: 'needs', expense_category_id: 'food', is_recurring: false, created_at: when, updated_at: when },
         });
         await screen.findByRole('radio', { name: /Alimentación/ });
+        await user.click(screen.getByRole('button', { name: /Más opciones/i }));
         expect(screen.queryByRole('switch', { name: /afecta al espacio compartido/i })).not.toBeInTheDocument();
         unmount();
         renderForm({ type: 'EXPENSE', sharedSpaces: spaces, onContinueShared: vi.fn() });
+        await screen.findByLabelText('Monto');
+        await user.click(screen.getByRole('button', { name: /Más opciones/i }));
         await screen.findByRole('switch', { name: /afecta al espacio compartido/i });
         await user.click(screen.getByLabelText(/es un ajuste de balance/i));
         expect(screen.queryByRole('switch', { name: /afecta al espacio compartido/i })).not.toBeInTheDocument();
@@ -545,6 +562,7 @@ describe('MovementForm', () => {
         const user = userEvent.setup();
         renderForm({ type: 'EXPENSE', sharedSpaces: spaces, onContinueShared, onComplete, onSavedAndNew: vi.fn() });
         await user.type(await screen.findByLabelText('Monto'), '80.5');
+        await user.click(screen.getByRole('button', { name: /Más opciones/i }));
         await user.click(screen.getByRole('switch', { name: /afecta al espacio compartido/i }));
         expect(screen.getByRole('switch', { name: /afecta al espacio compartido/i })).toHaveAttribute('aria-checked', 'true');
         expect(screen.queryByRole('button', { name: 'Guardar y registrar otro' })).not.toBeInTheDocument();
@@ -559,8 +577,54 @@ describe('MovementForm', () => {
         mockRepositories();
         const user = userEvent.setup();
         renderForm({ type: 'EXPENSE', sharedSpaces: [...spaces, { id: 's2', name: 'Viaje' }], onContinueShared: vi.fn() });
+        await screen.findByLabelText('Monto');
+        await user.click(screen.getByRole('button', { name: /Más opciones/i }));
         await user.click(await screen.findByRole('switch', { name: /afecta al espacio compartido/i }));
         expect(screen.getByRole('combobox', { name: 'Espacio compartido' })).toBeInTheDocument();
+      });
+    });
+
+    describe('prefill initialValues and structured links (spec 013)', () => {
+      it('prefills amount, description, account and saves recurrence_rule_id + recurrence_month', async () => {
+        const cashId = defaultCashAccountId('A');
+        accountRows.list = [
+          { id: cashId, user_id: 'A', name: 'Efectivo', kind: 'cash', opening_balance: 0, created_at: new Date(), updated_at: new Date() },
+          { id: 'acc-bank', user_id: 'A', name: 'BCP', kind: 'debit', opening_balance: 0, created_at: new Date(), updated_at: new Date() },
+        ];
+        const save = mockRepositories();
+        const onComplete = vi.fn();
+        const user = userEvent.setup();
+
+        renderForm({
+          type: 'EXPENSE',
+          onComplete,
+          initialValues: {
+            amountCents: 8000,
+            description: 'Gimnasio',
+            accountId: 'acc-bank',
+          },
+          links: {
+            recurrence_rule_id: 'rule-gym',
+            recurrence_month: '2026-11',
+          },
+        });
+
+        await screen.findByRole('radio', { name: /Alimentación/i });
+        expect(screen.getByLabelText('Monto')).toHaveValue('80.00');
+        expect(screen.getByLabelText(/Concepto/i)).toHaveValue('Gimnasio');
+        expect(screen.getByRole('radio', { name: 'BCP' })).toBeChecked();
+
+        await user.click(screen.getByRole('button', { name: 'Guardar registro' }));
+
+        await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({
+          type: 'EXPENSE',
+          amount: 8000,
+          description: 'Gimnasio',
+          account_id: 'acc-bank',
+          recurrence_rule_id: 'rule-gym',
+          recurrence_month: '2026-11',
+        })));
+        expect(onComplete).toHaveBeenCalledTimes(1);
       });
     });
   });

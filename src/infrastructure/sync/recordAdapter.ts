@@ -3,6 +3,7 @@ import { calendarKey, parseCalendarDate } from '../../core/use-cases/calendar';
 const dateFields = new Set([
   'created_at', 'updated_at', 'deleted_at', 'date', 'deadline', 'due_date',
   'read_at', 'joined_at', 'left_at', 'expires_at', 'redeemed_at', 'done_at', 'completed_at',
+  'opening_date',
 ]);
 export function fromRemoteRecord(record: RecordData): RecordData {
   const result: RecordData = {};

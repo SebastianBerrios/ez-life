@@ -38,7 +38,7 @@ function DropdownMenuContent({
         <MenuPrimitive.Popup
           data-slot="dropdown-menu-content"
           className={cn(
-            "min-w-40 origin-[var(--transform-origin)] rounded-lg border border-border-strong bg-popover p-1 text-popover-foreground shadow-dialog outline-none duration-100 data-[open]:animate-in data-[open]:fade-in-0 data-[open]:zoom-in-95 data-[closed]:animate-out data-[closed]:fade-out-0 data-[closed]:zoom-out-95",
+            "min-w-40 origin-[var(--transform-origin)] rounded-3xl bg-popover p-1.5 text-popover-foreground shadow-dialog outline-none duration-100 motion-safe:data-[open]:animate-in motion-safe:data-[open]:fade-in-0 motion-safe:data-[open]:zoom-in-95 motion-safe:data-[closed]:animate-out motion-safe:data-[closed]:fade-out-0 motion-safe:data-[closed]:zoom-out-95",
             className
           )}
           {...props}
@@ -60,7 +60,7 @@ function DropdownMenuItem({
       data-slot="dropdown-menu-item"
       data-variant={variant}
       className={cn(
-        "flex min-h-11 w-full cursor-default items-center gap-2 rounded-md px-3 text-body-md outline-none select-none data-[highlighted]:bg-surface-3 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
+        "flex min-h-11 w-full cursor-default items-center gap-2 rounded-xl px-3 text-body-md outline-none select-none data-[highlighted]:bg-surface-2 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
         variant === "destructive" && "text-destructive data-[highlighted]:bg-destructive/10",
         className
       )}

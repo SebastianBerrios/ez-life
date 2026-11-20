@@ -86,7 +86,7 @@ export function DateTimeRow({
 }
 
 /**
- * Mono uppercase micro-label with an icon, used above every field group of the quick-record forms.
+ * Subtle micro-label with an icon, used above every field group of the quick-record forms.
  * Renders a real `<label>` when `htmlFor` is given, otherwise a `<span>` (id-able, for aria-labelledby).
  */
 export function FieldLabel({
@@ -110,12 +110,12 @@ export function FieldLabel({
       <Wrapper
         id={id}
         {...(htmlFor ? { htmlFor } : {})}
-        className="flex items-center gap-1.5 font-mono text-label-mono-xs uppercase text-muted-foreground"
+        className="flex items-center gap-1.5 text-label-xs text-muted-foreground"
       >
         {Icon && <Icon className="size-3.5" aria-hidden="true" />}
         {children}
       </Wrapper>
-      {hint && <span className="font-mono text-label-mono-xs text-muted-foreground">{hint}</span>}
+      {hint && <span className="text-label-xs text-muted-foreground">{hint}</span>}
     </div>
   );
 }

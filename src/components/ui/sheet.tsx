@@ -36,6 +36,7 @@ function SheetClose({ ...props }: DialogPrimitive.Close.Props) {
 function SheetContent({
   className,
   children,
+  footer,
   side = "bottom",
   showCloseButton = true,
   ...props
@@ -43,6 +44,8 @@ function SheetContent({
   /** Mobile placement. Only `bottom` exists today; the prop reserves the API. */
   side?: "bottom"
   showCloseButton?: boolean
+  /** Optional sticky footer pinned to the bottom of the sheet within thumb reach. */
+  footer?: React.ReactNode
 }) {
   return (
     <DialogPortal>
@@ -51,18 +54,29 @@ function SheetContent({
         data-slot="sheet-content"
         data-side={side}
         className={cn(
-          "fixed inset-x-0 bottom-0 z-50 flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-xl border border-b-0 border-border-strong bg-popover text-sm text-popover-foreground shadow-dialog outline-none animate-sheet-in",
-          "md:inset-auto md:top-1/2 md:left-1/2 md:max-w-lg md:-translate-x-1/2 md:-translate-y-1/2 md:animate-sheet-fade-in md:rounded-xl md:border-b",
+          "fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-card bg-popover text-sm text-popover-foreground shadow-dialog outline-none motion-safe:animate-sheet-in",
+          "md:inset-auto md:top-1/2 md:left-1/2 md:max-w-lg md:-translate-x-1/2 md:-translate-y-1/2 md:motion-safe:animate-sheet-fade-in md:rounded-card",
           className
         )}
         {...props}
       >
         <div
           data-slot="sheet-body"
-          className="grid gap-4 overflow-y-auto overscroll-contain p-4"
+          className={cn(
+            "grid gap-4 overflow-y-auto overscroll-contain p-4",
+            !footer && "pb-[calc(1rem+env(safe-area-inset-bottom))]"
+          )}
         >
           {children}
         </div>
+        {footer !== undefined && (
+          <div
+            data-slot="sheet-sticky-footer"
+            className="shrink-0 border-t border-border/60 bg-popover px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
+          >
+            {footer}
+          </div>
+        )}
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="sheet-close"
@@ -97,7 +111,10 @@ function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="sheet-footer"
-      className={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", className)}
+      className={cn(
+        "sticky bottom-0 -mx-4 -mb-4 mt-2 flex flex-col-reverse gap-2 border-t border-border/60 bg-popover px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:flex-row sm:justify-end",
+        className
+      )}
       {...props}
     />
   )

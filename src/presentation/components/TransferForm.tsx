@@ -5,42 +5,55 @@ import { ArrowDownUp, CalendarDays, CheckCircle2, Loader2, PencilLine, Wallet } 
 import { LocalMovementRepository } from '../../infrastructure/repositories/local/LocalMovementRepository';
 import { LocalPaymentAccountRepository } from '../../infrastructure/repositories/local/LocalPaymentAccountRepository';
 import { parseMoney } from '../../core/use-cases/parseMoney';
+import { centsToAmountInput } from '../../core/use-cases/addQuickAmount';
 import { calendarKey, combineDateAndTime, parseCalendarDate, timeKey } from '../../core/use-cases/calendar';
 import { validateMovementAmount } from '../../core/use-cases/validateMovementAmount';
 import { validateTransfer } from '../../core/use-cases/validateTransfer';
 import {
   canTransfer, defaultTransferPair, selectTransferAccount, swapTransferPair, usableAccounts, type TransferPair,
 } from '../../core/use-cases/transferAccounts';
+import { countActiveFields, formatMoreOptionsLabel, hasAdvancedFieldError } from '../../core/use-cases/formAdvancedFields';
 import { DomainError } from '../../core/domain/errors/DomainError';
 import { PaymentAccount } from '../../core/domain/models/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { CollapsibleSection } from '@/components/ui/collapsible-section';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import AmountHero from './AmountHero';
 import PaymentAccountForm from './PaymentAccountForm';
 import { AccountChips, DateTimeRow, FieldLabel } from './quickRecordUi';
 
+export interface TransferInitialValues {
+  amountCents?: number;
+  fromAccountId?: string;
+  toAccountId?: string;
+  description?: string;
+}
+
 interface Props {
   userId: string;
   onComplete: () => void;
   autoFocusAmount?: boolean;
+  initialValues?: TransferInitialValues;
 }
 
-/**
- * "Mover" tab: moves money between two of the user's own accounts. A transfer is a `TRANSFER`
- * movement (never income nor expense). With fewer than two accounts the form explains why and
- * offers to create one right here.
- */
-export default function TransferForm({ userId, onComplete, autoFocusAmount = false }: Props) {
+export default function TransferForm({ userId, onComplete, autoFocusAmount = false, initialValues }: Props) {
   const [accounts, setAccounts] = useState<PaymentAccount[] | null>(null);
   const [pair, setPair] = useState<TransferPair | null>(null);
   const [creatingAccount, setCreatingAccount] = useState(false);
-  const [amount, setAmount] = useState('');
-  const [description, setDescription] = useState('');
-  const [date, setDate] = useState(calendarKey(new Date()));
-  const [time, setTime] = useState(timeKey(new Date()));
+  const [amount, setAmount] = useState(
+    initialValues?.amountCents !== undefined ? centsToAmountInput(initialValues.amountCents) : ''
+  );
+  const [description, setDescription] = useState(initialValues?.description ?? '');
+  const initialDateRef = useRef(calendarKey(new Date()));
+  const initialTimeRef = useRef(timeKey(new Date()));
+  const [date, setDate] = useState(initialDateRef.current);
+  const [time, setTime] = useState(initialTimeRef.current);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [amountError, setAmountError] = useState<string | null>(null);
+  const [dateError, setDateError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -52,17 +65,35 @@ export default function TransferForm({ userId, onComplete, autoFocusAmount = fal
     const loaded = await new LocalPaymentAccountRepository().getAll(userId);
     setAccounts(loaded);
     setPair(current => {
-      const stillValid = current && usableAccounts(loaded).some(a => a.id === current.fromId) && usableAccounts(loaded).some(a => a.id === current.toId);
-      return stillValid ? current : defaultTransferPair(loaded, userId);
+      const usable = usableAccounts(loaded);
+      const stillValid = current && usable.some(a => a.id === current.fromId) && usable.some(a => a.id === current.toId);
+      if (stillValid) return current;
+
+      const wantFrom = initialValues?.fromAccountId && usable.some(a => a.id === initialValues.fromAccountId)
+        ? initialValues.fromAccountId : undefined;
+      const wantTo = initialValues?.toAccountId && usable.some(a => a.id === initialValues.toAccountId)
+        ? initialValues.toAccountId : undefined;
+      if (wantFrom && wantTo && wantFrom !== wantTo) {
+        return { fromId: wantFrom, toId: wantTo };
+      }
+      if (wantTo) {
+        const altFrom = usable.find(a => a.id !== wantTo)?.id;
+        if (altFrom) return { fromId: altFrom, toId: wantTo };
+      }
+      if (wantFrom) {
+        const altTo = usable.find(a => a.id !== wantFrom)?.id;
+        if (altTo) return { fromId: wantFrom, toId: altTo };
+      }
+      return defaultTransferPair(loaded, userId);
     });
-  }, [userId]);
+  }, [userId, initialValues?.fromAccountId, initialValues?.toAccountId]);
 
   useEffect(() => {
     void loadAccounts().catch(error => console.error(error));
   }, [loadAccounts]);
 
   if (accounts === null) {
-    return <Skeleton className="h-64 w-full rounded-lg" />;
+    return <Skeleton className="h-64 w-full rounded-2xl" />;
   }
 
   if (!canTransfer(accounts) || !pair) {
@@ -80,20 +111,23 @@ export default function TransferForm({ userId, onComplete, autoFocusAmount = fal
       );
     }
     return (
-      <div className="rounded-lg border border-border bg-card p-6 text-center" data-testid="transfer-empty">
-        <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-lg bg-surface-3 text-muted-foreground">
-          <ArrowDownUp className="size-5" aria-hidden="true" />
-        </div>
-        <h3 className="text-headline-sm text-foreground">Necesitas al menos dos cuentas</h3>
-        <p className="mx-auto mt-1 max-w-xs text-body-md text-muted-foreground">
-          Para mover dinero entre cuentas propias tienes que tener un origen y un destino distintos.
-        </p>
-        <Button className="mt-4" onClick={() => setCreatingAccount(true)}>Crear cuenta</Button>
-      </div>
+      <EmptyState
+        testId="transfer-empty"
+        icon={<ArrowDownUp className="size-5" />}
+        title="Necesitas al menos dos cuentas"
+        description="Para mover dinero entre cuentas propias tienes que tener un origen y un destino distintos."
+        actionLabel="Crear cuenta"
+        onAction={() => setCreatingAccount(true)}
+      />
     );
   }
 
   const choices = usableAccounts(accounts);
+  const activeAdvancedCount = countActiveFields([
+    description.trim().length > 0,
+    date !== initialDateRef.current || time !== initialTimeRef.current,
+  ]);
+  const moreOptionsLabel = formatMoreOptionsLabel(activeAdvancedCount);
 
   const pick = (side: 'from' | 'to', accountId: string) => {
     const next = selectTransferAccount(pair, side, accountId);
@@ -107,19 +141,29 @@ export default function TransferForm({ userId, onComplete, autoFocusAmount = fal
     event.preventDefault();
     if (submitting.current) return;
     setFormError(null);
+    setDateError(null);
 
     let amountInCents: number;
-    let when: Date;
     try {
       amountInCents = parseMoney(amount);
       validateMovementAmount(amountInCents);
-      parseCalendarDate(date);
-      when = combineDateAndTime(date, time);
     } catch (err) {
       if (err instanceof DomainError) setAmountError(err.message);
       return;
     }
     setAmountError(null);
+
+    let when: Date;
+    try {
+      parseCalendarDate(date);
+      when = combineDateAndTime(date, time);
+    } catch (err) {
+      if (err instanceof DomainError) {
+        setDateError(err.message);
+        if (hasAdvancedFieldError([true])) setAdvancedOpen(true);
+      }
+      return;
+    }
 
     try {
       validateTransfer({ type: 'TRANSFER', account_id: pair.fromId, to_account_id: pair.toId, is_recurring: false });
@@ -156,7 +200,7 @@ export default function TransferForm({ userId, onComplete, autoFocusAmount = fal
       <AmountHero
         value={amount}
         autoFocus={autoFocusAmount}
-        badge={<Badge>TRANSFERENCIA</Badge>}
+        badge={<Badge>Transferencia</Badge>}
         error={amountError}
         onChange={value => {
           setAmount(value);
@@ -164,7 +208,7 @@ export default function TransferForm({ userId, onComplete, autoFocusAmount = fal
         }}
       />
 
-      <div className="space-y-4 rounded-lg border border-border bg-card p-4">
+      <div className="space-y-4 rounded-2xl bg-card p-4 shadow-card">
         <div>
           <FieldLabel icon={Wallet} id={fromLabelId}>Cuenta de origen</FieldLabel>
           <AccountChips labelId={fromLabelId} name="transfer-from" accounts={choices} value={pair.fromId} onChange={id => pick('from', id)} />
@@ -188,27 +232,38 @@ export default function TransferForm({ userId, onComplete, autoFocusAmount = fal
         </div>
 
         <p role="status" aria-live="polite" className={notice ? 'text-body-md text-muted-foreground' : 'sr-only'}>{notice ?? ''}</p>
-
-        <div>
-          <FieldLabel icon={CalendarDays}>Fecha y hora</FieldLabel>
-          <DateTimeRow date={date} time={time} onDateChange={setDate} onTimeChange={setTime} />
-        </div>
-
-        <div>
-          <FieldLabel icon={PencilLine} htmlFor="transfer-description" hint="Opcional">Concepto / descripción</FieldLabel>
-          <Input
-            id="transfer-description"
-            type="text"
-            placeholder="Ej. Pago de tarjeta, retiro de efectivo"
-            value={description}
-            onChange={event => setDescription(event.target.value)}
-          />
-        </div>
       </div>
+
+      <CollapsibleSection
+        variant="inline"
+        title={moreOptionsLabel}
+        open={advancedOpen}
+        onOpenChange={setAdvancedOpen}
+        testId="transfer-more-options"
+      >
+        <div className="space-y-4">
+          <div>
+            <FieldLabel icon={CalendarDays}>Fecha y hora</FieldLabel>
+            <DateTimeRow date={date} time={time} onDateChange={(v) => { setDate(v); setDateError(null); }} onTimeChange={(v) => { setTime(v); setDateError(null); }} />
+            {dateError && <p role="alert" className="mt-1 text-body-md text-destructive">{dateError}</p>}
+          </div>
+
+          <div>
+            <FieldLabel icon={PencilLine} htmlFor="transfer-description" hint="Opcional">Concepto / descripción</FieldLabel>
+            <Input
+              id="transfer-description"
+              type="text"
+              placeholder="Ej. Pago de tarjeta, retiro de efectivo"
+              value={description}
+              onChange={event => setDescription(event.target.value)}
+            />
+          </div>
+        </div>
+      </CollapsibleSection>
 
       {formError && <p role="alert" className="text-body-md text-destructive">{formError}</p>}
 
-      <div className="sticky -bottom-4 z-10 -mx-4 -mb-4 border-t border-border bg-popover px-4 pb-4 pt-3">
+      <div className="sticky -bottom-4 z-10 -mx-4 -mb-4 border-t border-border/60 bg-popover px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
         <Button type="submit" size="lg" disabled={isSubmitting} className="w-full">
           {isSubmitting ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}
           Guardar transferencia

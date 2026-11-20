@@ -3,7 +3,10 @@ import { IIncomeSourceRepository } from '../../../core/domain/repositories/IRepo
 import { IncomeSource, UUID } from '../../../core/domain/models/types';
 import { uuidv7 } from 'uuidv7';
 import { validateMovementAmount } from '../../../core/use-cases/validateMovementAmount';
+import { parseDayOfMonth } from '../../../core/use-cases/parseDayOfMonth';
 import { DomainError } from '../../../core/domain/errors/DomainError';
+
+const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 export class LocalIncomeSourceRepository implements IIncomeSourceRepository {
   async getAll(userId: UUID): Promise<IncomeSource[]> {
@@ -13,6 +16,12 @@ export class LocalIncomeSourceRepository implements IIncomeSourceRepository {
   async save(sourceData: Omit<IncomeSource, 'created_at' | 'updated_at'>): Promise<IncomeSource> {
     validateMovementAmount(sourceData.amount);
     if (!sourceData.name.trim()) throw new DomainError('Ingresa el nombre de la fuente.');
+    if (sourceData.pay_day !== undefined) {
+      parseDayOfMonth(String(sourceData.pay_day));
+    }
+    if (sourceData.received_month !== undefined && !MONTH_PATTERN.test(sourceData.received_month)) {
+      throw new DomainError('El mes de recepción no es válido.');
+    }
     const now = new Date();
     const id = sourceData.id || uuidv7();
     const existing = await db.income_sources.get(id);

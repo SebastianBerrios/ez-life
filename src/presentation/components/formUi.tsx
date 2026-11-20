@@ -111,7 +111,7 @@ export function WeekdayChips({ value, onToggle }: { value: DayOfWeek[]; onToggle
         return (
           <label
             key={day}
-            className={cn(choiceChipClass(checked), 'px-0 font-mono text-label-mono-sm uppercase')}
+            className={cn(choiceChipClass(checked), 'px-0 text-label-sm')}
           >
             <input type="checkbox" className="sr-only" aria-label={label} checked={checked} onChange={() => onToggle(day)} />
             <span aria-hidden="true">{short}</span>

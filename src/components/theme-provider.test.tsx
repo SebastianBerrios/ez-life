@@ -1,32 +1,58 @@
 import React from 'react';
 import { render, waitFor } from '@testing-library/react';
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { ThemeProvider } from './theme-provider';
 
-beforeAll(() => {
-  window.matchMedia ??= ((query: string) => ({
-    matches: false, media: query, onchange: null,
-    addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false,
+function mockSystemDark(matches: boolean) {
+  window.matchMedia = ((query: string) => ({
+    matches: query.includes('dark') ? matches : !matches,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
   })) as unknown as typeof window.matchMedia;
-});
+}
 
 beforeEach(() => {
   localStorage.clear();
   document.documentElement.className = '';
 });
 
-describe('ThemeProvider', () => {
-  it('treats a stored "system" theme as dark and rewrites it', async () => {
-    localStorage.setItem('theme', 'system');
-    render(<ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}><p>app</p></ThemeProvider>);
-    await waitFor(() => expect(localStorage.getItem('theme')).toBe('dark'));
-    expect(document.documentElement.classList.contains('dark')).toBe(true);
+describe('ThemeProvider (T083)', () => {
+  it('follows the OS light preference without writing theme to localStorage until setTheme is called', async () => {
+    mockSystemDark(false);
+    render(
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <p>app</p>
+      </ThemeProvider>,
+    );
+    await waitFor(() => expect(document.documentElement.classList.contains('light')).toBe(true));
+    expect(localStorage.getItem('theme')).toBeNull();
   });
 
-  it('keeps an explicit light theme untouched', async () => {
-    localStorage.setItem('theme', 'light');
-    render(<ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}><p>app</p></ThemeProvider>);
-    await waitFor(() => expect(document.documentElement.classList.contains('light')).toBe(true));
-    expect(localStorage.getItem('theme')).toBe('light');
+  it('follows the OS dark preference without writing theme to localStorage', async () => {
+    mockSystemDark(true);
+    render(
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <p>app</p>
+      </ThemeProvider>,
+    );
+    await waitFor(() => expect(document.documentElement.classList.contains('dark')).toBe(true));
+    expect(localStorage.getItem('theme')).toBeNull();
+  });
+
+  it('preserves an explicit stored theme preference', async () => {
+    mockSystemDark(false);
+    localStorage.setItem('theme', 'dark');
+    render(
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <p>app</p>
+      </ThemeProvider>,
+    );
+    await waitFor(() => expect(document.documentElement.classList.contains('dark')).toBe(true));
+    expect(localStorage.getItem('theme')).toBe('dark');
   });
 });

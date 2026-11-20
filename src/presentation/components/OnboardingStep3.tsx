@@ -1,17 +1,17 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, Trash2, X } from 'lucide-react';
-import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
-import { LocalMovementRepository } from '../../infrastructure/repositories/local/LocalMovementRepository';
-import { validateDeletion } from '../../core/use-cases/validateDeletion';
-import { DomainError } from '../../core/domain/errors/DomainError';
-import { DistributionCategory, ExpenseCategory, ExpenseSubcategory } from '../../core/domain/models/types';
+import React, { useState } from 'react';
+import { Plus, Trash2 } from 'lucide-react';
 import { uuidv7 } from 'uuidv7';
-import { useTransientMessages } from '../hooks/useTransientMessages';
+import { LocalOnboardingRepository } from '../../infrastructure/repositories/local/LocalOnboardingRepository';
+import { parseMoney } from '../../core/use-cases/parseMoney';
+import { parseDayOfMonth } from '../../core/use-cases/parseDayOfMonth';
+import { formatMoney } from '../../core/use-cases/formatMoney';
+import { validateOnboardingCard, type OnboardingCardDraft } from '../../core/use-cases/validateOnboardingCard';
+import { DomainError } from '../../core/domain/errors/DomainError';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import { Panel, PanelBody, PanelHeader } from '@/components/ui/panel';
 
 interface Props {
@@ -19,307 +19,322 @@ interface Props {
   onComplete: () => void;
 }
 
-interface CategoryWithSubs {
-  category: ExpenseCategory;
-  subcategories: ExpenseSubcategory[];
+interface CardRowState {
+  id: string;
+  name: string;
+  creditLimitText: string;
+  consumedText: string;
+  closingDayText: string;
+  paymentDayText: string;
 }
 
-/**
- * Step 3 — expense category management, grouped by distribution bucket. Seeds the default categories
- * once (when none exist yet) so every bucket, savings included, starts with examples (FR-023).
- */
-export default function OnboardingStep3({ profileId, onComplete }: Props) {
-  const [buckets, setBuckets] = useState<DistributionCategory[]>([]);
-  const [items, setItems] = useState<CategoryWithSubs[]>([]);
-  const [loading, setLoading] = useState(true);
-  // Guards the seed effect below against React 18 Strict Mode's dev
-  // double-invoke, which replays effect setup on the same mounted instance.
-  const seedStartedRef = useRef(false);
+const createEmptyCard = (): CardRowState => ({
+  id: uuidv7(),
+  name: '',
+  creditLimitText: '',
+  consumedText: '0',
+  closingDayText: '',
+  paymentDayText: '',
+});
 
-  // New category input — keyed by bucketId (each bucket section has its own inline add-input)
-  const [newCatName, setNewCatName] = useState<Record<string, string>>({});
-  const [addingCatFor, setAddingCatFor] = useState<string | null>(null);
-
-  // New subcategory input — keyed by categoryId
-  const [newSubName, setNewSubName] = useState<Record<string, string>>({});
-  const [addingSubFor, setAddingSubFor] = useState<string | null>(null);
-
-  // Blocked-delete notices fade on their own (keyed by the category/subcategory that caused them);
-  // a seeding failure is not transient, so it stays in its own state.
-  const { messages: errors, show: showError, clearAll: clearNotices } = useTransientMessages();
-  const [seedError, setSeedError] = useState('');
-
-  const catRepo = new LocalCategoryRepository();
-  const movRepo = new LocalMovementRepository();
-
-  // Load buckets + categories + their subcategories
-  const loadAll = useCallback(async () => {
-    const loadedBuckets = await catRepo.getDistributionCategories(profileId);
-    const cats = await catRepo.getExpenseCategories(profileId);
-    const withSubs: CategoryWithSubs[] = await Promise.all(
-      cats.map(async (cat) => ({
-        category: cat,
-        subcategories: await catRepo.getSubcategories(cat.id),
-      }))
-    );
-    setBuckets(loadedBuckets);
-    setItems(withSubs);
-    setLoading(false);
-    return { cats, loadedBuckets };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileId]);
-
-  // Seed on first load if no expense categories exist yet.
-  // The ref guard is checked and set synchronously, before any `await` —
-  // a `useState`-based guard is racy here because Strict Mode's second
-  // invocation starts before the first invocation's state update commits,
-  // so both async closures would see the old "not seeded" value.
-  useEffect(() => {
-    if (seedStartedRef.current) return;
-    seedStartedRef.current = true;
-    const init = async () => {
-      await catRepo.seedDefaults(profileId);
-      await loadAll();
-    };
-    init().catch(error => { setSeedError(error instanceof Error ? error.message : 'No se pudieron preparar las categorías.'); setLoading(false); });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleAddCategory = async (bucketId: string) => {
-    clearNotices();
-    const name = (newCatName[bucketId] || '').trim();
-    if (!name) return;
-    const catId = uuidv7();
-    await catRepo.saveExpenseCategory({ id: catId, user_id: profileId, distribution_category_id: bucketId, name });
-    setNewCatName(prev => ({ ...prev, [bucketId]: '' }));
-    setAddingCatFor(null);
-    await loadAll();
-  };
-
-  const handleDeleteCategory = async (categoryId: string) => {
-    clearNotices();
-    const count = await movRepo.countByExpenseCategory(categoryId);
-    try {
-      validateDeletion(
-        count,
-        `No se puede eliminar: tiene ${count} movimiento${count > 1 ? 's' : ''} asociado${count > 1 ? 's' : ''}.`
-      );
-    } catch (err) {
-      if (err instanceof DomainError) showError(categoryId, err.message);
-      return;
-    }
-    await catRepo.deleteExpenseCategory(categoryId);
-    await loadAll();
-  };
-
-  const handleAddSubcategory = async (categoryId: string) => {
-    clearNotices();
-    const name = (newSubName[categoryId] || '').trim();
-    if (!name) return;
-    await catRepo.saveSubcategory({ id: uuidv7(), category_id: categoryId, name });
-    setNewSubName(prev => ({ ...prev, [categoryId]: '' }));
-    setAddingSubFor(null);
-    await loadAll();
-  };
-
-  const handleDeleteSubcategory = async (subcategoryId: string, categoryId: string) => {
-    clearNotices();
-    const categoryItem = items.find(i => i.category.id === categoryId);
-    if (categoryItem && categoryItem.subcategories.length <= 1) {
-      showError(subcategoryId, 'No se puede eliminar: la categoría necesita al menos una subcategoría.');
-      return;
-    }
-
-    const count = await movRepo.countByExpenseSubcategory(subcategoryId);
-    try {
-      validateDeletion(
-        count,
-        `No se puede eliminar: tiene ${count} movimiento${count > 1 ? 's' : ''} asociado${count > 1 ? 's' : ''}.`
-      );
-    } catch (err) {
-      if (err instanceof DomainError) showError(subcategoryId, err.message);
-      return;
-    }
-
-    await catRepo.deleteSubcategory(subcategoryId);
-    // Reload just this category's subs
-    const updatedSubs = await catRepo.getSubcategories(categoryId);
-    setItems(prev => prev.map(item =>
-      item.category.id === categoryId
-        ? { ...item, subcategories: updatedSubs }
-        : item
-    ));
-  };
-
-  // "Finalizar" is enabled when at least 1 category with at least 1 subcategory exists
-  const canFinish = items.length > 0 && items.every(item => item.subcategories.length > 0);
-
-  if (loading) {
-    return <div className="py-8 text-center text-muted-foreground" role="status">Cargando...</div>;
+function tryParseCents(text: string): number | null {
+  const trimmed = text.trim();
+  if (!trimmed) return 0;
+  if (trimmed.startsWith('-')) return null;
+  try {
+    return parseMoney(trimmed);
+  } catch {
+    return null;
   }
+}
+
+function tryParseDay(text: string): number | undefined {
+  try {
+    return parseDayOfMonth(text);
+  } catch {
+    return undefined;
+  }
+}
+
+export default function OnboardingStep3({ profileId, onComplete }: Props) {
+  const [cards, setCards] = useState<CardRowState[]>([createEmptyCard()]);
+  const [cardErrors, setCardErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const updateCard = (id: string, patch: Partial<CardRowState>) => {
+    setCards(prev => prev.map(row => (row.id === id ? { ...row, ...patch } : row)));
+    setCardErrors(prev => {
+      if (!prev[id]) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  };
+
+  const addCard = () => {
+    setCards(prev => [...prev, createEmptyCard()]);
+    setFormError('');
+  };
+
+  const removeCard = (id: string) => {
+    setCards(prev => prev.filter(row => row.id !== id));
+    setCardErrors(prev => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  };
+
+  const handleSaveCards = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCardErrors({});
+    setFormError('');
+
+    if (cards.length === 0) {
+      setFormError('Agrega al menos una tarjeta o elige "No tengo tarjetas".');
+      return;
+    }
+
+    const parsed: OnboardingCardDraft[] = [];
+    const nextErrors: Record<string, string> = {};
+
+    for (const row of cards) {
+      try {
+        if (!row.creditLimitText.trim()) {
+          throw new DomainError('La línea de crédito es obligatoria.');
+        }
+        const creditLimitCents = row.creditLimitText.trim().startsWith('-')
+          ? -1
+          : parseMoney(row.creditLimitText);
+
+        let consumedCents = 0;
+        if (row.consumedText.trim()) {
+          if (row.consumedText.trim().startsWith('-')) {
+            throw new DomainError('El consumo no puede ser negativo.');
+          }
+          consumedCents = parseMoney(row.consumedText);
+        }
+
+        const closingDay = parseDayOfMonth(row.closingDayText);
+        const paymentDay = parseDayOfMonth(row.paymentDayText);
+
+        const draft: OnboardingCardDraft = {
+          id: row.id,
+          name: row.name.trim(),
+          creditLimitCents,
+          consumedCents,
+          closingDay,
+          paymentDay,
+        };
+        validateOnboardingCard(draft);
+        parsed.push(draft);
+      } catch (err) {
+        nextErrors[row.id] = err instanceof Error ? err.message : 'Revisa los datos de la tarjeta.';
+      }
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setCardErrors(nextErrors);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await new LocalOnboardingRepository().saveCards(profileId, parsed);
+      onComplete();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'No se pudieron guardar tus tarjetas.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleNoCards = async () => {
+    setIsSubmitting(true);
+    setFormError('');
+    try {
+      await new LocalOnboardingRepository().declareNotApplicable(profileId, 'cards');
+      onComplete();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'No se pudo guardar tu elección.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSkip = async () => {
+    setIsSubmitting(true);
+    setFormError('');
+    try {
+      await new LocalOnboardingRepository().skipStep(profileId, 3);
+      onComplete();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'No se pudo omitir este paso.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="mx-auto w-full max-w-md px-4">
       <Panel>
-        <PanelHeader eyebrow="Paso 3 de 3" title="Categorías de gasto" titleAs="h2">
-          <p className="mt-1 text-body-md text-muted-foreground">
-            Organiza tus gastos en categorías y subcategorías, agrupadas por cada categoría de distribución.
+        <PanelHeader eyebrow="Paso 3 de 6" title="¿Tienes tarjetas de crédito?" titleAs="h2">
+          <p className="mt-1 text-sm text-muted-foreground">
+            Agrega tus tarjetas en soles (PEN) para llevar el control de tu consumo y fechas de pago.
           </p>
         </PanelHeader>
-        <PanelBody className="space-y-6">
-          {seedError && <p role="alert" className="text-body-md text-destructive">{seedError}</p>}
+        <PanelBody>
+          <form onSubmit={handleSaveCards} noValidate className="space-y-4">
+            <div className="space-y-4">
+              {cards.map((card, idx) => {
+                const limitCents = card.creditLimitText.trim() ? tryParseCents(card.creditLimitText) : null;
+                const consumedCents = tryParseCents(card.consumedText) ?? 0;
+                const payDay = tryParseDay(card.paymentDayText);
+                const showSummary = limitCents !== null && limitCents > 0;
 
-          {/* One section per distribution bucket */}
-          {[...buckets].sort((a, b) => b.percentage - a.percentage).map(bucket => {
-            const bucketItems = items.filter(i => i.category.distribution_category_id === bucket.id);
-            return (
-              <section key={bucket.id} aria-label={bucket.name} className="space-y-3">
-                <div className="flex items-center justify-between gap-2 border-b border-border pb-2">
-                  <h3 className="font-mono text-label-mono-sm uppercase text-foreground">{bucket.name}</h3>
-                  <Badge>{bucket.percentage}%</Badge>
-                </div>
-
-                <div className="space-y-3">
-                  {bucketItems.map(({ category, subcategories }) => (
-                    <div key={category.id} className="space-y-2 rounded-lg bg-surface-2 p-3">
-                      {/* Category header */}
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="min-w-0 break-words text-body-md font-semibold text-foreground">{category.name}</span>
+                return (
+                  <div key={card.id} className="space-y-3 rounded-2xl bg-muted/40 p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium text-foreground">Tarjeta {idx + 1}</span>
+                      {cards.length > 1 && (
                         <Button
                           type="button"
                           variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteCategory(category.id)}
-                          className="shrink-0 text-destructive hover:text-destructive"
-                          aria-label={`Eliminar categoría ${category.name}`}
+                          size="icon"
+                          onClick={() => removeCard(card.id)}
+                          aria-label={`Quitar tarjeta ${idx + 1}`}
+                          className="text-muted-foreground hover:text-destructive"
                         >
-                          <Trash2 />
-                          Eliminar
-                        </Button>
-                      </div>
-
-                      {errors[category.id] && (
-                        <p role="alert" className="text-body-md text-destructive">{errors[category.id]}</p>
-                      )}
-
-                      {subcategories.length === 0 && (
-                        <p role="status" className="text-body-md text-muted-foreground">Agrega al menos una subcategoría.</p>
-                      )}
-
-                      {/* Subcategory list */}
-                      <ul className="space-y-1 pl-1">
-                        {subcategories.map(sub => (
-                          <li key={sub.id}>
-                            <div className="flex items-center justify-between gap-2 text-body-md">
-                              <span className="min-w-0 break-words text-muted-foreground">• {sub.name}</span>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDeleteSubcategory(sub.id, category.id)}
-                                className="shrink-0 text-destructive hover:text-destructive"
-                                aria-label={`Eliminar subcategoría ${sub.name}`}
-                              >
-                                <X />
-                              </Button>
-                            </div>
-                            {errors[sub.id] && (
-                              <p role="alert" className="text-body-md text-destructive">{errors[sub.id]}</p>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-
-                      {/* Add subcategory inline */}
-                      {addingSubFor === category.id ? (
-                        <div className="flex gap-2">
-                          <Input
-                            autoFocus
-                            type="text"
-                            placeholder="Nombre de subcategoría"
-                            aria-label={`Nombre de subcategoría en ${category.name}`}
-                            value={newSubName[category.id] || ''}
-                            onChange={(e) =>
-                              setNewSubName(prev => ({ ...prev, [category.id]: e.target.value }))
-                            }
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') { e.preventDefault(); handleAddSubcategory(category.id); }
-                              if (e.key === 'Escape') setAddingSubFor(null);
-                            }}
-                            className="min-w-0 flex-1"
-                          />
-                          <Button type="button" onClick={() => handleAddSubcategory(category.id)}>
-                            Agregar
-                          </Button>
-                          <Button type="button" variant="secondary" size="icon" aria-label="Cancelar subcategoría" onClick={() => setAddingSubFor(null)}>
-                            <X />
-                          </Button>
-                        </div>
-                      ) : (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setAddingSubFor(category.id)}
-                          className="text-primary hover:text-primary"
-                        >
-                          + Agregar subcategoría
+                          <Trash2 className="size-4" />
                         </Button>
                       )}
                     </div>
-                  ))}
-                </div>
 
-                {/* Add category, scoped to this bucket */}
-                {addingCatFor === bucket.id ? (
-                  <div className="flex gap-2">
-                    <Input
-                      autoFocus
-                      type="text"
-                      placeholder="Nombre de categoría"
-                      aria-label={`Nombre de categoría en ${bucket.name}`}
-                      value={newCatName[bucket.id] || ''}
-                      onChange={(e) => setNewCatName(prev => ({ ...prev, [bucket.id]: e.target.value }))}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') { e.preventDefault(); handleAddCategory(bucket.id); }
-                        if (e.key === 'Escape') setAddingCatFor(null);
-                      }}
-                      className="min-w-0 flex-1"
-                    />
-                    <Button type="button" onClick={() => handleAddCategory(bucket.id)}>
-                      Agregar
-                    </Button>
-                    <Button type="button" variant="secondary" size="icon" aria-label="Cancelar categoría" onClick={() => setAddingCatFor(null)}>
-                      <X />
-                    </Button>
+                    <div className="space-y-1.5">
+                      <Label htmlFor={`card-name-${card.id}`}>Nombre</Label>
+                      <Input
+                        id={`card-name-${card.id}`}
+                        type="text"
+                        placeholder="Ej. BBVA Visa"
+                        value={card.name}
+                        onChange={(e) => updateCard(card.id, { name: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label htmlFor={`card-limit-${card.id}`}>Línea de crédito</Label>
+                        <div className="relative">
+                          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                            <span className="text-sm text-muted-foreground">S/</span>
+                          </div>
+                          <Input
+                            id={`card-limit-${card.id}`}
+                            type="text"
+                            inputMode="decimal"
+                            className="pl-9 tabular-nums"
+                            placeholder="5000.00"
+                            value={card.creditLimitText}
+                            onChange={(e) => updateCard(card.id, { creditLimitText: e.target.value })}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label htmlFor={`card-consumed-${card.id}`}>Consumido hasta hoy</Label>
+                        <div className="relative">
+                          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                            <span className="text-sm text-muted-foreground">S/</span>
+                          </div>
+                          <Input
+                            id={`card-consumed-${card.id}`}
+                            type="text"
+                            inputMode="decimal"
+                            className="pl-9 tabular-nums"
+                            placeholder="0.00"
+                            value={card.consumedText}
+                            onChange={(e) => updateCard(card.id, { consumedText: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label htmlFor={`card-closing-${card.id}`}>Día de cierre (opcional)</Label>
+                        <Input
+                          id={`card-closing-${card.id}`}
+                          type="text"
+                          inputMode="numeric"
+                          className="tabular-nums"
+                          placeholder="Ej. 10"
+                          value={card.closingDayText}
+                          onChange={(e) => updateCard(card.id, { closingDayText: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label htmlFor={`card-payment-${card.id}`}>Día de pago (opcional)</Label>
+                        <Input
+                          id={`card-payment-${card.id}`}
+                          type="text"
+                          inputMode="numeric"
+                          className="tabular-nums"
+                          placeholder="Ej. 15"
+                          value={card.paymentDayText}
+                          onChange={(e) => updateCard(card.id, { paymentDayText: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    {showSummary && (
+                      <p className="text-sm text-muted-foreground" data-testid={`card-summary-${idx}`}>
+                        {`Usaste ${formatMoney(consumedCents)} de ${formatMoney(limitCents)}${payDay ? ` · Pagas el ${payDay}` : ''}`}
+                      </p>
+                    )}
+
+                    {cardErrors[card.id] && (
+                      <p role="alert" className="text-sm text-destructive">{cardErrors[card.id]}</p>
+                    )}
                   </div>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setAddingCatFor(bucket.id)}
-                    className="w-full border-dashed text-muted-foreground hover:text-foreground"
-                  >
-                    <Plus />
-                    Nueva categoría en {bucket.name}
-                  </Button>
-                )}
-              </section>
-            );
-          })}
+                );
+              })}
+            </div>
 
-          {/* Finish button */}
-          <div className="space-y-2">
-            <Button type="button" onClick={onComplete} disabled={!canFinish} size="lg" className="w-full">
-              Finalizar configuración
+            <Button type="button" variant="outline" onClick={addCard} className="w-full">
+              <Plus className="size-4" />
+              + Agregar tarjeta
             </Button>
 
-            {!canFinish && (
-              <p className="text-center text-body-md text-muted-foreground">
-                Necesitas al menos una categoría con una subcategoría para continuar.
-              </p>
-            )}
-          </div>
+            {formError && <p role="alert" className="text-sm text-destructive">{formError}</p>}
+
+            <div className="space-y-2 pt-2">
+              <Button type="submit" size="lg" disabled={isSubmitting} className="w-full">
+                {isSubmitting ? 'Guardando...' : 'Guardar tarjetas y continuar'}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="lg"
+                disabled={isSubmitting}
+                onClick={() => void handleNoCards()}
+                className="w-full"
+              >
+                No tengo tarjetas
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="lg"
+                disabled={isSubmitting}
+                onClick={() => void handleSkip()}
+                className="w-full"
+              >
+                Omitir por ahora
+              </Button>
+            </div>
+          </form>
         </PanelBody>
       </Panel>
     </div>

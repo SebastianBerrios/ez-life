@@ -3,7 +3,7 @@ import { cn } from './utils';
 
 describe('cn (design-system aware merge)', () => {
   it('keeps a typography-scale class together with a text color, in either order', () => {
-    expect(cn('text-label-mono-sm', 'text-success')).toBe('text-label-mono-sm text-success');
+    expect(cn('text-label-sm', 'text-success')).toBe('text-label-sm text-success');
     expect(cn('text-foreground', 'text-headline-md')).toBe('text-foreground text-headline-md');
   });
 

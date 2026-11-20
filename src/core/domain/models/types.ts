@@ -6,12 +6,26 @@ export interface BaseEntity {
   deleted_at?: Date;
 }
 
+export type ChecklistKey = 'accounts' | 'cards' | 'loans';
+export type SetupChecklistKey = 'income' | 'accounts' | 'cards' | 'loans';
+
 export interface Profile extends BaseEntity {
   gamification_enabled?: boolean;
-  onboarding_step?: 0 | 1 | 2 | 3;
+  /** Paso del onboarding (0..6; antes 0..3 en v1). */
+  onboarding_step?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  /** Marca la numeración ampliada de 6 pasos (spec 013). */
+  onboarding_version?: 2;
   onboarding_income_source_id?: UUID;
   id: UUID;
   last_recurrence_eval_month?: string; // YYYY-MM
+  /** Mes desde el que rigen las reglas nuevas de Balance ('YYYY-MM'). */
+  balance_since?: string;
+  /** Tarjeta "Completa tu configuración" descartada. */
+  checklist_dismissed?: boolean;
+  /** Claves declaradas explícitamente como "no aplica" ('accounts' | 'cards' | 'loans'). */
+  checklist_not_applicable?: ChecklistKey[];
+  /** Indica si el tour guiado ya fue visto (cualquier dispositivo). */
+  tour_seen?: boolean;
   notification_hour?: number; // 0-23, local hour for the daily reminder (RF-16)
   push_enabled?: boolean; // browser Notification API opt-in
   inapp_enabled?: boolean; // in-app notification history opt-in
@@ -22,6 +36,10 @@ export interface IncomeSource extends BaseEntity {
   user_id: UUID;
   name: string;
   amount: number; // in cents
+  /** Día del mes en que pagan (1–31). */
+  pay_day?: number;
+  /** Mes en el que ya se recibió el sueldo ('YYYY-MM'). */
+  received_month?: string;
 }
 
 export interface DistributionCategory extends BaseEntity {
@@ -65,6 +83,14 @@ export interface PaymentAccount extends BaseEntity {
   opening_balance: number; // in cents
   archived?: boolean; // accounts with movements are archived, never deleted
   sort_order?: number;
+  /** Línea de crédito en céntimos (> 0; solo `kind = 'credit'`). */
+  credit_limit?: number;
+  /** Día de cierre del estado de cuenta (1–31; solo crédito). */
+  closing_day?: number;
+  /** Día de pago de la tarjeta (1–31; solo crédito). */
+  payment_day?: number;
+  /** Día local en que se declaró `opening_balance`. */
+  opening_date?: Date;
 }
 
 export type MovementType = 'INCOME' | 'EXPENSE' | 'TRANSFER';
@@ -98,7 +124,7 @@ export interface MovementRecurrence extends Movement {
   activated_month: string;
 }
 
-export type NotificationType = 'achievement_unlocked' | 'budget_over_80' | 'goal_completed' | 'daily_reminder' | 'loan_due_soon' | 'shared_movement_added' | 'habit_reminder' | 'streak_at_risk' | 'task_due';
+export type NotificationType = 'achievement_unlocked' | 'budget_over_80' | 'goal_completed' | 'daily_reminder' | 'loan_due_soon' | 'shared_movement_added' | 'habit_reminder' | 'streak_at_risk' | 'task_due' | 'register_due';
 
 export interface Notification extends BaseEntity {
   id: UUID;
@@ -272,6 +298,8 @@ export interface InstallmentLoan extends BaseEntity {
   interest_rate?: number; // optional, purely informational, never used to calculate anything (FR-013)
   status: InstallmentLoanStatus; // derived: 'settled' once remaining_installments = 0 (FR-025), never reverts
   distribution_category_id?: UUID; // spec 003 FR-010/FR-011 — bucket used by the Movement this loan's payments generate
+  /** Día de pago de la cuota (1–31). */
+  payment_day?: number;
 }
 
 // Append-only payment log (FR-026) — analogous to HabitCompletion. Recording
@@ -288,4 +316,55 @@ export interface InstallmentPayment extends BaseEntity {
   date: Date;
   adjustment_type?: InstallmentAdjustmentType; // only when kind = 'principal' (FR-016)
   resulting_value?: number; // the value the user typed in themselves — never calculated (FR-017); only when kind = 'principal'
+}
+
+// Spec 013 — Omisiones de "Por registrar" persistidas y sincronizadas por propietario.
+export type RegistrationKind = 'income' | 'recurrence' | 'installment' | 'card';
+
+export interface ReminderSkip extends BaseEntity {
+  /** `stableId('skip:<userId>:<itemKey>')` — idempotente entre dispositivos. */
+  id: UUID;
+  user_id: UUID;
+  /** `<kind>:<refId>:<YYYY-MM>`, `kind ∈ income | recurrence | installment | card`. */
+  item_key: string;
+  /** `'YYYY-MM'` */
+  month: string;
+}
+
+export interface PendingRegistration {
+  key: string; // `${kind}:${refId}:${YYYY-MM}`
+  kind: RegistrationKind;
+  refId: string;
+  title: string;
+  amount: number; // céntimos (sugerido para tarjeta)
+  day: number; // día efectivo del mes (con recorte a fin de mes)
+  overdue: boolean; // día efectivo < hoy
+}
+
+export interface CardDebtSummary {
+  accountId: string;
+  name: string;
+  owed: number; // total adeudado hoy (>= 0)
+  previousDebt: number; // parte que es deuda previa
+  creditLimit?: number; // undefined -> "Debes S/ X"
+  paymentDay?: number;
+}
+
+export interface MonthBalance {
+  opening: number;
+  entro: number;
+  salio: number;
+  ahorraste: number;
+  sacaste: number;
+  ajuste: number;
+  balance: number;
+  savingsNet: number;
+  cards: CardDebtSummary[];
+}
+
+export interface SetupChecklist {
+  items: { key: SetupChecklistKey; done: boolean }[];
+  doneCount: number; // N de 4
+  visible: boolean; // !checklist_dismissed && doneCount < 4
+  nextPending?: SetupChecklistKey;
 }

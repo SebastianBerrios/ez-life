@@ -166,7 +166,7 @@ export default function TaskForm({ userId, existing, embedded, onComplete, onCan
       )}
 
       <details open={Boolean(existing?.description)} className="border-t border-border pt-3">
-        <summary className="flex min-h-11 cursor-pointer items-center font-mono text-label-mono-xs uppercase text-muted-foreground">Opciones adicionales</summary>
+        <summary className="flex min-h-11 cursor-pointer items-center text-label-xs text-muted-foreground">Opciones adicionales</summary>
         <div className="pt-2">
           <FieldLabel icon={AlignLeft} htmlFor="taskDescription" hint="Opcional">Descripción</FieldLabel>
           <Input

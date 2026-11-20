@@ -65,8 +65,10 @@ export class LocalMovementRepository implements IMovementRepository {
       : { ...data, id, created_at: now, updated_at: now };
 
     // Occurrences are independent. Only the source movement's checkbox edits
-    // the rule; changing/deleting a generated occurrence never changes it.
-    if (!existing?.recurrence_rule_id || existing.recurrence_rule_id === id) {
+    // the rule; registering or editing an occurrence linked to an existing
+    // recurrence_rule_id never deactivates or overwrites the rule (spec 013 T056).
+    const isLinkedOccurrence = Boolean(data.recurrence_rule_id && data.recurrence_rule_id !== id);
+    if (!isLinkedOccurrence && (!existing?.recurrence_rule_id || existing.recurrence_rule_id === id)) {
       const rule = await db.movement_recurrences.get(id);
       if (data.is_recurring) {
         const activated = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;

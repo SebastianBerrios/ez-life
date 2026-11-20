@@ -5,11 +5,14 @@ import { LocalInstallmentLoanRepository } from '../../infrastructure/repositorie
 import { LocalCategoryRepository } from '../../infrastructure/repositories/local/LocalCategoryRepository';
 import { validateMovementAmount } from '../../core/use-cases/validateMovementAmount';
 import { parseMoney } from '../../core/use-cases/parseMoney';
+import { parseDayOfMonth } from '../../core/use-cases/parseDayOfMonth';
+import { countActiveFields, formatMoreOptionsLabel, hasAdvancedFieldError } from '../../core/use-cases/formAdvancedFields';
 import { DomainError } from '../../core/domain/errors/DomainError';
 import { DistributionCategory, InstallmentLoan } from '../../core/domain/models/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -22,13 +25,6 @@ interface Props {
   onCancel: () => void;
 }
 
-/**
- * Registers or corrects an installment loan's original terms (FR-011,
- * FR-012, FR-022). Deliberately no amortization math here — every value the
- * user enters is stored exactly as-is, never derived from the others
- * (FR-012, FR-013): the app is a ledger for what the lender already told
- * them, not a calculator that could disagree with it.
- */
 export default function InstallmentLoanForm({ userId, existing, onComplete, onCancel }: Props) {
   const isEditing = Boolean(existing);
   const [lenderName, setLenderName] = useState(existing?.lender_name ?? '');
@@ -36,9 +32,8 @@ export default function InstallmentLoanForm({ userId, existing, onComplete, onCa
   const [installmentCount, setInstallmentCount] = useState(existing ? String(existing.installment_count) : '');
   const [installmentAmount, setInstallmentAmount] = useState(existing ? centsToAmountInput(existing.installment_amount) : '');
   const [interestRate, setInterestRate] = useState(existing?.interest_rate !== undefined ? String(existing.interest_rate) : '');
-  // FR-010/FR-011: every loan needs a real distribution bucket before it can
-  // accept a payment, since each payment now generates an expense Movement
-  // (constitution v2.0.0 Principio X) that must count in the 50/30/20 split.
+  const [paymentDayText, setPaymentDayText] = useState(existing?.payment_day !== undefined ? String(existing.payment_day) : '');
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [distCategoryId, setDistCategoryId] = useState(existing?.distribution_category_id ?? '');
   const [distCategories, setDistCategories] = useState<DistributionCategory[]>([]);
   const [categoriesLoaded, setCategoriesLoaded] = useState(false);
@@ -55,12 +50,20 @@ export default function InstallmentLoanForm({ userId, existing, onComplete, onCa
     loadCategories();
   }, [userId]);
 
+  const activeAdvancedCount = countActiveFields([
+    paymentDayText.trim() !== '',
+    interestRate.trim() !== '',
+  ]);
+  const moreOptionsLabel = formatMoreOptionsLabel(activeAdvancedCount);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const installmentCountValue = parseInt(installmentCount, 10);
     let amountInCents = 0;
     let installmentAmountInCents = 0;
+    let paymentDayValue: number | undefined;
+    let inAdvancedStep = false;
 
     try {
       amountInCents = parseMoney(amount);
@@ -73,7 +76,13 @@ export default function InstallmentLoanForm({ userId, existing, onComplete, onCa
       if (!distCategoryId) {
         throw new DomainError('Elige una categoría de distribución (50/30/20) para este préstamo.');
       }
+      inAdvancedStep = true;
+      paymentDayValue = parseDayOfMonth(paymentDayText);
+      inAdvancedStep = false;
     } catch (err) {
+      if (hasAdvancedFieldError([inAdvancedStep])) {
+        setAdvancedOpen(true);
+      }
       if (err instanceof DomainError) setError(err.message);
       return;
     }
@@ -91,6 +100,7 @@ export default function InstallmentLoanForm({ userId, existing, onComplete, onCa
           installmentAmount: installmentAmountInCents,
           interestRate: interestRateValue,
           distributionCategoryId: distCategoryId,
+          paymentDay: paymentDayValue,
         });
       } else {
         await repo.create({
@@ -102,6 +112,7 @@ export default function InstallmentLoanForm({ userId, existing, onComplete, onCa
           installment_amount: installmentAmountInCents,
           interest_rate: interestRateValue,
           distribution_category_id: distCategoryId,
+          ...(paymentDayValue !== undefined ? { payment_day: paymentDayValue } : {}),
         });
       }
 
@@ -115,10 +126,10 @@ export default function InstallmentLoanForm({ userId, existing, onComplete, onCa
 
   return (
     <div className="w-full">
-      <h2 className="mb-4 font-heading text-base leading-none font-medium">
+      <h2 className="mb-4 font-fredoka text-headline-sm text-foreground">
         {isEditing ? 'Corregir préstamo con cuotas' : 'Nuevo préstamo con cuotas'}
       </h2>
-      <form onSubmit={handleSubmit} data-testid="installment-loan-form" className="space-y-5">
+      <form onSubmit={handleSubmit} data-testid="installment-loan-form" className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="lenderName">Entidad financiera</Label>
           <Input
@@ -134,8 +145,8 @@ export default function InstallmentLoanForm({ userId, existing, onComplete, onCa
         <div className="space-y-2">
           <Label htmlFor="amount">Monto</Label>
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <span className="text-muted-foreground text-base font-medium">S/</span>
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+              <span className="text-base font-medium text-muted-foreground">S/</span>
             </div>
             <Input
               type="text"
@@ -164,8 +175,8 @@ export default function InstallmentLoanForm({ userId, existing, onComplete, onCa
         <div className="space-y-2">
           <Label htmlFor="installmentAmount">Monto de cuota</Label>
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <span className="text-muted-foreground text-base font-medium">S/</span>
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+              <span className="text-base font-medium text-muted-foreground">S/</span>
             </div>
             <Input
               type="text"
@@ -193,27 +204,45 @@ export default function InstallmentLoanForm({ userId, existing, onComplete, onCa
               </SelectContent>
             </Select>
           ) : (
-            <Skeleton className="h-11 w-full rounded-xl" />
+            <Skeleton className="h-11 w-full rounded-full" />
           )}
         </div>
 
-        <details open={Boolean(existing?.interest_rate)} className="border-t border-border pt-2"><summary className="text-sm font-medium">Opciones adicionales</summary><div className="space-y-4 pt-3">
-        <div className="space-y-2">
-          <Label htmlFor="interestRate">Interés % (Opcional, informativo)</Label>
-          <Input
-            type="text"
-            id="interestRate"
-            placeholder="0"
-            value={interestRate}
-            onChange={(e) => setInterestRate(e.target.value.replace(/[^0-9.]/g, ''))}
-          />
-        </div>
+        <CollapsibleSection
+          variant="inline"
+          title={moreOptionsLabel}
+          open={advancedOpen}
+          onOpenChange={setAdvancedOpen}
+          testId="loan-more-options"
+        >
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="paymentDay">Día de pago (opcional, 1–31)</Label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                id="paymentDay"
+                placeholder="Ej. 5"
+                value={paymentDayText}
+                onChange={(e) => { setPaymentDayText(e.target.value); if (error) setError(null); }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="interestRate">Interés % (opcional, informativo)</Label>
+              <Input
+                type="text"
+                id="interestRate"
+                placeholder="0"
+                value={interestRate}
+                onChange={(e) => setInterestRate(e.target.value.replace(/[^0-9.]/g, ''))}
+              />
+            </div>
+          </div>
+        </CollapsibleSection>
 
-        </div></details>
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
-
-        <div className="flex gap-3 pt-2">
+        <div className="sticky -bottom-4 z-10 -mx-4 -mb-4 flex gap-3 border-t border-border/60 bg-popover px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting} className="flex-1">
             Cancelar
           </Button>

@@ -50,6 +50,7 @@ describe('DebtForm', () => {
     await user.click(screen.getByLabelText(/dirección/i));
     await user.click(await screen.findByRole('option', { name: /Me prestaron a mí/i }));
     await user.type(screen.getByLabelText(/monto/i), '50.00');
+    await user.click(screen.getByRole('button', { name: /Más opciones/i }));
     fireEvent.change(screen.getByLabelText(/vencimiento/i), { target: { value: '2026-12-31' } });
     await user.type(screen.getByLabelText(/interés/i), '5');
 
@@ -114,6 +115,7 @@ describe('DebtForm', () => {
     render(<DebtForm userId="fake-user-id" onComplete={vi.fn()} onCancel={vi.fn()} />);
     await user.type(screen.getByLabelText(/nombre/i), 'Juan');
     await user.type(screen.getByLabelText(/monto/i), '10');
+    await user.click(screen.getByRole('button', { name: /Más opciones/i }));
     fireEvent.change(screen.getByLabelText(/vencimiento/i), { target: { value: '2026-10-20' } });
     fireEvent.submit(screen.getByTestId('debt-form'));
 

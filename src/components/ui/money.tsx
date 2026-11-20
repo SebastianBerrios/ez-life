@@ -47,7 +47,7 @@ const Money = React.forwardRef<HTMLSpanElement, MoneyProps>(function Money(
       data-slot="money"
       data-tone={resolvedTone}
       className={cn(
-        "inline-flex items-baseline gap-[0.25em] tabular-nums",
+        "inline-flex items-baseline gap-[0.25em] font-fredoka tabular-nums",
         sizeClass[size],
         resolvedTone === "income" && "text-success",
         resolvedTone === "expense" && "text-expense",

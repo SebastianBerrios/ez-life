@@ -53,15 +53,15 @@ export default function LoginScreen() {
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-sm space-y-6">
         <header className="space-y-2 text-center">
-          <h1 className="text-display-hero-mobile tracking-tight text-foreground">
+          <h1 className="font-fredoka text-display-hero-mobile tracking-tight text-foreground">
             ez<span className="text-primary">·</span>life
           </h1>
-          <p className="font-mono text-label-mono-sm uppercase text-muted-foreground">Finanzas, hábitos y metas</p>
+          <p className="text-sm font-medium text-muted-foreground">Finanzas, hábitos y metas</p>
           <p className="text-body-lg text-muted-foreground">Tus finanzas, sin complicaciones.</p>
         </header>
 
-        <Panel aria-label="Iniciar sesión" className="gap-3 p-5">
-          <p className="text-center font-mono text-label-mono-xs uppercase text-muted-foreground">Continuar con</p>
+        <Panel aria-label="Iniciar sesión" className="gap-3 p-6">
+          <p className="text-center text-xs font-medium text-muted-foreground">Continuar con</p>
 
           <Button type="button" variant="outline" size="lg" onClick={() => handleLogin('google')} className="w-full gap-3 text-base">
             <GoogleIcon />

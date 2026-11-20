@@ -4,10 +4,30 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import MainFlow from './MainFlow';
 
-const { movementListMounts, syncNow, ensureDefault } = vi.hoisted(() => ({ movementListMounts: vi.fn(), syncNow: vi.fn().mockResolvedValue(undefined), ensureDefault: vi.fn().mockResolvedValue(undefined) }));
+const { movementListMounts, syncNow, ensureDefault, adoptLegacySources, ensureBalanceSince, profileState, saveProfile } = vi.hoisted(() => ({
+  movementListMounts: vi.fn(),
+  syncNow: vi.fn().mockResolvedValue(undefined),
+  ensureDefault: vi.fn().mockResolvedValue(undefined),
+  adoptLegacySources: vi.fn().mockResolvedValue(undefined),
+  ensureBalanceSince: vi.fn().mockResolvedValue(undefined),
+  profileState: { current: { id: 'user-1', onboarding_step: 6, tour_seen: true } as Record<string, unknown> },
+  saveProfile: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('../../infrastructure/repositories/local/LocalPaymentAccountRepository', () => ({
   LocalPaymentAccountRepository: vi.fn(function () { return { ensureDefault }; }),
+}));
+vi.mock('../../infrastructure/repositories/local/LocalMovementRecurrenceRepository', () => ({
+  LocalMovementRecurrenceRepository: vi.fn(function () { return { adoptLegacySources }; }),
+}));
+vi.mock('../../infrastructure/repositories/local/LocalProfileRepository', () => ({
+  LocalProfileRepository: vi.fn(function () {
+    return {
+      ensureBalanceSince,
+      get: vi.fn(async () => profileState.current),
+      save: saveProfile,
+    };
+  }),
 }));
 
 vi.mock('../../infrastructure/supabase/client', () => ({
@@ -30,32 +50,40 @@ vi.mock('../../infrastructure/repositories/local/LocalCategoryRepository', () =>
 }));
 
 vi.mock('../../infrastructure/sync/repairOrphanedRows', () => ({ repairOrphanedLocalRows: vi.fn().mockResolvedValue(undefined) }));
-vi.mock('../../infrastructure/repositories/local/LocalOnboardingRepository', () => ({ LocalOnboardingRepository: vi.fn(function () { return { progress: async () => 3 }; }) }));
+vi.mock('../../infrastructure/repositories/local/LocalOnboardingRepository', () => ({ LocalOnboardingRepository: vi.fn(function () { return { progress: async () => 6 }; }) }));
 vi.mock('../../infrastructure/sync/mergeDuplicateCategories', () => ({ mergeDuplicateCategories: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('../../infrastructure/sync/repairDanglingExpenseCategories', () => ({ repairDanglingExpenseCategories: vi.fn().mockResolvedValue(undefined) }));
 
-vi.mock('../hooks/useRecurrenceEvaluator', () => ({ useRecurrenceEvaluator: vi.fn() }));
 vi.mock('../hooks/useSyncManager', () => ({ useSyncManager: () => ({ syncNow }) }));
 vi.mock('../hooks/useOnlineStatus', () => ({ useOnlineStatus: () => true }));
 vi.mock('../hooks/useNotificationEvaluator', () => ({ useNotificationEvaluator: vi.fn() }));
 vi.mock('../hooks/useTaskRecurrenceEvaluator', () => ({ useTaskRecurrenceEvaluator: vi.fn() }));
 
 vi.mock('./LoginScreen', () => ({ default: () => null }));
-vi.mock('./OnboardingWizard', () => ({ default: () => null }));
+vi.mock('./OnboardingWizard', () => ({
+  default: function MockWizard({ startStep, mode, onComplete }: { startStep: number; mode: string; onComplete: (id: string) => void }) {
+    return (
+      <div data-testid="onboarding-wizard-stub" data-start-step={startStep} data-mode={mode}>
+        <button onClick={() => onComplete('user-1')}>finish-wizard</button>
+      </div>
+    );
+  },
+}));
 vi.mock('../hooks/useHasUnreadNotifications', () => ({ useHasUnreadNotifications: () => false }));
 vi.mock('./Dashboard', () => ({
-  default: function MockDashboard({ refDate, onOpenQuickRecord, onNavigate }: {
+  default: function MockDashboard({ refDate, onOpenQuickRecord, onAddCreditLimit, onCompleteSetup }: {
     refDate?: Date;
     onOpenQuickRecord?: (tab?: string) => void;
-    onNavigate?: (route: string, options?: { financesTab?: string }) => void;
+    onAddCreditLimit?: (accountId: string) => void;
+    onCompleteSetup?: (key: string) => void;
   }) {
     return (
       <div>
         <span>{`DashboardStub:${refDate?.getFullYear()}-${refDate?.getMonth()}`}</span>
         <button onClick={() => onOpenQuickRecord?.('transfer')}>dashboard-quick-transfer</button>
         <button onClick={() => onOpenQuickRecord?.()}>dashboard-quick-default</button>
-        <button onClick={() => onNavigate?.('finances', { financesTab: 'loans' })}>dashboard-open-loans</button>
-        <button onClick={() => onNavigate?.('control')}>dashboard-open-control</button>
+        <button onClick={() => onAddCreditLimit?.('legacy-card-1')}>dashboard-add-credit-limit</button>
+        <button onClick={() => onCompleteSetup?.('cards')}>dashboard-complete-cards</button>
       </div>
     );
   },
@@ -91,8 +119,20 @@ vi.mock('./TaskForm', () => ({ default: () => <div data-testid="task-form" /> })
 vi.mock('./GoalForm', () => ({ default: () => <div data-testid="goal-form" /> }));
 vi.mock('./SavingsGoalForm', () => ({ default: () => <div data-testid="savings-goal-form" /> }));
 vi.mock('./SettingsScreen', () => ({
-  default: function MockSettings({ focus, accountName, accountEmail }: { focus?: { kind: string; id: string }; accountName?: string; accountEmail?: string }) {
-    return <span data-testid="settings-focus">{`${focus ? `${focus.kind}:${focus.id}` : 'none'}|${accountName ?? ''}|${accountEmail ?? ''}`}</span>;
+  default: function MockSettings({ focus, accountName, accountEmail, editAccountId, onReplayTour }: {
+    focus?: { kind: string; id: string };
+    accountName?: string;
+    accountEmail?: string;
+    editAccountId?: string;
+    onReplayTour?: () => void;
+  }) {
+    return (
+      <div>
+        <span data-testid="settings-focus">{`${focus ? `${focus.kind}:${focus.id}` : 'none'}|${accountName ?? ''}|${accountEmail ?? ''}`}</span>
+        <span data-testid="settings-edit-account">{editAccountId ?? 'none'}</span>
+        <button onClick={() => onReplayTour?.()}>settings-replay-tour</button>
+      </div>
+    );
   },
 }));
 vi.mock('./CommandPalette', () => ({
@@ -219,7 +259,7 @@ describe('MainFlow — Nuevo Registro sheet (spec 010)', () => {
 
     await user.click(await screen.findByRole('button', { name: /registrar nuevo movimiento/i }));
 
-    expect(await screen.findByRole('dialog', { name: 'Nuevo Registro' })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'Nuevo registro' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Gasto' })).toHaveAttribute('aria-selected', 'true');
 
     await user.click(screen.getByText('complete-movement'));
@@ -275,7 +315,7 @@ describe('MainFlow — per-route document title (US3, FR-004)', () => {
     await waitFor(() => expect(document.title).toBe('Finanzas · ez-life'));
 
     await user.click(await screen.findByText('go-control'));
-    await waitFor(() => expect(document.title).toBe('Control & Hábitos · ez-life'));
+    await waitFor(() => expect(document.title).toBe('Control y hábitos · ez-life'));
 
     await user.click(await screen.findByText('go-settings'));
     await waitFor(() => expect(document.title).toBe('Ajustes · ez-life'));
@@ -310,31 +350,20 @@ describe('MainFlow — shared month selector', () => {
   });
 });
 
-describe('MainFlow — Inicio deep links', () => {
-  it('opens Finanzas on the Préstamos tab from Inicio, and plain navigation goes back to Movimientos', async () => {
+describe('MainFlow — Resumen callbacks & mobile links (spec 013)', () => {
+  it('opens Ajustes on the requested credit card edit form when Resumen triggers onAddCreditLimit', async () => {
     const user = userEvent.setup();
     render(<MainFlow />);
 
-    await user.click(await screen.findByText('dashboard-open-loans'));
-    expect(screen.getByTestId('route')).toHaveTextContent('finances');
-    expect(await screen.findByText('FinancesTab:loans')).toBeInTheDocument();
-
-    await user.click(screen.getByText('go-dashboard'));
-    await user.click(screen.getByText('go-finances'));
-    expect(await screen.findByText('FinancesTab:movements')).toBeInTheDocument();
+    await user.click(await screen.findByText('dashboard-add-credit-limit'));
+    expect(screen.getByTestId('route')).toHaveTextContent('settings');
+    expect(await screen.findByTestId('settings-edit-account')).toHaveTextContent('legacy-card-1');
   });
 
-  it('routes Inicio navigation callbacks to the shell', async () => {
-    const user = userEvent.setup();
-    render(<MainFlow />);
-    await user.click(await screen.findByText('dashboard-open-control'));
-    expect(screen.getByTestId('route')).toHaveTextContent('control');
-  });
-
-  it('does not repeat the Mi progreso row under the Inicio card (Ajustes keeps it)', async () => {
+  it('keeps MobileRouteLinks under Resumen with showProgress tied to personal progress visibility', async () => {
     render(<MainFlow />);
     await screen.findByText(/^DashboardStub/);
-    expect(screen.queryByRole('button', { name: 'Mi progreso' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Espacio compartido' })).toBeInTheDocument();
   });
 });
 
@@ -404,11 +433,15 @@ describe('MainFlow — transitional mobile entry rows', () => {
   });
 });
 
-describe('MainFlow — default payment account (spec 011)', () => {
-  it('seeds the default "Efectivo" account for the signed-in user once the app shell is reached', async () => {
+describe('MainFlow — default payment account (spec 011) & balance_since (spec 013)', () => {
+  it('seeds the default "Efectivo" account and calls ensureBalanceSince once the app shell is reached', async () => {
+    ensureDefault.mockClear();
+    ensureBalanceSince.mockClear();
     render(<MainFlow />);
     await screen.findByText('go-finances');
     await waitFor(() => expect(ensureDefault).toHaveBeenCalledWith('user-1'));
+    await waitFor(() => expect(ensureBalanceSince).toHaveBeenCalledTimes(1));
+    expect(ensureBalanceSince).toHaveBeenCalledWith('user-1', expect.any(Date));
   });
 });
 
@@ -437,7 +470,7 @@ describe('MainFlow — ⌘K command palette (spec 010)', () => {
     const user = userEvent.setup();
     render(<MainFlow />);
     await user.click(await screen.findByRole('button', { name: /registrar nuevo movimiento/i }));
-    await screen.findByRole('dialog', { name: 'Nuevo Registro' });
+    await screen.findByRole('dialog', { name: 'Nuevo registro' });
     await user.keyboard('{Control>}k{/Control}');
     expect(screen.queryByRole('dialog', { name: 'palette-stub' })).not.toBeInTheDocument();
   });
@@ -494,5 +527,41 @@ describe('MainFlow — ⌘K command palette (spec 010)', () => {
     await user.click(await screen.findByText('open-search'));
     await user.click(await screen.findByText('pick-new-task'));
     expect(await screen.findByTestId('task-form')).toBeInTheDocument();
+  });
+});
+
+describe('MainFlow — guided tour and setup checklist wiring (spec 013 US5, T078)', () => {
+  it('shows the tour once for an existing v1 user with completed onboarding (SC-005), opens step 3 from checklist cards, and replays tour from Settings', async () => {
+    profileState.current = { id: 'user-1', onboarding_step: 3 }; // v1 complete, tour_seen absent
+    saveProfile.mockClear();
+    const user = userEvent.setup();
+    try {
+      render(<MainFlow />);
+
+      // Lands directly on Resumen (does NOT repeat onboarding) and opens GuidedTour step 1
+      await screen.findByText(/^DashboardStub/);
+      expect(await screen.findByTestId('guided-tour')).toHaveAttribute('data-tour-step', '1');
+
+      await user.click(screen.getByRole('button', { name: 'Omitir' }));
+      await waitFor(() => expect(saveProfile).toHaveBeenCalledWith({ id: 'user-1', tour_seen: true }));
+      expect(screen.queryByTestId('guided-tour')).not.toBeInTheDocument();
+
+      // Clicking "cards" on checklist opens OnboardingWizard in settings mode at step 3
+      await user.click(screen.getByText('dashboard-complete-cards'));
+      const wizard = await screen.findByTestId('onboarding-wizard-stub');
+      expect(wizard).toHaveAttribute('data-mode', 'settings');
+      expect(wizard).toHaveAttribute('data-start-step', '3');
+      await user.click(screen.getByText('finish-wizard'));
+
+      // Replay tour from Settings switches back to Resumen and shows step 1 without mutating tour_seen
+      saveProfile.mockClear();
+      await user.click(await screen.findByText('go-settings'));
+      await user.click(await screen.findByText('settings-replay-tour'));
+      expect(await screen.findByTestId('guided-tour')).toHaveAttribute('data-tour-step', '1');
+      await user.click(screen.getByRole('button', { name: 'Omitir' }));
+      expect(saveProfile).not.toHaveBeenCalled();
+    } finally {
+      profileState.current = { id: 'user-1', onboarding_step: 6, tour_seen: true };
+    }
   });
 });

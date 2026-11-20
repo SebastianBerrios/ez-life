@@ -23,8 +23,8 @@ describe('MobileRouteLinks', () => {
     expect(screen.queryByRole('button', { name: 'Mi progreso' })).toBeNull();
   });
 
-  it('is only visible on mobile', () => {
+  it('is only visible below lg (mobile and tablet portrait)', () => {
     render(<MobileRouteLinks onNavigate={vi.fn()} showProgress />);
-    expect(screen.getByTestId('mobile-route-links')).toHaveClass('md:hidden');
+    expect(screen.getByTestId('mobile-route-links')).toHaveClass('lg:hidden');
   });
 });

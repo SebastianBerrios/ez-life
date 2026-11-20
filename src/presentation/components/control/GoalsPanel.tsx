@@ -47,7 +47,7 @@ function GoalRow({ card, onIncrement, onToggleMilestone, onEdit, onDelete }: {
 }) {
   const { goal, percent, detail } = card;
   return (
-    <li className="rounded-lg bg-surface-2 p-4" data-testid={`goal-card-${goal.id}`}>
+    <li className="rounded-2xl bg-surface-2/60 p-4" data-testid={`goal-card-${goal.id}`}>
       <div className="flex items-start gap-3">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-primary" aria-hidden="true">
           {goal.kind === 'numeric' ? <Target className="size-5" /> : <ListChecks className="size-5" />}
@@ -64,7 +64,7 @@ function GoalRow({ card, onIncrement, onToggleMilestone, onEdit, onDelete }: {
 
       {goal.kind === 'numeric' ? (
         <div className="mt-3 flex items-center justify-between gap-3">
-          <span className="font-mono text-label-mono-sm text-muted-foreground">{detail}</span>
+          <span className="text-label-sm text-muted-foreground">{detail}</span>
           <Button variant="secondary" onClick={() => onIncrement(goal)} aria-label={`Sumar 1 a ${goal.name}`}>
             <Plus />
             1
@@ -72,7 +72,7 @@ function GoalRow({ card, onIncrement, onToggleMilestone, onEdit, onDelete }: {
         </div>
       ) : (
         <div className="mt-3">
-          <p className="font-mono text-label-mono-sm text-muted-foreground">{detail}</p>
+          <p className="text-label-sm text-muted-foreground">{detail}</p>
           <ul className="mt-1">
             {(goal.milestones ?? []).map(milestone => (
               <li key={milestone.id}>
@@ -109,20 +109,20 @@ function SavingsRow({ card, onEdit, onDelete, onAllocate }: {
         </span>
         <div className="min-w-0 flex-1">
           <h4 className="break-words text-headline-sm text-foreground">{goal.name}</h4>
-          <p className="font-mono text-label-mono-xs uppercase text-muted-foreground">Meta de ahorro</p>
+          <p className="text-label-xs text-muted-foreground">Meta de ahorro</p>
         </div>
         <span className="text-metric-num-md tabular-nums text-primary" data-testid={`savings-percent-${goal.id}`}>{percent}%</span>
         <ItemMenu label={goal.name} onEdit={() => onEdit(goal)} onDelete={() => onDelete(goal)} />
       </div>
 
-      <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-3 font-mono text-label-mono-sm">
+      <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-3 text-label-sm">
         <span className="text-muted-foreground">Acumulado: <span className="text-foreground">{formatMoney(currentCents)}</span></span>
         <span className="text-muted-foreground">Objetivo: <span className="text-foreground">{formatMoney(goal.target_amount)}</span></span>
       </div>
       <Progress value={percent} aria-label={`Progreso de ${goal.name}`} className="mt-2" />
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <span className="flex flex-wrap items-center gap-2 font-mono text-label-mono-xs text-muted-foreground">
+        <span className="flex flex-wrap items-center gap-2 text-label-xs text-muted-foreground">
           {goal.deadline && (
             <span className="inline-flex items-center gap-1.5">
               <CalendarDays className="size-3.5" aria-hidden="true" />
@@ -155,7 +155,7 @@ export default function GoalsPanel(props: Props) {
         subtitle="Visión estratégica"
         action={
           <>
-            <span className="hidden font-mono text-label-mono-xs text-muted-foreground sm:inline">{activeCount} {activeCount === 1 ? 'activa' : 'activas'}</span>
+            <span className="hidden text-label-xs text-muted-foreground sm:inline">{activeCount} {activeCount === 1 ? 'activa' : 'activas'}</span>
             <Button variant="secondary" size="sm" onClick={onNew}>
               <Plus />
               Nueva meta

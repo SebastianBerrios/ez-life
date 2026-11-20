@@ -4,10 +4,11 @@ import { usePersonalProgress } from '../hooks/usePersonalProgress';
 
 import React, { useCallback, useState } from 'react';
 import LoginScreen from './LoginScreen';
-import OnboardingWizard from './OnboardingWizard';
+import OnboardingWizard, { type WizardStepNumber } from './OnboardingWizard';
 import Layout from './Layout';
 import Dashboard from './Dashboard';
 import QuickRecordSheet, { type QuickRecordKind, type QuickRecordSavedKind, type QuickRecordTab } from './QuickRecordSheet';
+import type { RegistrationPrefill } from '../../core/use-cases/buildRegistrationPrefill';
 import FinancesScreen, { type FinancesTab } from './FinancesScreen';
 import MobileRouteLinks from './MobileRouteLinks';
 import { FORM_DIALOG_CONTENT_CLASS } from './dialogChrome';
@@ -16,17 +17,21 @@ import SharedSpaceCreate from './SharedSpaceCreate';
 import SharedSpaceJoin from './SharedSpaceJoin';
 import SharedMovementForm from './SharedMovementForm';
 import ControlPage from './ControlPage';
-import { Membership } from '../../core/domain/models/types';
+import { Membership, type SetupChecklistKey } from '../../core/domain/models/types';
 import SettingsScreen from './SettingsScreen';
 import NotificationHistory from './NotificationHistory';
+import GuidedTour from './summary/GuidedTour';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Panel } from '@/components/ui/panel';
 import { Badge } from '@/components/ui/badge';
 import CommandPalette from './CommandPalette';
 import { isAccountFocus, isControlFocus, isMovementFocus, type FocusTarget, type NavigateOptions } from '../../core/use-cases/paletteCommand';
+import { buildSetupChecklist } from '../../core/use-cases/buildSetupChecklist';
 import { useHotkey } from '../hooks/useHotkey';
+import { useGuidedTour } from '../hooks/useGuidedTour';
 import { shiftMonth } from '../../core/use-cases/calendar';
 import { useHasUnreadNotifications } from '../hooks/useHasUnreadNotifications';
-import { useRecurrenceEvaluator } from '../hooks/useRecurrenceEvaluator';
 import { useSyncManager } from '../hooks/useSyncManager';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useNotificationEvaluator } from '../hooks/useNotificationEvaluator';
@@ -34,31 +39,47 @@ import { useTaskRecurrenceEvaluator } from '../hooks/useTaskRecurrenceEvaluator'
 import { observeAccountSession } from '../../infrastructure/auth/observeAccountSession';
 import { forgetLocalAccount } from '../../infrastructure/auth/localAccount';
 import { LocalPaymentAccountRepository } from '../../infrastructure/repositories/local/LocalPaymentAccountRepository';
+import { LocalMovementRecurrenceRepository } from '../../infrastructure/repositories/local/LocalMovementRecurrenceRepository';
+import { LocalProfileRepository } from '../../infrastructure/repositories/local/LocalProfileRepository';
+import { LocalRegistrationRepository } from '../../infrastructure/repositories/local/LocalRegistrationRepository';
+import { LocalDebtRepository } from '../../infrastructure/repositories/local/LocalDebtRepository';
 
 // FR-004: per-page browser tab titles. The app has a single real Next.js
 // route (`src/app/page.tsx`) — every "page" below is client-side routing
 // inside this component's `currentRoute` state, so Next.js's file-based
 // `generateMetadata` can't produce a per-page title (research.md §1). This
 // mutates `document.title` directly instead, keyed off `currentRoute`.
+const SETUP_STEP_BY_KEY: Record<SetupChecklistKey, WizardStepNumber> = {
+  income: 1,
+  accounts: 2,
+  cards: 3,
+  loans: 4,
+};
+
 const routeTitles: Record<string, string> = {
   progress: 'Mi progreso',
   dashboard: 'Resumen',
   finances: 'Finanzas',
-  'shared-space': 'Espacio Compartido',
-  control: 'Control & Hábitos',
+  'shared-space': 'Espacio compartido',
+  control: 'Control y hábitos',
   settings: 'Ajustes',
 };
 
 export default function MainFlow() {
   const [step, setStep] = useState<'loading' | 'login' | 'onboarding-wizard' | 'app'>('loading');
-  const [wizardStartStep, setWizardStartStep] = useState<1 | 2 | 3>(1);
+  const [wizardStartStep, setWizardStartStep] = useState<WizardStepNumber>(1);
   const [wizardMode, setWizardMode] = useState<'setup' | 'settings'>('setup');
   const [currentRoute, setCurrentRoute] = useState('dashboard');
   // Sub-tab Finanzas opens on; set by deep links (Inicio -> Préstamos), reset by any other navigation.
   const [financesTab, setFinancesTab] = useState<FinancesTab>('movements');
   const [profileId, setProfileId] = useState<string | null>(null);
   // Single entry point of "Nuevo Registro" (central "+", sidebar button, Finanzas, Inicio quick actions).
-  const [quickRecord, setQuickRecord] = useState<{ open: boolean; tab: QuickRecordTab; kind?: QuickRecordKind }>({ open: false, tab: 'expense' });
+  const [quickRecord, setQuickRecord] = useState<{
+    open: boolean;
+    tab: QuickRecordTab;
+    kind?: QuickRecordKind;
+    prefill?: RegistrationPrefill;
+  }>({ open: false, tab: 'expense' });
   const [movementsRefreshKey, setMovementsRefreshKey] = useState(0);
   const [showSharedSpaceCreate, setShowSharedSpaceCreate] = useState(false);
   const [showSharedSpaceJoin, setShowSharedSpaceJoin] = useState(false);
@@ -73,17 +94,20 @@ export default function MainFlow() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   // Item a palette selection asks the destination screen to reveal; `nonce` re-triggers the same target.
   const [focus, setFocus] = useState<{ target: FocusTarget; nonce: number } | null>(null);
+  // Card selected via Resumen's "Agregar línea de crédito" -> opens edit sheet in Settings.
+  const [editAccountTarget, setEditAccountTarget] = useState<{ id: string; nonce: number } | null>(null);
 
   // Background Jobs
-  useRecurrenceEvaluator(profileId);
   const { syncNow } = useSyncManager();
   const celebration = useNotificationEvaluator(profileId);
   const progress = usePersonalProgress(profileId ?? '');
   useTaskRecurrenceEvaluator(profileId);
   const isOnline = useOnlineStatus();
   const hasUnreadNotifications = useHasUnreadNotifications(profileId, progress.visible);
+  const tour = useGuidedTour(profileId, step === 'app');
 
   const clearFocus = useCallback(() => setFocus(null), []);
+  const clearEditAccount = useCallback(() => setEditAccountTarget(null), []);
 
   // ⌘K / Ctrl+K toggles the palette from anywhere inside the app (never over the login or onboarding).
   useHotkey('mod+k', () => setPaletteOpen(open => !open), { enabled: step === 'app', allowInDialog: '[data-command-palette]' });
@@ -94,11 +118,14 @@ export default function MainFlow() {
       : 'ez-life';
   }, [currentRoute]);
 
-  // Spec 011: every user owns an "Efectivo" account. Runs when the app shell is
-  // reached — both on a normal start and right after onboarding completes.
+  // Spec 011: every user owns an "Efectivo" account; spec 013: adopt legacy
+  // recurring movements into rules once (never generates occurrences, FR-014)
+  // and fix `balance_since` once for existing profiles without creating a stub.
   React.useEffect(() => {
     if (step !== 'app' || !profileId) return;
     new LocalPaymentAccountRepository().ensureDefault(profileId).catch(error => console.error(error));
+    new LocalMovementRecurrenceRepository().adoptLegacySources(profileId).catch(error => console.error(error));
+    new LocalProfileRepository().ensureBalanceSince(profileId, new Date()).catch(error => console.error(error));
   }, [step, profileId]);
 
   React.useEffect(() => observeAccountSession(syncNow, state => {
@@ -113,11 +140,13 @@ export default function MainFlow() {
 
   if (step === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-
-          <p className="text-muted-foreground text-sm">Cargando...</p>
-        </div>
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <Panel className="w-full max-w-xs items-center gap-2 p-6 text-center">
+          <p className="font-fredoka text-headline-md text-foreground">
+            ez<span className="text-primary">·</span>life
+          </p>
+          <p className="text-sm text-muted-foreground">Cargando...</p>
+        </Panel>
       </div>
     );
   }
@@ -140,7 +169,43 @@ export default function MainFlow() {
     );
   }
 
-  const openQuickRecord = (tab: QuickRecordTab = 'expense', kind?: QuickRecordKind) => setQuickRecord({ open: true, tab, kind });
+  const openQuickRecord = (tab: QuickRecordTab = 'expense', kind?: QuickRecordKind) =>
+    setQuickRecord({ open: true, tab, kind, prefill: undefined });
+  const openPendingRegistration = (prefill: RegistrationPrefill) =>
+    setQuickRecord({ open: true, tab: prefill.tab === 'loan' ? 'expense' : prefill.tab, prefill });
+  const openEditCreditCard = (accountId: string) => {
+    setEditAccountTarget({ id: accountId, nonce: Date.now() });
+    setCurrentRoute('settings');
+  };
+  const openCompleteSetup = async (key?: SetupChecklistKey) => {
+    let targetKey: SetupChecklistKey = key ?? 'income';
+    if (!key && profileId) {
+      try {
+        const [regInputs, debts, profile] = await Promise.all([
+          new LocalRegistrationRepository().getInputs(profileId, new Date()),
+          new LocalDebtRepository().getAll(profileId),
+          new LocalProfileRepository().get(profileId),
+        ]);
+        const checklist = buildSetupChecklist({
+          incomeSources: regInputs.incomeSources,
+          accounts: regInputs.accounts,
+          loans: regInputs.loans,
+          debts,
+          profile,
+        });
+        targetKey = checklist.nextPending ?? 'income';
+      } catch (error) {
+        console.error(error);
+      }
+    }
+    setWizardMode('settings');
+    setWizardStartStep(SETUP_STEP_BY_KEY[targetKey]);
+    setStep('onboarding-wizard');
+  };
+  const handleReplayTour = () => {
+    setCurrentRoute('dashboard');
+    tour.replay();
+  };
   const navigate = (route: string, options?: NavigateOptions) => {
     setFinancesTab(options?.financesTab ?? 'movements');
     const target = options?.focus;
@@ -205,12 +270,13 @@ export default function MainFlow() {
             <Dashboard
               userId={profileId}
               refDate={refDate}
-              onOpenProgress={() => navigate('progress')}
               onOpenQuickRecord={openQuickRecord}
-              onNavigate={navigate}
+              onRegisterPending={openPendingRegistration}
+              onAddCreditLimit={openEditCreditCard}
+              onCompleteSetup={key => void openCompleteSetup(key)}
             />
-            {/* Mi Progreso already has its own card on Inicio; only the Espacio compartido row remains. */}
-            <MobileRouteLinks onNavigate={navigate} showProgress={false} />
+            {/* Mobile-only navigation shortcuts (not a Summary section, FR-034). */}
+            <MobileRouteLinks onNavigate={navigate} showProgress={progress.visible} />
           </>
         )}
 
@@ -228,13 +294,14 @@ export default function MainFlow() {
             focusNonce={focus?.nonce}
             onFocusHandled={clearFocus}
             onNewMovement={() => openQuickRecord('expense')}
+            onAddCreditLimit={openEditCreditCard}
             movementsRefreshKey={movementsRefreshKey}
           />
         )}
 
         {currentRoute === 'shared-space' && profileId && (
           <div className="space-y-4">
-            <h2 className="text-headline-lg-mobile md:text-headline-lg text-foreground">Espacio Compartido</h2>
+            <h2 className="font-fredoka text-headline-lg-mobile md:text-headline-lg text-foreground">Espacio compartido</h2>
             <SharedSpaceScreen
               userId={profileId}
               refreshKey={sharedSpacesRefreshKey}
@@ -261,14 +328,19 @@ export default function MainFlow() {
             <MobileRouteLinks onNavigate={navigate} showProgress={progress.visible} />
             <SettingsScreen
               userId={profileId}
-              onEditDistribution={() => { setWizardMode('settings'); setWizardStartStep(2); setStep('onboarding-wizard'); }}
-              onEditCategories={() => { setWizardMode('settings'); setWizardStartStep(3); setStep('onboarding-wizard'); }}
+              onEditDistribution={() => { setWizardMode('settings'); setWizardStartStep(5); setStep('onboarding-wizard'); }}
+              onEditCategories={() => { setWizardMode('settings'); setWizardStartStep(6); setStep('onboarding-wizard'); }}
+              onCompleteSetup={() => void openCompleteSetup()}
+              onReplayTour={handleReplayTour}
               onLogout={resetSession}
               accountName={accountName}
               accountEmail={accountEmail}
               focus={isAccountFocus(focus?.target) ? focus?.target : undefined}
               focusNonce={focus?.nonce}
               onFocusHandled={clearFocus}
+              editAccountId={editAccountTarget?.id}
+              editAccountNonce={editAccountTarget?.nonce}
+              onEditAccountHandled={clearEditAccount}
             />
           </>
         )}
@@ -277,17 +349,18 @@ export default function MainFlow() {
       {profileId && (
         <QuickRecordSheet
           open={quickRecord.open}
-          onOpenChange={open => setQuickRecord(current => ({ ...current, open }))}
+          onOpenChange={open => setQuickRecord(current => ({ ...current, open, ...(open ? {} : { prefill: undefined }) }))}
           userId={profileId}
           initialTab={quickRecord.tab}
           initialKind={quickRecord.kind}
+          prefill={quickRecord.prefill}
           onSaved={handleQuickRecordSaved}
         />
       )}
 
       {profileId && (
-        <Dialog open={showSharedSpaceCreate} onOpenChange={(open) => !open && setShowSharedSpaceCreate(false)}>
-          <DialogContent className={FORM_DIALOG_CONTENT_CLASS}>
+        <Sheet open={showSharedSpaceCreate} onOpenChange={(open) => !open && setShowSharedSpaceCreate(false)}>
+          <SheetContent>
             <SharedSpaceCreate
               onComplete={() => {
                 setShowSharedSpaceCreate(false);
@@ -295,13 +368,13 @@ export default function MainFlow() {
               }}
               onCancel={() => setShowSharedSpaceCreate(false)}
             />
-          </DialogContent>
-        </Dialog>
+          </SheetContent>
+        </Sheet>
       )}
 
       {profileId && (
-        <Dialog open={showSharedSpaceJoin} onOpenChange={(open) => !open && setShowSharedSpaceJoin(false)}>
-          <DialogContent className={FORM_DIALOG_CONTENT_CLASS}>
+        <Sheet open={showSharedSpaceJoin} onOpenChange={(open) => !open && setShowSharedSpaceJoin(false)}>
+          <SheetContent>
             <SharedSpaceJoin
               onComplete={() => {
                 setShowSharedSpaceJoin(false);
@@ -309,8 +382,8 @@ export default function MainFlow() {
               }}
               onCancel={() => setShowSharedSpaceJoin(false)}
             />
-          </DialogContent>
-        </Dialog>
+          </SheetContent>
+        </Sheet>
       )}
 
       {profileId && (
@@ -325,8 +398,8 @@ export default function MainFlow() {
       )}
 
       {profileId && addMovementTarget && (
-        <Dialog open={!!addMovementTarget} onOpenChange={(open) => !open && setAddMovementTarget(null)}>
-          <DialogContent className={FORM_DIALOG_CONTENT_CLASS}>
+        <Sheet open={!!addMovementTarget} onOpenChange={(open) => !open && setAddMovementTarget(null)}>
+          <SheetContent>
             <SharedMovementForm
               spaceId={addMovementTarget.spaceId}
               currentUserId={profileId}
@@ -337,8 +410,8 @@ export default function MainFlow() {
               }}
               onCancel={() => setAddMovementTarget(null)}
             />
-          </DialogContent>
-        </Dialog>
+          </SheetContent>
+        </Sheet>
       )}
 
       {profileId && (
@@ -350,6 +423,16 @@ export default function MainFlow() {
             />
           </DialogContent>
         </Dialog>
+      )}
+
+      {profileId && currentRoute === 'dashboard' && (
+        <GuidedTour
+          active={tour.active}
+          step={tour.step}
+          onNext={tour.next}
+          onSkip={tour.skip}
+          onFinish={tour.finish}
+        />
       )}
     </Layout>
   );

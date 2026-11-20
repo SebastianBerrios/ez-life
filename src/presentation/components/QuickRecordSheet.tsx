@@ -4,14 +4,16 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeftRight, Flag, Repeat, TrendingDown, TrendingUp } from 'lucide-react';
 import { Segmented } from '@/components/ui/segmented';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import MovementForm, { type SharedExpenseDraft } from './MovementForm';
-import TransferForm from './TransferForm';
+import MovementForm, { type MovementInitialValues, type MovementLinks, type SharedExpenseDraft } from './MovementForm';
+import TransferForm, { type TransferInitialValues } from './TransferForm';
+import InstallmentPaymentQuickForm from './InstallmentPaymentQuickForm';
 import HabitForm from './HabitForm';
 import TaskForm from './TaskForm';
 import GoalForm from './GoalForm';
 import SavingsGoalForm from './SavingsGoalForm';
 import SharedMovementForm from './SharedMovementForm';
 import { useActiveSharedSpaces } from '../hooks/useActiveSharedSpaces';
+import type { RegistrationPrefill } from '../../core/use-cases/buildRegistrationPrefill';
 
 export type QuickRecordTab = 'expense' | 'income' | 'transfer' | 'habit' | 'goal';
 export type QuickRecordSavedKind = 'movement' | 'transfer' | 'habit' | 'task' | 'goal' | 'savings-goal';
@@ -32,6 +34,8 @@ interface Props {
   initialTab?: QuickRecordTab;
   /** Sub-form to open inside the Hábito / Meta tabs (hábito, tarea, meta, meta de ahorro). */
   initialKind?: QuickRecordKind;
+  /** Optional prefill built from a "Por registrar" item (spec 013 FR-016). */
+  prefill?: RegistrationPrefill;
   /** Called after every successful save (also "Guardar y registrar otro"), so the host can refresh its lists. */
   onSaved: (kind: QuickRecordSavedKind) => void;
 }
@@ -59,12 +63,24 @@ const GOAL_OPTIONS = [
  * goal. The body is a separate component rendered only while the sheet is open, so every piece of
  * tab/draft state resets when it closes. Everything saves to local storage (works offline).
  */
-export default function QuickRecordSheet({ open, onOpenChange, userId, initialTab, initialKind, onSaved }: Props) {
+export default function QuickRecordSheet({ open, onOpenChange, userId, initialTab, initialKind, prefill, onSaved }: Props) {
+  const resolvedInitialTab: QuickRecordTab =
+    prefill && prefill.tab !== 'loan'
+      ? prefill.tab
+      : initialTab ?? tabForKind(initialKind) ?? 'expense';
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       {/* initialFocus=false: the body puts focus on the amount (or the first field) itself. */}
       <SheetContent initialFocus={false}>
-        <QuickRecordBody userId={userId} initialTab={initialTab ?? tabForKind(initialKind) ?? 'expense'} initialKind={initialKind} onSaved={onSaved} onClose={() => onOpenChange(false)} />
+        <QuickRecordBody
+          userId={userId}
+          initialTab={resolvedInitialTab}
+          initialKind={initialKind}
+          prefill={prefill}
+          onSaved={onSaved}
+          onClose={() => onOpenChange(false)}
+        />
       </SheetContent>
     </Sheet>
   );
@@ -74,12 +90,14 @@ function QuickRecordBody({
   userId,
   initialTab,
   initialKind,
+  prefill,
   onSaved,
   onClose,
 }: {
   userId: string;
   initialTab: QuickRecordTab;
   initialKind?: QuickRecordKind;
+  prefill?: RegistrationPrefill;
   onSaved: (kind: QuickRecordSavedKind) => void;
   onClose: () => void;
 }) {
@@ -93,14 +111,72 @@ function QuickRecordBody({
   // Amount forms focus their own amount input; the other tabs focus their first field once, on open
   // (never on tab changes, which would steal focus from the tablist while arrowing through it).
   useEffect(() => {
+    if (prefill?.tab === 'loan') return;
     if (initialTab !== 'habit' && initialTab !== 'goal') return;
     panelRef.current?.querySelector<HTMLElement>('input:not([type=hidden]):not([disabled]), textarea')?.focus();
-  }, [initialTab]);
+  }, [initialTab, prefill?.tab]);
 
   const saved = (kind: QuickRecordSavedKind) => {
     onSaved(kind);
     onClose();
   };
+
+  if (prefill?.tab === 'loan' && prefill.loanId) {
+    return (
+      <>
+        <SheetHeader>
+          <div className="flex items-center gap-2">
+            <span className="size-2.5 rounded-full bg-primary motion-safe:animate-pulse" aria-hidden="true" />
+            <SheetTitle className="text-headline-sm font-semibold">Registrar cuota</SheetTitle>
+          </div>
+          <SheetDescription className="sr-only">
+            Confirma el pago de una cuota de tu préstamo y la cuenta de origen.
+          </SheetDescription>
+        </SheetHeader>
+        <InstallmentPaymentQuickForm
+          userId={userId}
+          loanId={prefill.loanId}
+          initialAccountId={prefill.accountId}
+          amountCents={prefill.amountCents}
+          description={prefill.description}
+          onComplete={() => saved('movement')}
+          onCancel={onClose}
+        />
+      </>
+    );
+  }
+
+  const movementInitialValues: MovementInitialValues | undefined =
+    prefill && (prefill.tab === 'expense' || prefill.tab === 'income')
+      ? {
+          amountCents: prefill.amountCents,
+          description: prefill.description,
+          accountId: prefill.accountId,
+          incomeSourceId: prefill.incomeSourceId,
+          distributionCategoryId: prefill.distributionCategoryId,
+          expenseCategoryId: prefill.expenseCategoryId,
+          expenseSubcategoryId: prefill.expenseSubcategoryId,
+        }
+      : undefined;
+
+  const movementLinks: MovementLinks | undefined =
+    prefill && (prefill.tab === 'expense' || prefill.tab === 'income')
+      ? {
+          recurrence_rule_id: prefill.recurrenceRuleId,
+          recurrence_month: prefill.recurrenceMonth,
+          income_source_id: prefill.incomeSourceId,
+        }
+      : undefined;
+
+  const transferInitialValues: TransferInitialValues | undefined =
+    prefill?.tab === 'transfer'
+      ? {
+          amountCents: prefill.amountCents,
+          fromAccountId: prefill.accountId,
+          toAccountId: prefill.toAccountId,
+          description: prefill.description,
+        }
+      : undefined;
 
   const sharedSpace = sharedDraft ? spaces.find(space => space.id === sharedDraft.spaceId) : undefined;
   const isMovementTab = tab === 'expense' || tab === 'income';
@@ -110,7 +186,7 @@ function QuickRecordBody({
       <SheetHeader>
         <div className="flex items-center gap-2">
           <span className="size-2.5 rounded-full bg-primary motion-safe:animate-pulse" aria-hidden="true" />
-          <SheetTitle className="text-headline-sm font-semibold">Nuevo Registro</SheetTitle>
+          <SheetTitle className="font-fredoka text-headline-sm font-semibold">Nuevo registro</SheetTitle>
         </div>
         <SheetDescription className="sr-only">
           Registra un gasto, un ingreso, un movimiento entre cuentas, un hábito, una tarea o una meta.
@@ -133,7 +209,6 @@ function QuickRecordBody({
         <Segmented
           ariaLabel="Tipo de registro"
           idPrefix="quick-record"
-          mono
           fullWidth
           value={tab}
           onValueChange={value => setTab(value as QuickRecordTab)}
@@ -152,6 +227,8 @@ function QuickRecordBody({
             <MovementForm
               userId={userId}
               type={tab === 'expense' ? 'EXPENSE' : 'INCOME'}
+              initialValues={movementInitialValues}
+              links={movementLinks}
               autoFocusAmount
               sharedSpaces={spaces.map(({ id, name }) => ({ id, name }))}
               onContinueShared={setSharedDraft}
@@ -161,7 +238,14 @@ function QuickRecordBody({
             />
           )}
 
-          {tab === 'transfer' && <TransferForm userId={userId} autoFocusAmount onComplete={() => saved('transfer')} />}
+          {tab === 'transfer' && (
+            <TransferForm
+              userId={userId}
+              initialValues={transferInitialValues}
+              autoFocusAmount
+              onComplete={() => saved('transfer')}
+            />
+          )}
 
           {tab === 'habit' && (
             <>

@@ -1,31 +1,53 @@
 'use client';
 
 import * as React from 'react';
-import { Moon, Sun } from 'lucide-react';
-import { useTheme } from 'next-themes';
+import { Monitor, Moon, Sun } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useThemePreference, type ThemePreference } from '../hooks/useThemePreference';
 
-// Two-state toggle: the app defaults to dark and `enableSystem` is off (spec 010),
-// so a "system" step would leave next-themes without a resolvable class.
-export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
-  // The stored theme is unknown on the server: render the dark default until mounted
-  // so the markup matches during hydration.
-  const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => setMounted(true), []);
-  const isLight = mounted && theme === 'light';
+const OPTIONS: { value: ThemePreference; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
+  { value: 'light', label: 'Claro', Icon: Sun },
+  { value: 'dark', label: 'Oscuro', Icon: Moon },
+  { value: 'system', label: 'Sistema', Icon: Monitor },
+];
 
-  const label = isLight ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro';
+/**
+ * Three-way theme preference selector: Claro / Oscuro / Sistema (spec 013 FR-040).
+ * Updates immediately and persists via `next-themes` when the user chooses an option.
+ */
+export function ThemeToggle({ className, compact = false }: { className?: string; compact?: boolean }) {
+  const { theme, setTheme } = useThemePreference();
 
   return (
-    <button
-      onClick={() => setTheme(isLight ? 'dark' : 'light')}
-      className="relative flex size-11 items-center justify-center rounded-lg outline-none transition-colors hover:bg-surface-3 focus-visible:shadow-focus"
-      title={label}
-      aria-label={label}
+    <div
+      role="radiogroup"
+      aria-label="Tema visual"
+      className={cn('inline-flex items-center gap-1 rounded-full bg-surface-2 p-1', className)}
     >
-      <Sun className={`h-5 w-5 transition-all text-foreground ${isLight ? 'scale-100 opacity-100' : 'scale-0 opacity-0 absolute'}`} />
-      <Moon className={`h-5 w-5 transition-all text-foreground ${!isLight ? 'scale-100 opacity-100' : 'scale-0 opacity-0 absolute'}`} />
-      <span className="sr-only">{label}</span>
-    </button>
+      {OPTIONS.map(({ value, label, Icon }) => {
+        const active = theme === value;
+        return (
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            aria-label={compact ? label : undefined}
+            title={compact ? label : undefined}
+            onClick={() => setTheme(value)}
+            className={cn(
+              'inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full text-xs font-medium outline-none transition-colors focus-visible:shadow-focus',
+              compact ? 'min-w-11 px-2' : 'px-3',
+              active
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <Icon className="size-3.5 shrink-0" />
+            <span className={compact ? 'sr-only' : undefined}>{label}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }

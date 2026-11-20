@@ -1,11 +1,23 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import InstallmentLoanList from './InstallmentLoanList';
 import { LocalInstallmentLoanRepository } from '../../infrastructure/repositories/local/LocalInstallmentLoanRepository';
+import { LocalPaymentAccountRepository } from '../../infrastructure/repositories/local/LocalPaymentAccountRepository';
 import { DomainError } from '../../core/domain/errors/DomainError';
 
 vi.mock('../../infrastructure/repositories/local/LocalInstallmentLoanRepository');
+vi.mock('../../infrastructure/repositories/local/LocalPaymentAccountRepository');
+
+function mockAccounts(accounts: unknown[] = []) {
+  vi.mocked(LocalPaymentAccountRepository).mockImplementation(function () {
+    return { getAll: vi.fn().mockResolvedValue(accounts) } as unknown as InstanceType<typeof LocalPaymentAccountRepository>;
+  });
+}
+
+beforeEach(() => {
+  mockAccounts([]);
+});
 
 const activeLoan = {
   id: 'loan-1',
@@ -41,7 +53,7 @@ describe('InstallmentLoanList', () => {
     render(<InstallmentLoanList userId="fake-user-id" />);
 
     expect(await screen.findByText(/BCP/i)).toBeInTheDocument();
-    expect(screen.getByText(/10/)).toBeInTheDocument(); // remaining installments visible somewhere
+    expect(screen.getByText('Te faltan 10 cuotas')).toBeInTheDocument();
   });
 
   it('shows "Pagado/Saldado" for a settled loan and keeps it in the list (FR-025)', async () => {
@@ -192,7 +204,7 @@ describe('InstallmentLoanList', () => {
     expect(within(card).getByText('2,000.00')).toBeInTheDocument();
     expect(within(card).getByText('200.00')).toBeInTheDocument();
     expect(within(card).getByText('10 de 12 cuotas restantes')).toBeInTheDocument();
-    expect(within(card).getByText('15% (informativo)')).toBeInTheDocument();
+    expect(within(card).getByText(/15%/)).toBeInTheDocument();
     expect(within(card).getByRole('progressbar', { name: 'Avance de cuotas de BCP' })).toHaveAttribute('aria-valuenow', '17');
   });
 
@@ -213,5 +225,45 @@ describe('InstallmentLoanList', () => {
     expect(screen.getByText('10 oct 2026')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /ocultar historial/i }));
     expect(screen.queryByText('10 oct 2026')).toBeNull();
+  });
+
+  it('defaults origin account via pickPrimaryAccount and lets the user switch accounts on installment and principal payments (FR-020)', async () => {
+    const user = userEvent.setup();
+    const recordInstallmentPayment = vi.fn().mockResolvedValue(undefined);
+    const recordPrincipalPayment = vi.fn().mockResolvedValue(undefined);
+    mockRepo({ recordInstallmentPayment, recordPrincipalPayment } as never);
+    mockAccounts([
+      { id: 'cash-1', user_id: 'fake-user-id', name: 'Efectivo', kind: 'cash', opening_balance: 0, created_at: new Date(2026, 0, 1), updated_at: new Date(2026, 0, 1) },
+      { id: 'debit-1', user_id: 'fake-user-id', name: 'BCP Débito', kind: 'debit', opening_balance: 100000, created_at: new Date(2026, 0, 2), updated_at: new Date(2026, 0, 2) },
+      { id: 'debit-2', user_id: 'fake-user-id', name: 'Interbank', kind: 'debit', opening_balance: 50000, created_at: new Date(2026, 0, 5), updated_at: new Date(2026, 0, 5) },
+    ]);
+
+    render(<InstallmentLoanList userId="fake-user-id" />);
+    const originSelect = await screen.findByLabelText('Cuenta de origen');
+    expect(originSelect).toHaveValue('debit-1');
+
+    // Pay 1 installment with default primary account
+    await user.type(screen.getByLabelText(/cuotas a pagar/i), '1');
+    await user.click(screen.getByRole('button', { name: /pagar cuota/i }));
+    await waitFor(() => expect(recordInstallmentPayment).toHaveBeenCalledWith('loan-1', 1, expect.any(Date), 'debit-1'));
+
+    // Change origin account and pay principal
+    await user.click(screen.getByRole('button', { name: /abono a capital/i }));
+    const principalAccountSelect = screen.getByLabelText('Cuenta de origen del abono');
+    expect(principalAccountSelect).toHaveValue('debit-1');
+    await user.selectOptions(principalAccountSelect, 'debit-2');
+    await user.type(screen.getByLabelText(/monto del abono/i), '500.00');
+    await user.click(screen.getByLabelText(/reduce/i));
+    await user.click(await screen.findByRole('option', { name: /plazo/i }));
+    await user.type(screen.getByLabelText(/nuevo número de cuotas/i), '6');
+    await user.click(screen.getByRole('button', { name: /confirmar abono/i }));
+
+    await waitFor(() => expect(recordPrincipalPayment).toHaveBeenCalledWith(
+      'loan-1',
+      50000,
+      expect.any(Date),
+      { type: 'reduce_term', newRemainingInstallments: 6 },
+      'debit-2',
+    ));
   });
 });

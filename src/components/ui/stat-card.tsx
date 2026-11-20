@@ -21,7 +21,7 @@ export interface StatCardProps
   tone?: StatTone
 }
 
-/** KPI tile: mono uppercase label, big tabular value, optional hint and icon. */
+/** KPI tile: muted label, big tabular Fredoka value, optional hint and icon. */
 const StatCard = React.forwardRef<HTMLDivElement, StatCardProps>(function StatCard(
   { label, value, hint, icon, tone = "default", className, ...props },
   ref
@@ -32,22 +32,22 @@ const StatCard = React.forwardRef<HTMLDivElement, StatCardProps>(function StatCa
       data-slot="stat-card"
       data-tone={tone}
       className={cn(
-        "flex flex-col gap-2 rounded-lg border border-border bg-card p-4 text-card-foreground",
+        "flex flex-col gap-2 rounded-card bg-card p-5 text-card-foreground shadow-card",
         className
       )}
       {...props}
     >
       <div className="flex items-start justify-between gap-2">
-        <span className="font-mono text-label-mono-xs uppercase text-muted-foreground">
+        <span className="text-label-xs text-muted-foreground">
           {label}
         </span>
         {icon !== undefined && (
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-surface-2 text-primary [&_svg]:size-4">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-foreground [&_svg]:size-4">
             {icon}
           </span>
         )}
       </div>
-      <div className={cn("text-metric-num-md tabular-nums", toneClass[tone])}>{value}</div>
+      <div className={cn("font-fredoka text-metric-num-md tabular-nums", toneClass[tone])}>{value}</div>
       {hint !== undefined && (
         <div className="text-body-sm text-muted-foreground">{hint}</div>
       )}

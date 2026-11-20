@@ -112,4 +112,43 @@ describe('LocalPaymentAccountRepository', () => {
       expect(await repo.getAll('B')).toHaveLength(1);
     });
   });
+
+  describe('credit card fields and opening_date (spec 013)', () => {
+    it('requires credit_limit when creating a new credit card and saves credit metadata + opening_date', async () => {
+      const repo = new LocalPaymentAccountRepository();
+      await expect(repo.save({
+        id: '', user_id: 'A', name: 'BBVA', kind: 'credit', opening_balance: -80000,
+      })).rejects.toThrow('La línea de crédito es obligatoria.');
+
+      await expect(repo.save({
+        id: '', user_id: 'A', name: 'BBVA', kind: 'credit', opening_balance: -600000, credit_limit: 500000,
+      })).rejects.toThrow('El consumo no puede superar la línea de crédito.');
+
+      const openingDate = new Date(2026, 10, 10, 12, 0);
+      const card = await repo.save({
+        id: '', user_id: 'A', name: 'BBVA', kind: 'credit', opening_balance: -80000,
+        credit_limit: 500000, closing_day: 10, payment_day: 15, opening_date: openingDate,
+      });
+      expect(card).toMatchObject({
+        credit_limit: 500000,
+        closing_day: 10,
+        payment_day: 15,
+        opening_date: openingDate,
+      });
+    });
+
+    it('still allows editing an existing legacy credit card without credit_limit (FR-035)', async () => {
+      const repo = new LocalPaymentAccountRepository();
+      const now = new Date();
+      await db.payment_accounts.put({
+        id: 'legacy-card', user_id: 'A', name: 'Visa antigua', kind: 'credit',
+        opening_balance: -20000, created_at: now, updated_at: now,
+      });
+      const updated = await repo.save({
+        id: 'legacy-card', user_id: 'A', name: 'Visa renombrada', kind: 'credit', opening_balance: -20000,
+      });
+      expect(updated.name).toBe('Visa renombrada');
+      expect(updated.credit_limit).toBeUndefined();
+    });
+  });
 });

@@ -55,7 +55,7 @@ export default function Layout({
         onLogout={onLogout}
       />
 
-      <div className="md:ml-60">
+      <div className="lg:ml-60">
         <AppTopbar
           currentRoute={currentRoute}
           refDate={refDate}
@@ -65,7 +65,7 @@ export default function Layout({
           onOpenNotifications={onOpenNotifications}
           onOpenSearch={onOpenSearch}
         />
-        <main className="mx-auto w-full max-w-[1680px] px-4 pb-24 md:px-6 md:pb-10 md:pt-6 lg:px-10">
+        <main className="mx-auto w-full max-w-[720px] px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:px-6 lg:pb-10 lg:pt-6">
           <MobileHeader
             currentRoute={currentRoute}
             refDate={refDate}

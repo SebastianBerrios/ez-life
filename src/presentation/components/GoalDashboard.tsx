@@ -62,11 +62,11 @@ export default function GoalDashboard({ userId }: Props) {
           <li key={goal.id} className="space-y-2 rounded-lg bg-surface-2 px-4 py-3">
             <div className="flex items-center justify-between gap-3">
               <span className="min-w-0 break-words text-body-md font-medium text-foreground">{goal.name}</span>
-              <span className="shrink-0 font-mono text-label-mono-sm text-muted-foreground">{current} / {target}</span>
+              <span className="shrink-0 text-label-sm text-muted-foreground">{current} / {target}</span>
             </div>
             <div className="flex items-center gap-3">
               <Progress value={progressPercent} aria-label={`Progreso de ${goal.name}`} className="flex-1" />
-              <span className="font-mono text-label-mono-xs text-muted-foreground">{`${progressPercent}%`}</span>
+              <span className="text-label-xs text-muted-foreground">{`${progressPercent}%`}</span>
             </div>
           </li>
         );

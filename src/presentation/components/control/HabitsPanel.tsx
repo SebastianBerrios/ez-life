@@ -57,7 +57,7 @@ function HabitRow({ card, onComplete, onEdit, onDelete }: { card: HabitCard } & 
   const { habit } = card;
   const chip = streakChip(card);
   return (
-    <li className="rounded-lg bg-surface-2 p-3" data-testid={`habit-card-${habit.id}`} data-status={card.status}>
+    <li className="rounded-2xl bg-surface-2/60 p-3.5" data-testid={`habit-card-${habit.id}`} data-status={card.status}>
       <div className="flex items-start gap-3">
         <CheckButton
           done={card.doneToday}
@@ -69,9 +69,9 @@ function HabitRow({ card, onComplete, onEdit, onDelete }: { card: HabitCard } & 
             {habit.icon ? `${habit.icon} ${habit.name}` : habit.name}
           </p>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="font-mono text-label-mono-xs text-muted-foreground">{card.scheduleText}</span>
+            <span className="text-label-xs text-muted-foreground">{card.scheduleText}</span>
             {chip && (
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-sm bg-surface-3 px-1.5 py-0.5 font-mono text-label-mono-xs text-primary">
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-sm bg-surface-3 px-1.5 py-0.5 text-label-xs text-primary">
                 <Flame className="size-3" aria-hidden="true" />
                 {chip}
               </span>
@@ -82,7 +82,7 @@ function HabitRow({ card, onComplete, onEdit, onDelete }: { card: HabitCard } & 
       </div>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 pl-14">
         <SevenDayBar card={card} />
-        <span className={cn('font-mono text-label-mono-xs', card.doneToday ? 'text-primary' : 'text-muted-foreground')}>
+        <span className={cn('text-label-xs', card.doneToday ? 'text-primary' : 'text-muted-foreground')}>
           {STATUS_TEXT[card.status]}
           {card.tokensAvailable > 0 && <span className="ml-2 text-muted-foreground">· Comodines {card.tokensAvailable}</span>}
         </span>
@@ -120,7 +120,7 @@ export default function HabitsPanel({ cards, adherence, onComplete, onNew, onEdi
           </ul>
         )}
         {adherence !== null && (
-          <p className="flex items-center justify-between rounded-lg bg-surface-2 px-3 py-2.5 font-mono text-label-mono-xs text-muted-foreground" data-testid="adherence">
+          <p className="flex items-center justify-between rounded-lg bg-surface-2 px-3 py-2.5 text-label-xs text-muted-foreground" data-testid="adherence">
             <span>Tasa de adherencia (30 días)</span>
             <span className="text-body-md font-medium tabular-nums text-primary">{adherence}%</span>
           </p>

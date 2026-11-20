@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Settings } from 'lucide-react';
 import { LocalSharedSpaceRepository } from '../../infrastructure/repositories/local/LocalSharedSpaceRepository';
 import { LocalMembershipRepository } from '../../infrastructure/repositories/local/LocalMembershipRepository';
 import { SharedSpace } from '../../core/domain/models/types';
-import { Panel, PanelBody } from '@/components/ui/panel';
+import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { Button } from '@/components/ui/button';
 
 interface Props {
@@ -48,15 +49,22 @@ export default function SharedSpaceSettings({ space, onChanged, onLeft }: Props)
   };
 
   return (
-    <Panel aria-label={`Ajustes de ${space.name}`}>
-      <PanelBody className="space-y-4 pt-5">
+    <CollapsibleSection
+      variant="panel"
+      defaultOpen={false}
+      testId="shared-space-settings"
+      icon={<Settings className="size-4" />}
+      title={`Ajustes de ${space.name}`}
+      subtitle="Permisos y membresía"
+    >
+      <div className="space-y-4 pt-2">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-body-md font-medium text-foreground">Modo de permisos</p>
             <p className="text-body-sm text-muted-foreground">
               {space.permission_mode === 'strict'
-                ? 'Cada quien edita/borra solo lo suyo'
-                : 'Cualquiera puede editar/borrar cualquier movimiento'}
+                ? 'Cada quien edita o borra solo lo suyo'
+                : 'Cualquiera puede editar o borrar cualquier movimiento'}
             </p>
           </div>
           <Button size="sm" variant="outline" onClick={handleToggleMode} disabled={isSubmitting}>
@@ -69,7 +77,7 @@ export default function SharedSpaceSettings({ space, onChanged, onLeft }: Props)
         <Button variant="destructive" className="w-full" onClick={handleLeave} disabled={isSubmitting}>
           Abandonar espacio
         </Button>
-      </PanelBody>
-    </Panel>
+      </div>
+    </CollapsibleSection>
   );
 }

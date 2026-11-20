@@ -90,7 +90,7 @@ export default function HabitDashboard({ userId }: Props) {
             aria-pressed={rangeDays === days}
             onClick={() => setRangeDays(days)}
             className={cn(
-              'min-h-11 rounded-lg border px-3 font-mono text-label-mono-sm outline-none transition-colors focus-visible:shadow-focus',
+              'min-h-11 rounded-lg border px-3 text-label-sm outline-none transition-colors focus-visible:shadow-focus',
               rangeDays === days ? 'border-border-strong bg-surface-2 text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
             )}
           >
@@ -111,9 +111,9 @@ export default function HabitDashboard({ userId }: Props) {
           <div key={habit.id} className="space-y-3 rounded-lg bg-surface-2 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-body-lg font-medium text-foreground">{habit.name}</span>
-              <span className="font-mono text-label-mono-sm text-muted-foreground">Racha: {habit.streak}</span>
+              <span className="text-label-sm text-muted-foreground">Racha: {habit.streak}</span>
             </div>
-            <p className="font-mono text-label-mono-xs text-muted-foreground">{habit.completionRate}% de cumplimiento (últimos 30 días)</p>
+            <p className="text-label-xs text-muted-foreground">{habit.completionRate}% de cumplimiento (últimos 30 días)</p>
             {chartData.length === 0 ? (
               <p className="text-body-sm text-muted-foreground">Sin historial suficiente para graficar todavía.</p>
             ) : (

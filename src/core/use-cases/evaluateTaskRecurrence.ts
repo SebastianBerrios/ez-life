@@ -48,9 +48,9 @@ export type NewTaskOccurrence = Omit<Task, 'id' | 'created_at' | 'updated_at'>;
 
 /**
  * Data-generation engine for recurring Task occurrences (research.md §2) —
- * intentionally separate from useRecurrenceEvaluator (Movement-only,
- * monthly) and from the Notification pipeline (Principio XI: generating a
- * Task row is a data change, not a reminder).
+ * intentionally separate from Movement recurrences (which never auto-generate
+ * movements, FR-014) and from the Notification pipeline (Principio XI:
+ * generating a Task row is a data change, not a reminder).
  *
  * For each recurrence series (grouped by `recurrence_series_id`), reads the
  * MOST RECENT occurrence (by due_date) to decide whether the next one is due

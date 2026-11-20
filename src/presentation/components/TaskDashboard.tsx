@@ -67,7 +67,7 @@ export default function TaskDashboard({ userId }: Props) {
   return (
     <div className="space-y-3">
       <div className="space-y-3 rounded-lg bg-surface-2 p-4">
-        <div className="flex flex-wrap justify-between gap-x-4 gap-y-1 font-mono text-label-mono-sm text-muted-foreground">
+        <div className="flex flex-wrap justify-between gap-x-4 gap-y-1 text-label-sm text-muted-foreground">
           <span>A tiempo: {stats.onTime}</span>
           <span>Vencidas: {stats.overdue}</span>
           <span>Por vencer: {stats.pending}</span>
@@ -93,7 +93,7 @@ export default function TaskDashboard({ userId }: Props) {
         {tasks.map(task => (
           <li key={task.id} className="flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-4 py-3">
             <span className="min-w-0 break-words text-body-md font-medium text-foreground">{task.title}</span>
-            <span className="shrink-0 font-mono text-label-mono-xs text-muted-foreground">{task.status === 'done' ? 'Hecha' : 'Pendiente'}</span>
+            <span className="shrink-0 text-label-xs text-muted-foreground">{task.status === 'done' ? 'Hecha' : 'Pendiente'}</span>
           </li>
         ))}
       </ul>
