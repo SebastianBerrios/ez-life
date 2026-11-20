@@ -17,29 +17,41 @@ function accountFromUser(user: SessionUser): LocalAccount {
 }
 
 export type OnboardingStartStep = 1 | 2 | 3 | 4 | 5 | 6;
-export interface AccountState { account: LocalAccount | null; startStep: OnboardingStartStep; completed: boolean }
+export interface AccountState { account: LocalAccount | null; startStep: OnboardingStartStep; completed: boolean; syncError?: boolean }
 /** Async setup has an immediate cleanup boundary; callbacks never await under the auth lock. */
-export function observeAccountSession(syncNow: () => Promise<void>, listener: (state: AccountState) => void): () => void {
+export function observeAccountSession(syncNow: () => Promise<boolean | void>, listener: (state: AccountState) => void): () => void {
   const supabase = getSupabaseBrowserClient();
   let disposed = false;
   let generation = 0;
   const timers = new Set<ReturnType<typeof setTimeout>>();
   async function apply(account: LocalAccount | null, remote: boolean) {
     const version = ++generation;
-    if (!account) { if (!disposed) listener({ account: null, startStep: 1, completed: false }); return; }
+    if (!account) { if (!disposed) listener({ account: null, startStep: 1, completed: false, syncError: false }); return; }
     if (remote) rememberLocalAccount(account);
+    let syncFailed = false;
     if (remote && navigator.onLine) {
       try {
         const { error } = await supabase.rpc('enroll_self');
-        if (error) console.error('enroll_self failed:', error);
-        await syncNow();
-      } catch (error) { console.error('Initial sync failed:', error); }
+        if (error) {
+          console.error('enroll_self failed:', error);
+          syncFailed = true;
+        }
+        const synced = await syncNow();
+        if (synced === false) syncFailed = true;
+      } catch (error) {
+        console.error('Initial sync failed:', error);
+        syncFailed = true;
+      }
     }
     const progress = await new LocalOnboardingRepository().progress(account.id);
     if (disposed || version !== generation || getLocalAccount()?.id !== account.id) return;
+    if (syncFailed && progress === 0) {
+      listener({ account, startStep: 1, completed: false, syncError: true });
+      return;
+    }
     const completed = progress === 6;
     const startStep = (progress >= 6 ? 6 : progress + 1) as OnboardingStartStep;
-    listener({ account, startStep, completed });
+    listener({ account, startStep, completed, syncError: false });
   }
   const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
     if (event === 'TOKEN_REFRESHED') return;

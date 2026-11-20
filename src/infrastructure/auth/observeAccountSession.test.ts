@@ -60,3 +60,23 @@ it('maps progress 6 (including v1 step 3) to completed=true, and progress 5 (v1 
   await waitFor(() => expect(listenerStep2).toHaveBeenCalledWith(expect.objectContaining({ completed: false, startStep: 2 })));
   d3();
 });
+
+it('reports syncError instead of starting onboarding when initial sync fails on a fresh device, while keeping existing local users working', async () => {
+  mock.progress.mockResolvedValueOnce(0);
+  const listenerFreshFail = vi.fn();
+  const d1 = observeAccountSession(async () => false, listenerFreshFail);
+  await waitFor(() => expect(listenerFreshFail).toHaveBeenCalledWith(expect.objectContaining({
+    completed: false,
+    syncError: true,
+  })));
+  d1();
+
+  mock.progress.mockResolvedValueOnce(6);
+  const listenerExistingFail = vi.fn();
+  const d2 = observeAccountSession(async () => false, listenerExistingFail);
+  await waitFor(() => expect(listenerExistingFail).toHaveBeenCalledWith(expect.objectContaining({
+    completed: true,
+    syncError: false,
+  })));
+  d2();
+});

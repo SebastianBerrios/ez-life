@@ -12,8 +12,8 @@ const tables = [
 const pageSize = 500;
 
 export class CustomSyncLayer {
-  private syncPromise: Promise<void> | null = null;
-  sync(): Promise<void> {
+  private syncPromise: Promise<boolean> | null = null;
+  sync(): Promise<boolean> {
     if (!this.syncPromise) this.syncPromise = this.performSync().finally(() => { this.syncPromise = null; });
     return this.syncPromise;
   }
@@ -28,12 +28,12 @@ export class CustomSyncLayer {
           ? await db.installment_loans.get(String(item.data.installment_loan_id)) : undefined;
     return parent?.user_id;
   }
-  private async performSync(): Promise<void> {
-    if (!navigator.onLine) return;
+  private async performSync(): Promise<boolean> {
+    if (!navigator.onLine) return false;
     const supabase = getSupabaseBrowserClient();
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user.id;
-    if (!userId) return;
+    if (!userId) return false;
     const sameSession = async () => (await supabase.auth.getSession()).data.session?.user.id === userId;
     try {
       for (const tableName of tables) {
@@ -43,7 +43,7 @@ export class CustomSyncLayer {
           let query = supabase.from(tableName).select('*').order('id').limit(pageSize);
           if (afterId) query = query.gt('id', afterId);
           const { data, error } = await query;
-          if (!await sameSession()) return;
+          if (!await sameSession()) return false;
           if (error) throw new Error(`Pull ${tableName}: ${error.message}`);
           const page = (data ?? []).map(fromRemoteRecord);
           records.push(...page);
@@ -60,7 +60,7 @@ export class CustomSyncLayer {
       }
       const ordered = [...latest.values()].sort((a, b) => tables.indexOf(a.table_name as typeof tables[number]) - tables.indexOf(b.table_name as typeof tables[number]));
       for (const item of ordered) {
-        if (!await sameSession()) return;
+        if (!await sameSession()) return false;
         // IndexedDB is authoritative even when two writes share a clock tick.
         // Queue ordering alone cannot disambiguate snapshots with equal dates.
         const current = await db.table(item.table_name).get(String(item.data.id));
@@ -73,8 +73,10 @@ export class CustomSyncLayer {
         const ids = pending.filter(previous => previous.table_name === item.table_name && previous.data.id === item.data.id).map(previous => previous.id);
         await db.sync_queue.bulkDelete(ids);
       }
+      return true;
     } catch (error) {
       console.error('Sync failed:', error);
+      return false;
     } finally { emitSyncCompleted(); }
   }
 }

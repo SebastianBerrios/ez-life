@@ -190,3 +190,10 @@ it('maps legacy v1 profiles end-to-end via resolveOnboardingProgress without los
   expect(await repo.progress('v1-2')).toBe(5);
   expect(await repo.progress('v1-3')).toBe(6);
 });
+
+it('does not write a stub profile or queue sync when progress() runs on an empty fresh device', async () => {
+  const repo = new LocalOnboardingRepository();
+  expect(await repo.progress('fresh-user')).toBe(0);
+  expect(await db.profiles.get('fresh-user')).toBeUndefined();
+  expect(await db.sync_queue.count()).toBe(0);
+});

@@ -159,4 +159,9 @@ describe('CustomSyncLayer', () => {
     });
     expect(await db.sync_queue.count()).toBe(0);
   });
+  it('returns true when sync completes and false when a pull fails', async () => {
+    expect(await new CustomSyncLayer().sync()).toBe(true);
+    errors.add('profiles');
+    expect(await new CustomSyncLayer().sync()).toBe(false);
+  });
 });

@@ -25,6 +25,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Panel } from '@/components/ui/panel';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import CommandPalette from './CommandPalette';
 import { isAccountFocus, isControlFocus, isMovementFocus, type FocusTarget, type NavigateOptions } from '../../core/use-cases/paletteCommand';
 import { buildSetupChecklist } from '../../core/use-cases/buildSetupChecklist';
@@ -38,6 +39,7 @@ import { useNotificationEvaluator } from '../hooks/useNotificationEvaluator';
 import { useTaskRecurrenceEvaluator } from '../hooks/useTaskRecurrenceEvaluator';
 import { observeAccountSession } from '../../infrastructure/auth/observeAccountSession';
 import { forgetLocalAccount } from '../../infrastructure/auth/localAccount';
+import { getSupabaseBrowserClient } from '../../infrastructure/supabase/client';
 import { LocalPaymentAccountRepository } from '../../infrastructure/repositories/local/LocalPaymentAccountRepository';
 import { LocalMovementRecurrenceRepository } from '../../infrastructure/repositories/local/LocalMovementRecurrenceRepository';
 import { LocalProfileRepository } from '../../infrastructure/repositories/local/LocalProfileRepository';
@@ -66,7 +68,8 @@ const routeTitles: Record<string, string> = {
 };
 
 export default function MainFlow() {
-  const [step, setStep] = useState<'loading' | 'login' | 'onboarding-wizard' | 'app'>('loading');
+  const [step, setStep] = useState<'loading' | 'login' | 'sync-error' | 'onboarding-wizard' | 'app'>('loading');
+  const [sessionRetryKey, setSessionRetryKey] = useState(0);
   const [wizardStartStep, setWizardStartStep] = useState<WizardStepNumber>(1);
   const [wizardMode, setWizardMode] = useState<'setup' | 'settings'>('setup');
   const [currentRoute, setCurrentRoute] = useState('dashboard');
@@ -135,8 +138,8 @@ export default function MainFlow() {
     setAccountEmail(state.account?.email);
     setWizardStartStep(state.startStep);
     setWizardMode('setup');
-    setStep(!state.account ? 'login' : state.completed ? 'app' : 'onboarding-wizard');
-  }), [syncNow]);
+    setStep(!state.account ? 'login' : state.syncError ? 'sync-error' : state.completed ? 'app' : 'onboarding-wizard');
+  }), [syncNow, sessionRetryKey]);
 
   if (step === 'loading') {
     return (
@@ -153,6 +156,54 @@ export default function MainFlow() {
 
   if (step === 'login') {
     return <LoginScreen />;
+  }
+
+  if (step === 'sync-error') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <Panel className="w-full max-w-sm items-center gap-4 p-6 text-center">
+          <p className="font-fredoka text-headline-md text-foreground">
+            ez<span className="text-primary">·</span>life
+          </p>
+          <div className="space-y-1.5">
+            <h1 className="text-base font-medium text-foreground">No pudimos sincronizar tu cuenta</h1>
+            <p className="text-sm text-muted-foreground">
+              Hubo un problema al cargar tus datos desde el servidor. Reintenta para evitar empezar una configuración desde cero.
+            </p>
+          </div>
+          <div className="flex w-full flex-col gap-2">
+            <Button
+              type="button"
+              onClick={() => {
+                setStep('loading');
+                setSessionRetryKey(k => k + 1);
+              }}
+            >
+              Reintentar
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={async () => {
+                try {
+                  await getSupabaseBrowserClient().auth.signOut();
+                } catch (error) {
+                  console.error(error);
+                }
+                forgetLocalAccount();
+                setProfileId(null);
+                setAvatarUrl(undefined);
+                setAccountName(undefined);
+                setAccountEmail(undefined);
+                setStep('login');
+              }}
+            >
+              Cerrar sesión
+            </Button>
+          </div>
+        </Panel>
+      </div>
+    );
   }
 
   if (step === 'onboarding-wizard') {

@@ -59,7 +59,9 @@ export class LocalOnboardingRepository {
       if (categories.length > 0 && complete.every(count => count > 0)) legacyStep = 3;
     }
     const resolved = resolveOnboardingProgress({ onboarding_step: legacyStep });
-    await new LocalProfileRepository().save({ id: userId, onboarding_step: resolved.step, onboarding_version: 2 });
+    if (resolved.step > 0) {
+      await new LocalProfileRepository().save({ id: userId, onboarding_step: resolved.step, onboarding_version: 2 });
+    }
     return resolved.step;
   }
 
